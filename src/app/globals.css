@@ -1,3 +1,4 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 @import "tailwindcss";
 
 :root {
@@ -8,8 +9,26 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  --font-mono: "SF Mono", SFMono-Regular, Consolas, monospace;
+
+  /* Primary - Team Brand (Warm Brown) */
+  --color-team-50: #F5F0EB;
+  --color-team-100: #EBE1D7;
+  --color-team-200: #DDD2C6;
+  --color-team-300: #C3A587;
+  --color-team-400: #AD9478;
+  --color-team-500: #967B5D;
+  --color-team-600: #7F6850;
+  --color-team-700: #685643;
+
+  /* Condition Spectrum - Red → Orange → Yellow → Green */
+  --color-cond-red: #DC2626;
+  --color-cond-orange: #F97316;
+  --color-cond-yellow: #EAB308;
+  --color-cond-green-light: #86EFAC;
+  --color-cond-green: #22C55E;
+  --color-cond-green-deep: #15803D;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +41,45 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Polaroid animations */
+.polaroid-enter {
+  animation: polaroid-spread 0.4s ease-out both;
+}
+
+@keyframes polaroid-spread {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Toast animation */
+.animate-toast-in {
+  animation: toast-in 0.3s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }

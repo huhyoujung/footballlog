@@ -1,0 +1,161 @@
+// Prisma schema for Football Log
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// NextAuth.js 모델
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// 앱 모델
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(MEMBER)
+  teamId        String?
+  position      String?
+  number        Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 관계
+  team         Team?         @relation(fields: [teamId], references: [id])
+  accounts     Account[]
+  sessions     Session[]
+  trainingLogs TrainingLog[]
+  comments     Comment[]
+  likes             Like[]
+  pushSubscriptions PushSubscription[]
+  nudgesSent        Nudge[]       @relation("NudgeSender")
+  nudgesReceived    Nudge[]       @relation("NudgeRecipient")
+  createdTeam       Team?         @relation("CreatedBy")
+}
+
+model Team {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique @default(cuid())
+  createdAt  DateTime @default(now())
+  createdBy  String   @unique
+
+  // 관계
+  creator User   @relation("CreatedBy", fields: [createdBy], references: [id])
+  members User[]
+  nudges  Nudge[]
+}
+
+model TrainingLog {
+  id              String   @id @default(cuid())
+  userId          String
+  trainingDate    DateTime
+  condition       Int      // 0-10
+  conditionReason String   @db.Text
+  keyPoints       String   @db.Text
+  improvement     String   @db.Text
+  imageUrl        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // 관계
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments Comment[]
+  likes    Like[]
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  content       String   @db.Text
+  userId        String
+  trainingLogId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 관계
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingLog TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
+}
+
+model Like {
+  id            String   @id @default(cuid())
+  userId        String
+  trainingLogId String
+  createdAt     DateTime @default(now())
+
+  // 관계
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingLog TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trainingLogId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+}
+
+model Nudge {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  teamId      String
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("NudgeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("NudgeRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
