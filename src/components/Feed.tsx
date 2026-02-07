@@ -256,7 +256,7 @@ export default function Feed() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
           {teamLogoUrl ? (
-            <img src={teamLogoUrl} alt="팀 로고" className="w-6 h-6 object-contain" />
+            <img src={teamLogoUrl} alt="팀 로고" className="w-8 h-8 object-cover rounded-full" />
           ) : (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="1" width="18" height="22" rx="1" fill="#E8E0D8" stroke="#967B5D" strokeWidth="1" />
