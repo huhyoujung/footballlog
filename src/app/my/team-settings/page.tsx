@@ -135,7 +135,9 @@ export default function TeamSettingsPage() {
       const updated = await res.json();
       setTeam(updated);
       setSuccess("저장되었습니다");
-      setTimeout(() => setSuccess(""), 2000);
+      setTimeout(() => {
+        router.push("/my");
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
