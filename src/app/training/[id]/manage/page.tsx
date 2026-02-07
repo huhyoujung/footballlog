@@ -357,6 +357,13 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </svg>
           </Link>
           <h1 className="text-lg font-semibold text-gray-900 truncate max-w-[200px]">{event?.title || "운동 관리"}</h1>
+          <div className="flex-1" />
+          <Link
+            href={`/training/${eventId}/edit`}
+            className="text-team-500 font-medium text-sm hover:text-team-600 transition-colors"
+          >
+            수정
+          </Link>
         </div>
       </header>
 

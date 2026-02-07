@@ -2,6 +2,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light only;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -31,12 +32,13 @@
   --color-cond-green-deep: #15803D;
 }
 
-@media (prefers-color-scheme: dark) {
+/* 다크모드 비활성화 - 라이트 모드로만 동작 */
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 body {
   background: var(--background);

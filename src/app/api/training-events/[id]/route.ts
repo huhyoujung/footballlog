@@ -95,6 +95,8 @@ export async function PUT(
     const updated = await prisma.trainingEvent.update({
       where: { id },
       data: {
+        ...(body.title && { title: body.title }),
+        ...(body.isRegular !== undefined && { isRegular: body.isRegular }),
         ...(body.date && { date: new Date(body.date) }),
         ...(body.location && { location: body.location }),
         ...(body.uniform !== undefined && { uniform: body.uniform || null }),
