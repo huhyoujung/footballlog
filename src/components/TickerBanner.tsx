@@ -14,7 +14,17 @@ interface Props {
 export default function TickerBanner({ messages }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isInitial, setIsInitial] = useState(true);
 
+  // Initial slide-in animation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitial(false);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Message rotation
   useEffect(() => {
     if (messages.length <= 1) return;
 
@@ -39,9 +49,11 @@ export default function TickerBanner({ messages }: Props) {
         <p
           key={current.key}
           className={`text-xs text-team-700 truncate transition-all duration-500 ease-in-out ${
-            isAnimating
-              ? "-translate-y-full opacity-0"
-              : "translate-y-0 opacity-100"
+            isInitial
+              ? "translate-y-full opacity-0"
+              : isAnimating
+                ? "-translate-y-full opacity-0"
+                : "translate-y-0 opacity-100"
           }`}
         >
           {current.text}

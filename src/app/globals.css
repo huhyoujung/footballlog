@@ -70,72 +70,7 @@ body {
 
 /* Stack card smooth position transition (used by PolaroidStack) */
 .stack-card {
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ============================================
-   Expand: stacks → carousel crossfade
-   ============================================ */
-
-/* Selected stack: cards spread out, stay visible, then fade at the end */
-.stack-expanding {
-  animation: stack-expanding 0.6s ease-out forwards;
-}
-
-@keyframes stack-expanding {
-  0% { opacity: 1; transform: scale(1); }
-  60% { opacity: 1; transform: scale(1.08); }
-  100% { opacity: 0; transform: scale(1.12); }
-}
-
-/* Other stacks fade out quickly */
-.stack-fade-out {
-  animation: stack-fade-out 0.4s ease-out forwards;
-}
-
-@keyframes stack-fade-out {
-  to {
-    opacity: 0;
-    transform: scale(0.92) translateY(8px);
-  }
-}
-
-/* Carousel group fading in (overlaps with stacks exit) */
-.carousel-group-enter {
-  animation: carousel-group-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 0.2s;
-}
-
-@keyframes carousel-group-enter {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================
-   Collapse: carousel → stacks crossfade
-   ============================================ */
-
-/* Carousel group fading out */
-.carousel-group-exit {
-  animation: carousel-group-exit 0.4s ease-out forwards;
-}
-
-@keyframes carousel-group-exit {
-  to {
-    opacity: 0;
-    transform: scale(0.97) translateY(6px);
-  }
-}
-
-/* Stacks group fading in from collapse */
-.stacks-group-enter {
-  animation: stacks-group-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 0.1s;
-}
-
-@keyframes stacks-group-enter {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Invite card */

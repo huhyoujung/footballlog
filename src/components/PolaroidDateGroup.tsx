@@ -23,23 +23,23 @@ export default function PolaroidDateGroup({
   onCollapse,
   onLikeToggle,
 }: Props) {
-  if (isExpanded) {
-    return (
-      <PolaroidCarousel
-        logs={logs}
-        displayDate={displayDate}
-        onCollapse={onCollapse}
-        onLikeToggle={onLikeToggle}
-      />
-    );
-  }
-
   return (
-    <PolaroidStack
-      logs={logs}
-      displayDate={displayDate}
-      onClick={onExpand}
-      isExpanding={isExpanding}
-    />
+    <div className="transition-all duration-300 ease-out">
+      {isExpanded ? (
+        <PolaroidCarousel
+          logs={logs}
+          displayDate={displayDate}
+          onCollapse={onCollapse}
+          onLikeToggle={onLikeToggle}
+        />
+      ) : (
+        <PolaroidStack
+          logs={logs}
+          displayDate={displayDate}
+          onClick={onExpand}
+          isExpanding={isExpanding}
+        />
+      )}
+    </div>
   );
 }

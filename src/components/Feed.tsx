@@ -21,16 +21,12 @@ interface Nudge {
   createdAt: string;
 }
 
-type AnimPhase = "idle" | "expanding" | "collapsing";
-
 export default function Feed() {
   const { data: session } = useSession();
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
-  const [animatingDate, setAnimatingDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [nextEvent, setNextEvent] = useState<TrainingEventSummary | null>(null);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
@@ -82,31 +78,13 @@ export default function Feed() {
     }
   };
 
-  // 펼치기: 스택 퇴장 + 캐러셀 등장 동시 (crossfade overlap)
   const handleExpand = useCallback((date: string) => {
-    if (animPhase !== "idle") return;
-    setAnimatingDate(date);
-    setAnimPhase("expanding");
-    // 600ms 후 스택 퇴장 완료, 캐러셀 정착
-    setTimeout(() => {
-      setExpandedDate(date);
-      setAnimatingDate(null);
-      setAnimPhase("idle");
-    }, 600);
-  }, [animPhase]);
+    setExpandedDate(date);
+  }, []);
 
-  // 접기: 캐러셀 퇴장 + 스택 등장 동시
   const handleCollapse = useCallback(() => {
-    if (animPhase !== "idle") return;
-    setAnimatingDate(expandedDate);
-    setAnimPhase("collapsing");
-    // 500ms 후 캐러셀 퇴장 완료, 스택 정착
-    setTimeout(() => {
-      setExpandedDate(null);
-      setAnimatingDate(null);
-      setAnimPhase("idle");
-    }, 500);
-  }, [animPhase, expandedDate]);
+    setExpandedDate(null);
+  }, []);
 
   const handleLikeToggle = async (logId: string) => {
     // 낙관적 업데이트
@@ -284,23 +262,12 @@ export default function Feed() {
             <line x1="9.5" y1="14.8" x2="5.5" y2="20.8" stroke="#967B5D" strokeWidth="1.2" />
             <line x1="8" y1="10.2" x2="1.5" y2="6.7" stroke="#967B5D" strokeWidth="1.2" />
           </svg>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/write"
-              className="w-8 h-8 bg-team-500 rounded-full flex items-center justify-center hover:bg-team-600 transition-colors"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </Link>
-            <Link href="/my" className="text-team-500 hover:text-team-600 transition-colors">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </Link>
-          </div>
+          <Link href="/my" className="text-team-500 hover:text-team-600 transition-colors">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </Link>
         </div>
       </header>
 
@@ -329,69 +296,32 @@ export default function Feed() {
             </Link>
           </div>
         ) : (
-          <div className="relative">
-            {/* 스택 뷰: 접힌 상태 또는 접히는 중 */}
-            {(!expandedDate || animPhase === "collapsing") && (
-              <div className={`flex flex-col items-center gap-10 px-4 py-8 ${
-                animPhase === "expanding"
-                  ? "absolute inset-x-0 top-0 z-20 pointer-events-none"
-                  : animPhase === "collapsing"
-                    ? "relative z-10 stacks-group-enter"
-                    : "relative"
-              }`}>
-                {groupedLogs.map((group) => {
-                  const isTarget = group.displayDate === animatingDate;
-                  const isOther = animPhase === "expanding" && !isTarget;
-                  return (
-                    <div
-                      key={group.displayDate}
-                      className={
-                        isOther ? "stack-fade-out" :
-                        isTarget && animPhase === "expanding" ? "stack-expanding" : ""
-                      }
-                    >
-                      <PolaroidDateGroup
-                        logs={group.logs}
-                        displayDate={group.displayDate}
-                        isExpanded={false}
-                        isExpanding={isTarget && animPhase === "expanding"}
-                        onExpand={() => handleExpand(group.displayDate)}
-                        onCollapse={handleCollapse}
-                        onLikeToggle={handleLikeToggle}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 캐러셀 뷰: 펼친 상태 또는 펼치는 중 */}
-            {(!!expandedDate || animPhase === "expanding") && (animatingDate || expandedDate) && (
-              <div className={`py-4 ${
-                animPhase === "expanding"
-                  ? "relative z-10 carousel-group-enter"
-                  : animPhase === "collapsing"
-                    ? "absolute inset-x-0 top-0 z-20 pointer-events-none carousel-group-exit"
-                    : "relative"
-              }`}>
-                {groupedLogs.map((group) =>
-                  group.displayDate === (expandedDate || animatingDate) ? (
-                    <PolaroidDateGroup
-                      key={group.displayDate}
-                      logs={group.logs}
-                      displayDate={group.displayDate}
-                      isExpanded={true}
-                      onExpand={() => handleExpand(group.displayDate)}
-                      onCollapse={handleCollapse}
-                      onLikeToggle={handleLikeToggle}
-                    />
-                  ) : null
-                )}
-              </div>
-            )}
+          <div className="flex flex-col items-center gap-10 px-4 py-8">
+            {groupedLogs.map((group) => (
+              <PolaroidDateGroup
+                key={group.displayDate}
+                logs={group.logs}
+                displayDate={group.displayDate}
+                isExpanded={expandedDate === group.displayDate}
+                onExpand={() => handleExpand(group.displayDate)}
+                onCollapse={handleCollapse}
+                onLikeToggle={handleLikeToggle}
+              />
+            ))}
           </div>
         )}
       </main>
+
+      {/* FAB - 일지 쓰기 버튼 */}
+      <Link
+        href="/write"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 transition-colors z-50"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </Link>
 
       {/* 토스트 */}
       <Toast
