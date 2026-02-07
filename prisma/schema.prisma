@@ -88,11 +88,13 @@ model User {
 }
 
 model Team {
-  id         String   @id @default(cuid())
-  name       String
-  inviteCode String   @unique @default(cuid())
-  createdAt  DateTime @default(now())
-  createdBy  String   @unique
+  id           String   @id @default(cuid())
+  name         String
+  inviteCode   String   @unique @default(cuid())
+  logoUrl      String?
+  primaryColor String   @default("#967B5D")
+  createdAt    DateTime @default(now())
+  createdBy    String   @unique
 
   // 관계
   creator        User             @relation("CreatedBy", fields: [createdBy], references: [id])

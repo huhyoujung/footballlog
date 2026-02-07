@@ -79,6 +79,14 @@ export async function PUT(req: Request) {
       data.name = body.name.trim();
     }
 
+    if (body.logoUrl !== undefined) {
+      data.logoUrl = body.logoUrl || null;
+    }
+
+    if (body.primaryColor && typeof body.primaryColor === "string") {
+      data.primaryColor = body.primaryColor;
+    }
+
     if (body.regenerateInviteCode) {
       data.inviteCode = Math.random().toString(36).substring(2, 10);
     }

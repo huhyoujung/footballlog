@@ -26,89 +26,44 @@ export default function TrainingInviteCard({ event }: Props) {
   return (
     <Link
       href={`/training/${event.id}`}
-      className="block px-6 my-4"
+      className="block px-4 my-3"
     >
-      <div className="relative max-w-sm mx-auto invite-card-emerge">
-        {/* 편지지 (봉투에서 위로 삐져나옴) */}
-        <div className="relative z-10 mx-4 -mb-1">
-          <div className="bg-white border-2 border-team-500 rounded-t px-5 pt-5 pb-6">
-            <div className="text-center">
-              {/* INVITATION 레이블 */}
-              <div className="mb-3">
-                <span className="text-team-400 text-[10px] font-semibold tracking-[0.2em] uppercase">
-                  INVITATION
-                </span>
-              </div>
+      <div className="max-w-lg mx-auto bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-5 shadow-lg">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 7 L15.5 10 L14 14.5 L10 14.5 L8.5 10 Z" fill="none" />
+            </svg>
+            <span className="text-white/80 text-xs font-semibold tracking-wider uppercase">팀 운동</span>
+          </div>
+          <span className="px-2.5 py-1 bg-white/20 text-white text-xs font-medium rounded-full">
+            {event._count.rsvps}명 응답
+          </span>
+        </div>
 
-              {/* 타이틀 */}
-              <h3 className="text-base font-bold text-team-700">{event.title}</h3>
+        <h3 className="text-xl font-bold text-white mb-3">{event.title}</h3>
 
-              {/* 정보 */}
-              <div className="mt-2.5 space-y-1">
-                <div className="text-sm text-team-600">{dateStr}</div>
-                <div className="text-sm text-team-500">{event.location}</div>
-              </div>
-
-              {/* 구분선 + 축구공 */}
-              <div className="flex items-center gap-3 my-3">
-                <div className="flex-1 border-t border-team-200" />
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" className="text-team-300" />
-                  <path d="M12 7 L15.5 10 L14 14.5 L10 14.5 L8.5 10 Z" stroke="currentColor" strokeWidth="1" fill="none" className="text-team-300" />
-                </svg>
-                <div className="flex-1 border-t border-team-200" />
-              </div>
-
-              {/* CTA */}
-              <p className="text-sm font-semibold text-team-700">
-                참석 여부를 알려주세요
-              </p>
-              <div className="flex items-center justify-center gap-3 mt-1.5">
-                <span className="text-[11px] text-team-400">마감 {deadlineStr}</span>
-                <span className="text-[11px] text-team-400">{event._count.rsvps}명 응답</span>
-              </div>
-            </div>
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-2 text-white/90">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span className="text-sm">{dateStr}</span>
+          </div>
+          <div className="flex items-center gap-2 text-white/90">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="text-sm">{event.location}</span>
           </div>
         </div>
 
-        {/* 봉투 */}
-        <div className="relative z-20">
-          {/* 열린 봉투 뚜껑 (위로 펼쳐진 삼각형 아웃라인) */}
-          <svg
-            viewBox="0 0 300 55"
-            preserveAspectRatio="none"
-            className="w-full block"
-            style={{ height: 36, marginBottom: -2 }}
-          >
-            <polygon
-              points="5,53 150,5 295,53"
-              fill="white"
-              stroke="var(--color-team-500)"
-              strokeWidth="4"
-              strokeLinejoin="round"
-            />
-          </svg>
-
-          {/* 봉투 몸체 */}
-          <div
-            className="relative border-[2.5px] border-t-0 border-team-500 bg-white overflow-hidden"
-            style={{ height: 52, borderRadius: '0 0 6px 6px' }}
-          >
-            {/* 앞면 V 접힘선 */}
-            <svg
-              viewBox="0 0 300 65"
-              preserveAspectRatio="none"
-              className="absolute inset-0 w-full h-full"
-            >
-              <polyline
-                points="4,0 150,62 296,0"
-                fill="none"
-                stroke="var(--color-team-500)"
-                strokeWidth="3"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+        <div className="pt-3 border-t border-white/20 flex items-center justify-between">
+          <span className="text-white/70 text-xs">마감: {deadlineStr}</span>
+          <span className="text-white font-semibold text-sm">참석 여부 응답하기 →</span>
         </div>
       </div>
     </Link>

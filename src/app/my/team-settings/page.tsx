@@ -1,23 +1,42 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 interface TeamInfo {
   id: string;
   name: string;
   inviteCode: string;
+  logoUrl?: string | null;
+  primaryColor?: string;
 }
+
+const PRESET_COLORS = [
+  "#967B5D", // 기본 갈색
+  "#059669", // 초록
+  "#3B82F6", // 파랑
+  "#EF4444", // 빨강
+  "#F59E0B", // 주황
+  "#8B5CF6", // 보라
+  "#EC4899", // 핑크
+  "#06B6D4", // 청록
+];
 
 export default function TeamSettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [teamName, setTeamName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [primaryColor, setPrimaryColor] = useState("#967B5D");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -37,11 +56,53 @@ export default function TeamSettingsPage() {
         const data = await res.json();
         setTeam(data);
         setTeamName(data.name || "");
+        setLogoUrl(data.logoUrl || null);
+        setPrimaryColor(data.primaryColor || "#967B5D");
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("이미지는 5MB 이하만 가능합니다");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("이미지 파일만 업로드 가능합니다");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: uploadData,
+      });
+
+      if (!uploadRes.ok) {
+        const data = await uploadRes.json();
+        throw new Error(data.error || "이미지 업로드에 실패했습니다");
+      }
+
+      const { url } = await uploadRes.json();
+      setLogoUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이미지 업로드 실패");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -59,7 +120,11 @@ export default function TeamSettingsPage() {
       const res = await fetch("/api/teams", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: teamName.trim() }),
+        body: JSON.stringify({
+          name: teamName.trim(),
+          logoUrl: logoUrl || undefined,
+          primaryColor
+        }),
       });
 
       if (!res.ok) {
@@ -111,11 +176,7 @@ export default function TeamSettingsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
@@ -140,6 +201,66 @@ export default function TeamSettingsPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
+        {/* 팀 로고 */}
+        <div className="bg-white rounded-xl p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            팀 로고
+          </label>
+          <div className="flex flex-col items-center">
+            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden mb-3 flex items-center justify-center">
+              {logoUrl ? (
+                <Image
+                  src={logoUrl}
+                  alt="팀 로고"
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 7 L15.5 10 L14 14.5 L10 14.5 L8.5 10 Z" fill="none" />
+                </svg>
+              )}
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="text-team-500 text-sm font-medium"
+            >
+              {uploading ? "업로드 중..." : "로고 변경"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoSelect}
+              className="hidden"
+            />
+          </div>
+        </div>
+
+        {/* 팀 컬러 */}
+        <div className="bg-white rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            팀 컬러
+          </label>
+          <div className="grid grid-cols-4 gap-3">
+            {PRESET_COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={() => setPrimaryColor(color)}
+                className={`w-full aspect-square rounded-lg transition-all ${
+                  primaryColor === color
+                    ? "ring-2 ring-offset-2 ring-gray-900 scale-110"
+                    : "hover:scale-105"
+                }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </div>
+
         {/* 팀 이름 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">

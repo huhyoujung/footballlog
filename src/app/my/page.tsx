@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Team {
   id: string;
@@ -104,11 +105,7 @@ export default function MyPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

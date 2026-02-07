@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -155,11 +156,7 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

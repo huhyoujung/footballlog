@@ -7,6 +7,7 @@ import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
 import Toast from "./Toast";
+import LoadingSpinner from "./LoadingSpinner";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
 import { timeAgo } from "@/lib/timeAgo";
@@ -261,17 +262,13 @@ export default function Feed() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   const groupedLogs = groupLogsByDate();
 
-  // 미투표 초대장 표시 여부
-  const showInvite = nextEvent && !nextEvent.myRsvp;
+  // 미투표 초대장 표시 여부 (마감 시간 전까지만)
+  const showInvite = nextEvent && !nextEvent.myRsvp && new Date() < new Date(nextEvent.rsvpDeadline);
 
   return (
     <div className="min-h-screen bg-gray-50">
