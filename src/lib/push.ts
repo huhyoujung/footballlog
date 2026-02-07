@@ -3,15 +3,17 @@ import { prisma } from "./prisma";
 
 let vapidConfigured = false;
 
-function ensureVapid() {
-  if (vapidConfigured) return;
+function ensureVapid(): boolean {
+  if (vapidConfigured) return true;
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) {
-    throw new Error("VAPID keys not configured");
+    console.warn("VAPID keys not configured — push notifications disabled");
+    return false;
   }
   webPush.setVapidDetails("mailto:noreply@football-log.app", publicKey, privateKey);
   vapidConfigured = true;
+  return true;
 }
 
 export async function sendPushToTeam(
@@ -19,7 +21,7 @@ export async function sendPushToTeam(
   excludeUserId: string,
   payload: { title: string; body: string; url?: string }
 ) {
-  ensureVapid();
+  if (!ensureVapid()) return [];
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
       user: { teamId },
@@ -55,7 +57,7 @@ export async function sendPushToUsers(
   userIds: string[],
   payload: { title: string; body: string; url?: string }
 ) {
-  ensureVapid();
+  if (!ensureVapid()) return [];
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId: { in: userIds } },
   });

@@ -2,13 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import webPush from "web-push";
-
-webPush.setVapidDetails(
-  "mailto:noreply@football-log.app",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+import { sendPushToUsers } from "@/lib/push";
 
 // 닦달 보내기
 export async function POST(req: Request) {
@@ -65,31 +59,15 @@ export async function POST(req: Request) {
     });
 
     // 대상에게 푸시 알림
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId: recipientId },
-    });
-
-    const payload = JSON.stringify({
-      title: "💪 닦달!",
-      body: `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`,
-      url: "/write",
-    });
-
-    await Promise.allSettled(
-      subscriptions.map(async (sub) => {
-        try {
-          await webPush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload
-          );
-        } catch (err) {
-          const wpErr = err as { statusCode?: number };
-          if (wpErr.statusCode === 410) {
-            await prisma.pushSubscription.delete({ where: { id: sub.id } });
-          }
-        }
-      })
-    );
+    try {
+      await sendPushToUsers([recipientId], {
+        title: "💪 닦달!",
+        body: `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`,
+        url: "/write",
+      });
+    } catch {
+      // 푸시 실패는 무시 (VAPID 미설정 등)
+    }
 
     return NextResponse.json(nudge, { status: 201 });
   } catch (error) {

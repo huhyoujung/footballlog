@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabase() {
+  if (supabase) return supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase configuration missing");
+  }
+  supabase = createClient(url, key);
+  return supabase;
+}
 
 export async function POST(req: Request) {
   try {
@@ -45,7 +53,8 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
-    const { error } = await supabase.storage
+    const sb = getSupabase();
+    const { error } = await sb.storage
       .from("training-images")
       .upload(fileName, buffer, {
         contentType: file.type,
@@ -59,7 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = sb.storage
       .from("training-images")
       .getPublicUrl(fileName);
 
