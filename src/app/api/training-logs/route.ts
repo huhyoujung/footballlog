@@ -20,16 +20,23 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
+    const userId = searchParams.get("userId");
     const skip = (page - 1) * limit;
 
-    // 같은 팀의 운동 일지만 조회
+    // 같은 팀의 운동 일지만 조회 (userId 필터 옵션)
+    const whereClause: any = {
+      user: {
+        teamId: session.user.teamId,
+      },
+    };
+
+    if (userId) {
+      whereClause.userId = userId;
+    }
+
     const [logs, total] = await Promise.all([
       prisma.trainingLog.findMany({
-        where: {
-          user: {
-            teamId: session.user.teamId,
-          },
-        },
+        where: whereClause,
         include: {
           user: {
             select: {
@@ -62,11 +69,7 @@ export async function GET(req: Request) {
         take: limit,
       }),
       prisma.trainingLog.count({
-        where: {
-          user: {
-            teamId: session.user.teamId,
-          },
-        },
+        where: whereClause,
       }),
     ]);
 
