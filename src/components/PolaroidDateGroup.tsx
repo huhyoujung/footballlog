@@ -8,6 +8,7 @@ interface Props {
   logs: TrainingLog[];
   displayDate: string;
   isExpanded: boolean;
+  isExpanding?: boolean;
   onExpand: () => void;
   onCollapse: () => void;
   onLikeToggle: (logId: string) => void;
@@ -17,6 +18,7 @@ export default function PolaroidDateGroup({
   logs,
   displayDate,
   isExpanded,
+  isExpanding,
   onExpand,
   onCollapse,
   onLikeToggle,
@@ -37,6 +39,7 @@ export default function PolaroidDateGroup({
       logs={logs}
       displayDate={displayDate}
       onClick={onExpand}
+      isExpanding={isExpanding}
     />
   );
 }

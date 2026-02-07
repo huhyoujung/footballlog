@@ -76,6 +76,15 @@ model User {
   nudgesSent        Nudge[]       @relation("NudgeSender")
   nudgesReceived    Nudge[]       @relation("NudgeRecipient")
   createdTeam       Team?         @relation("CreatedBy")
+
+  // 정기운동 관계
+  createdTrainingEvents  TrainingEvent[]         @relation("TrainingEventCreator")
+  vestBringerEvents      TrainingEvent[]         @relation("VestBringer")
+  vestReceiverEvents     TrainingEvent[]         @relation("VestReceiver")
+  rsvps                  Rsvp[]
+  checkIns               CheckIn[]
+  lateFees               LateFee[]
+  sessionTeamAssignments SessionTeamAssignment[]
 }
 
 model Team {
@@ -86,9 +95,10 @@ model Team {
   createdBy  String   @unique
 
   // 관계
-  creator User   @relation("CreatedBy", fields: [createdBy], references: [id])
-  members User[]
-  nudges  Nudge[]
+  creator        User             @relation("CreatedBy", fields: [createdBy], references: [id])
+  members        User[]
+  nudges         Nudge[]
+  trainingEvents TrainingEvent[]
 }
 
 model TrainingLog {
@@ -158,4 +168,111 @@ model Nudge {
   sender    User @relation("NudgeSender", fields: [senderId], references: [id], onDelete: Cascade)
   recipient User @relation("NudgeRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
   team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+// === 정기운동 공고 ===
+
+enum RsvpStatus {
+  ATTEND
+  ABSENT
+  LATE
+}
+
+enum LateFeeStatus {
+  PENDING
+  PAID
+}
+
+model TrainingEvent {
+  id             String   @id @default(cuid())
+  teamId         String
+  createdById    String
+  title          String
+  isRegular      Boolean  @default(true)
+  date           DateTime
+  location       String
+  uniform        String?  @db.Text
+  vestBringerId  String?
+  vestReceiverId String?
+  rsvpDeadline   DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation("TrainingEventCreator", fields: [createdById], references: [id])
+  vestBringer  User?             @relation("VestBringer", fields: [vestBringerId], references: [id])
+  vestReceiver User?             @relation("VestReceiver", fields: [vestReceiverId], references: [id])
+  rsvps        Rsvp[]
+  checkIns     CheckIn[]
+  lateFees     LateFee[]
+  sessions     TrainingSession[]
+}
+
+model Rsvp {
+  id              String     @id @default(cuid())
+  trainingEventId String
+  userId          String
+  status          RsvpStatus
+  reason          String?    @db.Text
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingEventId, userId])
+}
+
+model CheckIn {
+  id              String   @id @default(cuid())
+  trainingEventId String
+  userId          String
+  checkedInAt     DateTime @default(now())
+  isLate          Boolean  @default(false)
+
+  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingEventId, userId])
+}
+
+model LateFee {
+  id              String        @id @default(cuid())
+  trainingEventId String
+  userId          String
+  amount          Int
+  status          LateFeeStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingEventId, userId])
+}
+
+model TrainingSession {
+  id              String   @id @default(cuid())
+  trainingEventId String
+  title           String?
+  memo            String?  @db.Text
+  orderIndex      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  trainingEvent   TrainingEvent           @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  teamAssignments SessionTeamAssignment[]
+}
+
+model SessionTeamAssignment {
+  id                String   @id @default(cuid())
+  trainingSessionId String
+  userId            String
+  teamLabel         String
+  createdAt         DateTime @default(now())
+
+  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingSessionId, userId])
 }

@@ -1,0 +1,780 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { getPositionGroup } from "@/lib/position";
+import { assignBalanced, assignGrouped } from "@/lib/random-team";
+
+interface User {
+  id: string;
+  name: string | null;
+  image: string | null;
+  position?: string | null;
+  number?: number | null;
+}
+
+interface RsvpEntry {
+  id: string;
+  userId: string;
+  status: "ATTEND" | "ABSENT" | "LATE";
+  reason: string | null;
+  user: User;
+}
+
+interface CheckInEntry {
+  id: string;
+  userId: string;
+  checkedInAt: string;
+  isLate: boolean;
+  user: User;
+}
+
+interface LateFeeEntry {
+  id: string;
+  userId: string;
+  amount: number;
+  status: "PENDING" | "PAID";
+  user: User;
+}
+
+interface SessionEntry {
+  id: string;
+  title: string | null;
+  memo: string | null;
+  orderIndex: number;
+  teamAssignments: {
+    id: string;
+    userId: string;
+    teamLabel: string;
+    user: User;
+  }[];
+}
+
+interface EventDetail {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  rsvps: RsvpEntry[];
+  checkIns: CheckInEntry[];
+  lateFees: LateFeeEntry[];
+  sessions: SessionEntry[];
+}
+
+type Tab = "attendance" | "latefee" | "session";
+
+// 팀의 포지션 요약 문자열 생성 (예: "GK1 DF2 MF2 FW1")
+function getTeamPositionSummary(
+  userIds: string[],
+  attendees: RsvpEntry[]
+): string {
+  const counts: Record<string, number> = {};
+  for (const uid of userIds) {
+    const user = attendees.find((r) => r.userId === uid)?.user;
+    const group = getPositionGroup(user?.position);
+    counts[group] = (counts[group] || 0) + 1;
+  }
+  const order = ["GK", "DF", "MF", "FW", "??"];
+  return order
+    .filter((g) => counts[g])
+    .map((g) => `${g}${counts[g]}`)
+    .join(" ");
+}
+
+export default function TrainingManagePage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const [eventId, setEventId] = useState<string>("");
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("attendance");
+
+  // 지각비 상태
+  const [showLateFeeForm, setShowLateFeeForm] = useState(false);
+  const [lateFeeUserId, setLateFeeUserId] = useState("");
+  const [lateFeeAmount, setLateFeeAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // 세션 상태
+  const [showSessionForm, setShowSessionForm] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState("");
+  const [sessionMemo, setSessionMemo] = useState("");
+
+  // 팀 배정 상태
+  const [editingSession, setEditingSession] = useState<string | null>(null);
+  const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
+  const [teamLabels, setTeamLabels] = useState<Record<string, string[]>>({});
+  const [draggedUser, setDraggedUser] = useState<{ userId: string; userName: string; fromTeam: string } | null>(null);
+
+  // 랜덤 배정 상태
+  const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
+  const [randomTeamCount, setRandomTeamCount] = useState(2);
+
+  useEffect(() => {
+    params.then((p) => setEventId(p.id));
+  }, [params]);
+
+  useEffect(() => {
+    if (eventId) fetchEvent();
+  }, [eventId]);
+
+  const fetchEvent = async () => {
+    try {
+      const res = await fetch(`/api/training-events/${eventId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEvent(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 지각비 부과
+  const handleAddLateFee = async () => {
+    if (!lateFeeUserId || !lateFeeAmount) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/late-fees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: lateFeeUserId, amount: parseInt(lateFeeAmount) }),
+      });
+      if (res.ok) {
+        setShowLateFeeForm(false);
+        setLateFeeUserId("");
+        setLateFeeAmount("");
+        fetchEvent();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 지각비 납부 확인
+  const handleMarkPaid = async (feeId: string) => {
+    const res = await fetch(`/api/training-events/${eventId}/late-fees/${feeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "PAID" }),
+    });
+    if (res.ok) fetchEvent();
+  };
+
+  // 지각비 삭제
+  const handleDeleteLateFee = async (feeId: string) => {
+    if (!confirm("지각비를 삭제하시겠습니까?")) return;
+    const res = await fetch(`/api/training-events/${eventId}/late-fees/${feeId}`, { method: "DELETE" });
+    if (res.ok) fetchEvent();
+  };
+
+  // 세션 생성
+  const handleCreateSession = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: sessionTitle || null, memo: sessionMemo || null }),
+      });
+      if (res.ok) {
+        setShowSessionForm(false);
+        setSessionTitle("");
+        setSessionMemo("");
+        fetchEvent();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 세션 삭제
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("이 세션을 삭제하시겠습니까?")) return;
+    const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, { method: "DELETE" });
+    if (res.ok) fetchEvent();
+  };
+
+  // 팀 배정 편집 시작
+  const startEditingTeams = useCallback((sess: SessionEntry) => {
+    setEditingSession(sess.id);
+    setShowRandomPanel(null);
+
+    const assignments = sess.teamAssignments.map((a) => ({
+      userId: a.userId,
+      teamLabel: a.teamLabel,
+    }));
+
+    const labels = [...new Set(assignments.map((a) => a.teamLabel))];
+    if (labels.length === 0) labels.push("A", "B");
+
+    setTeamAssignments((prev) => ({ ...prev, [sess.id]: assignments }));
+    setTeamLabels((prev) => ({ ...prev, [sess.id]: labels }));
+  }, []);
+
+  // 랜덤 배정 시작 (편집 모드 진입 + 패널 표시)
+  const startRandomAssignment = useCallback((sess: SessionEntry) => {
+    setEditingSession(sess.id);
+    setShowRandomPanel(sess.id);
+    setRandomTeamCount(2);
+
+    // 기존 배정 초기화
+    setTeamAssignments((prev) => ({ ...prev, [sess.id]: [] }));
+    setTeamLabels((prev) => ({ ...prev, [sess.id]: ["A", "B"] }));
+  }, []);
+
+  // 랜덤 배정 실행
+  const executeRandomAssignment = (sessionId: string, mode: "balanced" | "grouped") => {
+    if (!event) return;
+
+    const attendeesList = event.rsvps
+      .filter((r) => r.status === "ATTEND" || r.status === "LATE")
+      .map((r) => ({ userId: r.userId, position: r.user.position }));
+
+    const assignments = mode === "balanced"
+      ? assignBalanced(attendeesList, randomTeamCount)
+      : assignGrouped(attendeesList, randomTeamCount);
+
+    // 팀 라벨 생성
+    const labels = Array.from({ length: randomTeamCount }, (_, i) => String.fromCharCode(65 + i));
+
+    setTeamAssignments((prev) => ({ ...prev, [sessionId]: assignments }));
+    setTeamLabels((prev) => ({ ...prev, [sessionId]: labels }));
+    setShowRandomPanel(null);
+  };
+
+  // 팀 추가
+  const addTeamLabel = (sessionId: string) => {
+    const current = teamLabels[sessionId] || ["A", "B"];
+    const nextChar = String.fromCharCode(65 + current.length);
+    setTeamLabels((prev) => ({ ...prev, [sessionId]: [...current, nextChar] }));
+  };
+
+  // 유저를 팀으로 이동
+  const moveUserToTeam = (sessionId: string, userId: string, toTeam: string) => {
+    setTeamAssignments((prev) => {
+      const current = prev[sessionId] || [];
+      const filtered = current.filter((a) => a.userId !== userId);
+      if (toTeam === "unassigned") return { ...prev, [sessionId]: filtered };
+      return { ...prev, [sessionId]: [...filtered, { userId, teamLabel: toTeam }] };
+    });
+  };
+
+  // 팀 배정 저장
+  const saveTeamAssignments = async (sessionId: string) => {
+    setSubmitting(true);
+    try {
+      const assignments = teamAssignments[sessionId] || [];
+      const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/teams`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignments }),
+      });
+      if (res.ok) {
+        setEditingSession(null);
+        setShowRandomPanel(null);
+        fetchEvent();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 드래그 핸들러
+  const handleDragStart = (userId: string, userName: string, fromTeam: string) => {
+    setDraggedUser({ userId, userName, fromTeam });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.currentTarget.classList.add("bg-team-100");
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove("bg-team-100");
+  };
+
+  const handleDrop = (e: React.DragEvent, sessionId: string, toTeam: string) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("bg-team-100");
+    if (draggedUser) {
+      moveUserToTeam(sessionId, draggedUser.userId, toTeam);
+      setDraggedUser(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" />
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">공고를 찾을 수 없습니다</p>
+      </div>
+    );
+  }
+
+  const isAdmin = session?.user?.role === "ADMIN";
+  if (!isAdmin) {
+    router.push(`/training/${eventId}`);
+    return null;
+  }
+
+  // 참석 응답자 중 ATTEND/LATE
+  const attendees = event.rsvps.filter((r) => r.status === "ATTEND" || r.status === "LATE");
+  const checkedInIds = new Set(event.checkIns.map((c) => c.userId));
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "attendance", label: "출석" },
+    { key: "latefee", label: "지각비" },
+    { key: "session", label: "세션" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-8">
+      {/* 헤더 */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <Link href={`/training/${eventId}`} className="text-gray-500 hover:text-gray-700">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </Link>
+          <h1 className="text-lg font-semibold text-gray-900 truncate max-w-[200px]">{event?.title || "운동 관리"}</h1>
+        </div>
+      </header>
+
+      {/* 탭 */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-lg mx-auto flex">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 py-3 text-sm font-medium text-center transition-colors ${
+                activeTab === tab.key
+                  ? "text-team-600 border-b-2 border-team-500"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <main className="max-w-lg mx-auto p-4 space-y-4">
+        {/* 출석 탭 */}
+        {activeTab === "attendance" && (
+          <div className="bg-white rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">
+              출석 현황 ({event.checkIns.length}/{attendees.length}명 도착)
+            </h3>
+            <div className="space-y-2">
+              {attendees.map((rsvp) => {
+                const checkIn = event.checkIns.find((c) => c.userId === rsvp.userId);
+                return (
+                  <div key={rsvp.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-2">
+                      {checkIn ? (
+                        checkIn.isLate ? (
+                          <span className="text-red-500 text-sm">🔴</span>
+                        ) : (
+                          <span className="text-green-500 text-sm">✅</span>
+                        )
+                      ) : (
+                        <span className="text-gray-300 text-sm">⬜</span>
+                      )}
+                      <span className="text-sm text-gray-900">{rsvp.user.name || "이름 없음"}</span>
+                      {rsvp.status === "LATE" && (
+                        <span className="text-xs text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">늦참</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {checkIn
+                        ? new Date(checkIn.checkedInAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                        : "미도착"}
+                      {checkIn?.isLate && <span className="text-red-500 ml-1">(지각)</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {attendees.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">참석 응답한 멤버가 없습니다</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 지각비 탭 */}
+        {activeTab === "latefee" && (
+          <>
+            <div className="bg-white rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">지각비 현황</h3>
+              {event.lateFees.length > 0 ? (
+                <div className="space-y-2">
+                  {event.lateFees.map((fee) => (
+                    <div key={fee.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-900">{fee.user.name || "이름 없음"}</span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {fee.amount.toLocaleString()}원
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          fee.status === "PAID" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
+                        }`}>
+                          {fee.status === "PAID" ? "납부" : "미납"}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {fee.status === "PENDING" && (
+                          <button
+                            onClick={() => handleMarkPaid(fee.id)}
+                            className="text-xs text-green-600 hover:text-green-700 px-2 py-1"
+                          >
+                            완료
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteLateFee(fee.id)}
+                          className="text-xs text-red-400 hover:text-red-500 px-2 py-1"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-4">지각비 내역이 없습니다</p>
+              )}
+            </div>
+
+            {/* 지각비 추가 */}
+            {!showLateFeeForm ? (
+              <button
+                onClick={() => setShowLateFeeForm(true)}
+                className="w-full py-3 bg-white rounded-xl text-sm font-medium text-team-600 hover:bg-team-50 transition-colors border border-team-100"
+              >
+                + 지각비 추가
+              </button>
+            ) : (
+              <div className="bg-white rounded-xl p-5 space-y-3">
+                <h4 className="text-sm font-semibold text-gray-900">지각비 부과</h4>
+                <select
+                  value={lateFeeUserId}
+                  onChange={(e) => setLateFeeUserId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                >
+                  <option value="">멤버 선택</option>
+                  {event.checkIns
+                    .filter((c) => c.isLate)
+                    .filter((c) => !event.lateFees.some((f) => f.userId === c.userId))
+                    .map((c) => (
+                      <option key={c.userId} value={c.userId}>
+                        {c.user.name || "이름 없음"} (지각)
+                      </option>
+                    ))}
+                  {attendees
+                    .filter((r) => !checkedInIds.has(r.userId))
+                    .map((r) => (
+                      <option key={r.userId} value={r.userId}>
+                        {r.user.name || "이름 없음"} (미도착)
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  value={lateFeeAmount}
+                  onChange={(e) => setLateFeeAmount(e.target.value)}
+                  placeholder="금액 (원)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowLateFeeForm(false)}
+                    className="flex-1 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleAddLateFee}
+                    disabled={!lateFeeUserId || !lateFeeAmount || submitting}
+                    className="flex-1 py-2 text-sm text-white bg-team-500 rounded-lg disabled:opacity-50"
+                  >
+                    {submitting ? "처리 중..." : "부과하기"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 세션 탭 */}
+        {activeTab === "session" && (
+          <>
+            {event.sessions.map((sess, idx) => (
+              <div key={sess.id} className="bg-white rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    세션 {idx + 1}{sess.title ? `: ${sess.title}` : ""}
+                  </h3>
+                  <div className="flex gap-1">
+                    {editingSession !== sess.id && (
+                      <>
+                        <button
+                          onClick={() => startEditingTeams(sess)}
+                          className="text-xs text-team-600 hover:text-team-700 px-2 py-1"
+                        >
+                          팀 배정
+                        </button>
+                        <button
+                          onClick={() => startRandomAssignment(sess)}
+                          className="text-xs font-semibold text-team-700 bg-team-50 hover:bg-team-100 px-2 py-1 rounded"
+                        >
+                          🔀 랜덤
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteSession(sess.id)}
+                      className="text-xs text-red-400 hover:text-red-500 px-2 py-1"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+                {sess.memo && <p className="text-xs text-gray-500 mb-3">{sess.memo}</p>}
+
+                {/* 팀 배정 편집 모드 */}
+                {editingSession === sess.id ? (
+                  <div className="space-y-3">
+                    {/* 랜덤 배정 패널 */}
+                    {showRandomPanel === sess.id && (
+                      <div className="bg-team-50 rounded-lg p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-team-700">팀 수</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setRandomTeamCount((c) => Math.max(2, c - 1))}
+                              className="w-7 h-7 flex items-center justify-center bg-white border border-team-200 rounded text-team-700 text-sm font-semibold"
+                            >
+                              −
+                            </button>
+                            <span className="text-sm font-bold text-team-700 w-4 text-center">{randomTeamCount}</span>
+                            <button
+                              onClick={() => setRandomTeamCount((c) => Math.min(4, c + 1))}
+                              className="w-7 h-7 flex items-center justify-center bg-white border border-team-200 rounded text-team-700 text-sm font-semibold"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => executeRandomAssignment(sess.id, "balanced")}
+                            className="flex-1 py-2 bg-team-500 text-white text-xs font-semibold rounded-lg"
+                          >
+                            🔀 포지션 골고루
+                          </button>
+                          <button
+                            onClick={() => executeRandomAssignment(sess.id, "grouped")}
+                            className="flex-1 py-2 bg-white text-team-700 text-xs font-semibold rounded-lg border border-team-200"
+                          >
+                            🎯 포지션끼리
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 미배정 풀 */}
+                    <div
+                      className="border border-dashed border-gray-300 rounded-lg p-3 min-h-[48px] transition-colors"
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
+                    >
+                      <div className="text-xs font-medium text-gray-500 mb-2">미배정</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {attendees
+                          .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
+                          .map((r) => (
+                            <span
+                              key={r.userId}
+                              draggable
+                              onDragStart={() => handleDragStart(r.userId, r.user.name || "이름 없음", "unassigned")}
+                              className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded cursor-grab active:cursor-grabbing select-none"
+                            >
+                              {r.user.name || "이름 없음"}
+                              {r.user.position && (
+                                <span className="text-[9px] font-semibold text-gray-400">
+                                  {getPositionGroup(r.user.position)}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* 팀별 드롭 영역 */}
+                    {(teamLabels[sess.id] || ["A", "B"]).map((label) => {
+                      const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
+                      const summary = getTeamPositionSummary(
+                        teamMembers.map((m) => m.userId),
+                        attendees
+                      );
+                      return (
+                        <div
+                          key={label}
+                          className="border border-team-200 rounded-lg p-3 min-h-[48px] transition-colors"
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, sess.id, label)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-team-600">{label}팀</span>
+                            {summary && (
+                              <span className="text-[9px] text-team-400">{summary}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {teamMembers.map((a) => {
+                              const user = attendees.find((r) => r.userId === a.userId)?.user;
+                              return (
+                                <span
+                                  key={a.userId}
+                                  draggable
+                                  onDragStart={() => handleDragStart(a.userId, user?.name || "이름 없음", label)}
+                                  className="inline-flex items-center gap-1 text-xs bg-team-50 text-team-700 px-2 py-1 rounded cursor-grab active:cursor-grabbing select-none"
+                                >
+                                  {user?.name || "이름 없음"}
+                                  {user?.position && (
+                                    <span className="text-[9px] font-semibold text-team-400">
+                                      {getPositionGroup(user.position)}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                            {teamMembers.length === 0 && (
+                              <span className="text-xs text-gray-300">여기에 드래그</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => addTeamLabel(sess.id)}
+                        className="text-xs text-team-600 hover:text-team-700 px-3 py-1.5 border border-team-100 rounded-lg"
+                      >
+                        + 팀 추가
+                      </button>
+                      <div className="flex-1" />
+                      <button
+                        onClick={() => { setEditingSession(null); setShowRandomPanel(null); }}
+                        className="text-xs text-gray-500 px-3 py-1.5 border border-gray-200 rounded-lg"
+                      >
+                        취소
+                      </button>
+                      <button
+                        onClick={() => saveTeamAssignments(sess.id)}
+                        disabled={submitting}
+                        className="text-xs text-white bg-team-500 px-4 py-1.5 rounded-lg disabled:opacity-50"
+                      >
+                        {submitting ? "저장 중..." : "저장"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* 팀 배정 읽기 모드 */
+                  sess.teamAssignments.length > 0 ? (
+                    <div className="space-y-1">
+                      {Object.entries(
+                        sess.teamAssignments.reduce<Record<string, string[]>>((acc, a) => {
+                          if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
+                          acc[a.teamLabel].push(a.user.name || "이름 없음");
+                          return acc;
+                        }, {})
+                      ).map(([label, names]) => (
+                        <div key={label} className="text-xs text-gray-600">
+                          <span className="font-medium text-team-600">{label}팀:</span>{" "}
+                          {names.join(", ")}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">팀 배정 없음</p>
+                  )
+                )}
+              </div>
+            ))}
+
+            {/* 세션 추가 */}
+            {!showSessionForm ? (
+              <button
+                onClick={() => setShowSessionForm(true)}
+                className="w-full py-3 bg-white rounded-xl text-sm font-medium text-team-600 hover:bg-team-50 transition-colors border border-team-100"
+              >
+                + 세션 추가
+              </button>
+            ) : (
+              <div className="bg-white rounded-xl p-5 space-y-3">
+                <h4 className="text-sm font-semibold text-gray-900">새 세션</h4>
+                <input
+                  type="text"
+                  value={sessionTitle}
+                  onChange={(e) => setSessionTitle(e.target.value)}
+                  placeholder="세션 제목 (선택)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                />
+                <textarea
+                  value={sessionMemo}
+                  onChange={(e) => setSessionMemo(e.target.value)}
+                  placeholder="메모 (선택)"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowSessionForm(false); setSessionTitle(""); setSessionMemo(""); }}
+                    className="flex-1 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleCreateSession}
+                    disabled={submitting}
+                    className="flex-1 py-2 text-sm text-white bg-team-500 rounded-lg disabled:opacity-50"
+                  >
+                    {submitting ? "생성 중..." : "생성하기"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {event.sessions.length === 0 && !showSessionForm && (
+              <p className="text-sm text-gray-400 text-center py-4">세션을 추가하여 팀을 분배하세요</p>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}

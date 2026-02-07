@@ -68,6 +68,58 @@ body {
   }
 }
 
+/* Stack expand/collapse transitions */
+.stack-card {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stack-fade-out {
+  animation: stack-fade-out 0.3s ease-out forwards;
+}
+
+@keyframes stack-fade-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.stack-fade-in {
+  animation: stack-fade-in 0.35s ease-out both;
+}
+
+@keyframes stack-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.carousel-exit {
+  animation: carousel-exit 0.3s ease-in forwards;
+}
+
+@keyframes carousel-exit {
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+}
+
+/* Invite card */
+.invite-float {
+  animation: invite-float 3s ease-in-out infinite;
+}
+
+@keyframes invite-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 /* Toast animation */
 .animate-toast-in {
   animation: toast-in 0.3s ease-out;

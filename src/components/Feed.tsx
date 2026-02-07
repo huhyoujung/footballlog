@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
+import TrainingBanner from "./TrainingBanner";
+import TrainingInviteCard from "./TrainingInviteCard";
 import Toast from "./Toast";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
 import { timeAgo } from "@/lib/timeAgo";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
+import type { TrainingEventSummary } from "@/types/training-event";
 
 interface Nudge {
   id: string;
@@ -18,13 +21,18 @@ interface Nudge {
   createdAt: string;
 }
 
+type AnimState = "idle" | "expanding" | "collapsing";
+
 export default function Feed() {
   const { data: session } = useSession();
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [animState, setAnimState] = useState<AnimState>("idle");
+  const [animatingDate, setAnimatingDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
+  const [nextEvent, setNextEvent] = useState<TrainingEventSummary | null>(null);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
 
@@ -41,10 +49,11 @@ export default function Feed() {
 
   const fetchData = async () => {
     try {
-      const [logsRes, teamRes, nudgesRes] = await Promise.all([
+      const [logsRes, teamRes, nudgesRes, eventRes] = await Promise.all([
         fetch("/api/training-logs"),
         fetch("/api/teams"),
         fetch("/api/nudges"),
+        fetch("/api/training-events/next"),
       ]);
 
       if (logsRes.ok) {
@@ -61,12 +70,39 @@ export default function Feed() {
         const data = await nudgesRes.json();
         setNudges(data.nudges || []);
       }
+
+      if (eventRes.ok) {
+        const data = await eventRes.json();
+        setNextEvent(data.event || null);
+      }
     } catch (error) {
       console.error("데이터 로드 실패:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  // 펼치기 애니메이션
+  const handleExpand = useCallback((date: string) => {
+    if (animState !== "idle") return;
+    setAnimatingDate(date);
+    setAnimState("expanding");
+    setTimeout(() => {
+      setExpandedDate(date);
+      setAnimState("idle");
+      setAnimatingDate(null);
+    }, 420);
+  }, [animState]);
+
+  // 접기 애니메이션
+  const handleCollapse = useCallback(() => {
+    if (animState !== "idle") return;
+    setAnimState("collapsing");
+    setTimeout(() => {
+      setExpandedDate(null);
+      setAnimState("idle");
+    }, 350);
+  }, [animState]);
 
   const handleLikeToggle = async (logId: string) => {
     // 낙관적 업데이트
@@ -219,7 +255,9 @@ export default function Feed() {
   }
 
   const groupedLogs = groupLogsByDate();
-  const activeUserIds = todayActiveUserIds();
+
+  // 미투표 초대장 표시 여부
+  const showInvite = nextEvent && !nextEvent.myRsvp;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -258,6 +296,12 @@ export default function Feed() {
       {/* 전광판 */}
       <TickerBanner messages={getTickerMessages()} />
 
+      {/* 미투표 초대장 */}
+      {showInvite && <TrainingInviteCard event={nextEvent!} />}
+
+      {/* 투표 완료 시 일반 배너 */}
+      {nextEvent && nextEvent.myRsvp && <TrainingBanner event={nextEvent} />}
+
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
         {logs.length === 0 ? (
@@ -278,7 +322,7 @@ export default function Feed() {
           </div>
         ) : expandedDate ? (
           // 펼친 상태: 해당 날짜 캐러셀만 표시
-          <div className="py-4">
+          <div className={`py-4 ${animState === "collapsing" ? "carousel-exit" : ""}`}>
             {groupedLogs.map((group) =>
               group.displayDate === expandedDate ? (
                 <PolaroidDateGroup
@@ -286,8 +330,8 @@ export default function Feed() {
                   logs={group.logs}
                   displayDate={group.displayDate}
                   isExpanded={true}
-                  onExpand={() => setExpandedDate(group.displayDate)}
-                  onCollapse={() => setExpandedDate(null)}
+                  onExpand={() => handleExpand(group.displayDate)}
+                  onCollapse={handleCollapse}
                   onLikeToggle={handleLikeToggle}
                 />
               ) : null
@@ -296,17 +340,27 @@ export default function Feed() {
         ) : (
           // 접힌 상태: 폴라로이드 스택들
           <div className="flex flex-col items-center gap-10 px-4 py-8">
-            {groupedLogs.map((group) => (
-              <PolaroidDateGroup
-                key={group.displayDate}
-                logs={group.logs}
-                displayDate={group.displayDate}
-                isExpanded={false}
-                onExpand={() => setExpandedDate(group.displayDate)}
-                onCollapse={() => setExpandedDate(null)}
-                onLikeToggle={handleLikeToggle}
-              />
-            ))}
+            {groupedLogs.map((group) => {
+              const isThis = group.displayDate === animatingDate;
+              const isOther = animState === "expanding" && !isThis;
+
+              return (
+                <div
+                  key={group.displayDate}
+                  className={isOther ? "stack-fade-out" : animState === "idle" && !expandedDate ? "stack-fade-in" : ""}
+                >
+                  <PolaroidDateGroup
+                    logs={group.logs}
+                    displayDate={group.displayDate}
+                    isExpanded={false}
+                    isExpanding={isThis && animState === "expanding"}
+                    onExpand={() => handleExpand(group.displayDate)}
+                    onCollapse={handleCollapse}
+                    onLikeToggle={handleLikeToggle}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
