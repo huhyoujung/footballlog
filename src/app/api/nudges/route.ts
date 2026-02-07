@@ -31,18 +31,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "같은 팀원만 닦달할 수 있어요" }, { status: 400 });
     }
 
-    // 24시간 내 중복 확인
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // 1시간 내 중복 확인
+    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
     const existing = await prisma.nudge.findFirst({
       where: {
         senderId: session.user.id,
         recipientId,
-        createdAt: { gte: oneDayAgo },
+        createdAt: { gte: oneHourAgo },
       },
     });
 
     if (existing) {
-      return NextResponse.json({ error: "오늘은 이미 닦달했어요!" }, { status: 429 });
+      return NextResponse.json({ error: "1시간 뒤에 다시 닦달할 수 있어요!" }, { status: 429 });
     }
 
     // 닦달 생성
@@ -84,12 +84,12 @@ export async function GET() {
       return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
     }
 
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
 
     const nudges = await prisma.nudge.findMany({
       where: {
         teamId: session.user.teamId,
-        createdAt: { gte: twoHoursAgo },
+        createdAt: { gte: oneHourAgo },
       },
       include: {
         sender: { select: { id: true, name: true } },
