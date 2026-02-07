@@ -15,6 +15,8 @@ interface Team {
     name: string | null;
     image: string | null;
     role: string;
+    position: string | null;
+    number: number | null;
   }[];
 }
 
@@ -22,7 +24,6 @@ export default function MyPage() {
   const { data: session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
-  const [changingRole, setChangingRole] = useState<string | null>(null);
   const [nudging, setNudging] = useState<string | null>(null);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
 
@@ -47,34 +48,6 @@ export default function MyPage() {
       console.error("팀 정보 로드 실패:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    setChangingRole(userId);
-    try {
-      const res = await fetch("/api/teams/role", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
-
-      if (res.ok) {
-        setTeam((prev) =>
-          prev
-            ? {
-                ...prev,
-                members: prev.members.map((m) =>
-                  m.id === userId ? { ...m, role: newRole } : m
-                ),
-              }
-            : null
-        );
-      }
-    } catch (error) {
-      console.error("역할 변경 실패:", error);
-    } finally {
-      setChangingRole(null);
     }
   };
 
@@ -190,6 +163,9 @@ export default function MyPage() {
                     <span className="text-sm text-gray-900">
                       {member.name || "익명"}
                     </span>
+                    <span className="text-xs text-gray-400">
+                      {member.position || ""} {member.number ? `#${member.number}` : ""}
+                    </span>
                     {member.id === session?.user?.id && (
                       <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full flex-shrink-0">
                         나
@@ -201,24 +177,6 @@ export default function MyPage() {
                       </span>
                     )}
                   </div>
-                  {isAdmin && member.id !== session?.user?.id && (
-                    <button
-                      onClick={() =>
-                        handleRoleChange(
-                          member.id,
-                          member.role === "ADMIN" ? "MEMBER" : "ADMIN"
-                        )
-                      }
-                      disabled={changingRole === member.id}
-                      className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-50 flex-shrink-0"
-                    >
-                      {changingRole === member.id
-                        ? "..."
-                        : member.role === "ADMIN"
-                          ? "해제"
-                          : "운영진 지정"}
-                    </button>
-                  )}
                   {member.id !== session?.user?.id && (
                     <button
                       onClick={() => handleNudge(member.id)}
@@ -250,17 +208,32 @@ export default function MyPage() {
           </div>
         )}
 
-        {/* 메뉴 */}
-        <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
-          <Link
-            href="/my/settings"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <span className="text-gray-900">내 프로필 수정</span>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-          {isAdmin && (
-            <>
+        {/* 내 정보 */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-400 px-2">내 정보</p>
+          <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
+            <Link
+              href="/my/settings"
+              className="flex items-center justify-between p-4 hover:bg-gray-50"
+            >
+              <span className="text-gray-900">내 프로필 수정</span>
+              <span className="text-gray-400">&rsaquo;</span>
+            </Link>
+            <Link
+              href="/my/logs"
+              className="flex items-center justify-between p-4 hover:bg-gray-50"
+            >
+              <span className="text-gray-900">내 운동 일지</span>
+              <span className="text-gray-400">&rsaquo;</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 팀 관리 (운영진만) */}
+        {isAdmin && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-400 px-2">팀 관리</p>
+            <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
               <Link
                 href="/my/team-settings"
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
@@ -275,16 +248,9 @@ export default function MyPage() {
                 <span className="text-gray-900">팀 운동 관리</span>
                 <span className="text-gray-400">&rsaquo;</span>
               </Link>
-            </>
-          )}
-          <Link
-            href="/my/logs"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <span className="text-gray-900">내 운동 일지</span>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-        </div>
+            </div>
+          </div>
+        )}
       </main>
 
     </div>
