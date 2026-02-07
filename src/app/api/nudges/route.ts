@@ -60,13 +60,16 @@ export async function POST(req: Request) {
 
     // 대상에게 푸시 알림
     try {
-      await sendPushToUsers([recipientId], {
+      console.log(`[NUDGE] Sending push to user ${recipientId}`);
+      const results = await sendPushToUsers([recipientId], {
         title: "💪 닦달!",
         body: `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`,
         url: "/write",
       });
-    } catch {
-      // 푸시 실패는 무시 (VAPID 미설정 등)
+      console.log(`[NUDGE] Push sent, results:`, results);
+    } catch (error) {
+      console.error('[NUDGE] Push notification failed:', error);
+      // 푸시 실패해도 닦달은 생성됨
     }
 
     return NextResponse.json(nudge, { status: 201 });
