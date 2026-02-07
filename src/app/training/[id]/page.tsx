@@ -79,7 +79,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleDelete = async () => {
-    if (!confirm("정말 이 공고를 삭제하시겠습니까?")) return;
+    if (!confirm("정말 이 운동을 삭제하시겠습니까?")) return;
     const res = await fetch(`/api/training-events/${eventId}`, { method: "DELETE" });
     if (res.ok) router.push("/");
   };
@@ -95,7 +95,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   if (!event) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">공고를 찾을 수 없습니다</p>
+        <p className="text-gray-500">운동을 찾을 수 없습니다</p>
       </div>
     );
   }
@@ -134,7 +134,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
               <path d="m15 18-6-6 6-6" />
             </svg>
           </Link>
-          <h1 className="text-lg font-semibold text-gray-900">{event?.title || "운동 공고"}</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{event?.title || "팀 운동"}</h1>
           {isAdmin ? (
             <div className="relative">
               <button onClick={() => setShowMenu(!showMenu)} className="text-gray-500 hover:text-gray-700 p-1">
@@ -160,7 +160,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
-        {/* 공고 정보 */}
+        {/* 운동 정보 */}
         <div className="bg-white rounded-xl p-5 space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-900">

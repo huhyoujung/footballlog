@@ -60,6 +60,45 @@ export async function POST(req: Request) {
   }
 }
 
+// 팀 정보 수정 (ADMIN)
+export async function PUT(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id || !session.user.teamId) {
+      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+    }
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "운영진만 수정할 수 있습니다" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const data: Record<string, unknown> = {};
+
+    if (body.name && typeof body.name === "string" && body.name.trim()) {
+      data.name = body.name.trim();
+    }
+
+    if (body.regenerateInviteCode) {
+      data.inviteCode = Math.random().toString(36).substring(2, 10);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "수정할 항목이 없습니다" }, { status: 400 });
+    }
+
+    const team = await prisma.team.update({
+      where: { id: session.user.teamId },
+      data,
+    });
+
+    return NextResponse.json(team);
+  } catch (error) {
+    console.error("팀 수정 오류:", error);
+    return NextResponse.json({ error: "팀 수정에 실패했습니다" }, { status: 500 });
+  }
+}
+
 // 팀 정보 조회
 export async function GET() {
   try {

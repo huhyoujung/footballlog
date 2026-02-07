@@ -17,33 +17,19 @@ interface Team {
   }[];
 }
 
-interface TrainingEventItem {
-  id: string;
-  title: string;
-  isRegular: boolean;
-  date: string;
-  location: string;
-  _count: { rsvps: number };
-}
-
 export default function MyPage() {
   const { data: session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [nudging, setNudging] = useState<string | null>(null);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
-  const [trainingEvents, setTrainingEvents] = useState<TrainingEventItem[]>([]);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
   useEffect(() => {
     if (session?.user?.teamId) {
       fetchTeam();
-      if (session.user.role === "ADMIN") {
-        fetchTrainingEvents();
-      }
     } else {
       setLoading(false);
     }
@@ -60,30 +46,6 @@ export default function MyPage() {
       console.error("팀 정보 로드 실패:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTrainingEvents = async () => {
-    try {
-      const res = await fetch("/api/training-events");
-      if (res.ok) {
-        const data = await res.json();
-        setTrainingEvents(data.events || []);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleCopyInviteCode = async () => {
-    if (!team) return;
-
-    try {
-      await navigator.clipboard.writeText(team.inviteCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("복사 실패:", error);
     }
   };
 
@@ -302,89 +264,6 @@ export default function MyPage() {
               ))}
             </div>
 
-            {/* 초대 코드 (하단, 운영진만) */}
-            {isAdmin && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-400">초대 코드</p>
-                    <p className="text-sm font-medium tracking-wider mt-0.5">
-                      {team.inviteCode}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleCopyInviteCode}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    {copied ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#967B5D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 정기운동 관리 (운영진) */}
-        {isAdmin && (
-          <div className="bg-white rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">정기운동 관리</h3>
-              <Link
-                href="/training/create"
-                className="flex items-center gap-1 text-xs text-team-600 hover:text-team-700 font-medium"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14" /><path d="M5 12h14" />
-                </svg>
-                새 공고
-              </Link>
-            </div>
-            {trainingEvents.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">예정된 운동이 없습니다</p>
-            ) : (
-              <div className="space-y-2">
-                {trainingEvents.map((ev) => {
-                  const d = new Date(ev.date);
-                  const dateStr = d.toLocaleDateString("ko-KR", {
-                    month: "numeric",
-                    day: "numeric",
-                    weekday: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                  return (
-                    <Link
-                      key={ev.id}
-                      href={`/training/${ev.id}/manage`}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-team-50 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-gray-900 truncate">{ev.title}</span>
-                          {ev.isRegular && (
-                            <span className="px-1.5 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full flex-shrink-0">정기</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">{dateStr} · {ev.location}</div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                        <span className="text-xs text-gray-400">{ev._count.rsvps}명 응답</span>
-                        <span className="text-gray-300">&rsaquo;</span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
 
@@ -394,9 +273,27 @@ export default function MyPage() {
             href="/my/settings"
             className="flex items-center justify-between p-4 hover:bg-gray-50"
           >
-            <span className="text-gray-900">프로필 수정</span>
+            <span className="text-gray-900">내 프로필 수정</span>
             <span className="text-gray-400">&rsaquo;</span>
           </Link>
+          {isAdmin && (
+            <>
+              <Link
+                href="/my/team-settings"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">팀 프로필 수정</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              <Link
+                href="/my/training"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">팀 운동 관리</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+            </>
+          )}
           <Link
             href="/my/logs"
             className="flex items-center justify-between p-4 hover:bg-gray-50"

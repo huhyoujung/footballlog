@@ -14,7 +14,6 @@ export default function PolaroidCarousel({
   logs,
   displayDate,
   onCollapse,
-  onLikeToggle,
 }: Props) {
   return (
     <div>
@@ -39,13 +38,9 @@ export default function PolaroidCarousel({
           <div
             key={log.id}
             className="snap-center flex-shrink-0 polaroid-enter"
-            style={{ animationDelay: `${index * 80}ms` }}
+            style={{ animationDelay: `${index * 70}ms` }}
           >
-            <PolaroidCard
-              log={log}
-              variant="full"
-              onLikeToggle={onLikeToggle}
-            />
+            <PolaroidCard log={log} variant="full" />
           </div>
         ))}
       </div>

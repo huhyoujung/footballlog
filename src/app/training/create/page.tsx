@@ -98,25 +98,25 @@ export default function TrainingCreatePage() {
               <path d="m15 18-6-6 6-6" />
             </svg>
           </Link>
-          <h1 className="text-lg font-semibold text-gray-900">정기운동 공고</h1>
+          <h1 className="text-lg font-semibold text-gray-900">팀 운동</h1>
           <div className="w-6" />
         </div>
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
-        {/* 제목 + 정기운동 여부 */}
+        {/* 제목 + 정기 여부 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="예: 주말 정기운동"
+            placeholder="예: 주말 운동"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
           <div className="flex items-center justify-between mt-4">
             <div>
-              <span className="text-sm font-medium text-gray-700">정기운동</span>
+              <span className="text-sm font-medium text-gray-700">정기 운동</span>
               <p className="text-xs text-gray-400 mt-0.5">출석률 집계에 포함됩니다</p>
             </div>
             <button
@@ -241,7 +241,7 @@ export default function TrainingCreatePage() {
               disabled={loading}
               className="w-full py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
             >
-              {loading ? "생성 중..." : "공고 올리기"}
+              {loading ? "생성 중..." : "운동 올리기"}
             </button>
           </div>
         </div>

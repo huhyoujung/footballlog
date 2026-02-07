@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
-import TrainingBanner from "./TrainingBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
 import Toast from "./Toast";
 import { usePushSubscription } from "@/lib/usePushSubscription";
@@ -21,7 +20,7 @@ interface Nudge {
   createdAt: string;
 }
 
-type AnimState = "idle" | "expanding" | "collapsing";
+type AnimPhase = "idle" | "expanding" | "collapsing";
 
 export default function Feed() {
   const { data: session } = useSession();
@@ -29,7 +28,7 @@ export default function Feed() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [animState, setAnimState] = useState<AnimState>("idle");
+  const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
   const [animatingDate, setAnimatingDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [nextEvent, setNextEvent] = useState<TrainingEventSummary | null>(null);
@@ -82,27 +81,31 @@ export default function Feed() {
     }
   };
 
-  // 펼치기 애니메이션
+  // 펼치기: 스택 퇴장 + 캐러셀 등장 동시 (crossfade overlap)
   const handleExpand = useCallback((date: string) => {
-    if (animState !== "idle") return;
+    if (animPhase !== "idle") return;
     setAnimatingDate(date);
-    setAnimState("expanding");
+    setAnimPhase("expanding");
+    // 600ms 후 스택 퇴장 완료, 캐러셀 정착
     setTimeout(() => {
       setExpandedDate(date);
-      setAnimState("idle");
       setAnimatingDate(null);
-    }, 420);
-  }, [animState]);
+      setAnimPhase("idle");
+    }, 600);
+  }, [animPhase]);
 
-  // 접기 애니메이션
+  // 접기: 캐러셀 퇴장 + 스택 등장 동시
   const handleCollapse = useCallback(() => {
-    if (animState !== "idle") return;
-    setAnimState("collapsing");
+    if (animPhase !== "idle") return;
+    setAnimatingDate(expandedDate);
+    setAnimPhase("collapsing");
+    // 500ms 후 캐러셀 퇴장 완료, 스택 정착
     setTimeout(() => {
       setExpandedDate(null);
-      setAnimState("idle");
-    }, 350);
-  }, [animState]);
+      setAnimatingDate(null);
+      setAnimPhase("idle");
+    }, 500);
+  }, [animPhase, expandedDate]);
 
   const handleLikeToggle = async (logId: string) => {
     // 낙관적 업데이트
@@ -222,6 +225,17 @@ export default function Feed() {
   const getTickerMessages = () => {
     const messages: { key: string; text: string }[] = [];
 
+    // 팀 운동 (최우선)
+    if (nextEvent) {
+      const d = new Date(nextEvent.date);
+      const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
+      const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+      messages.push({
+        key: `event-${nextEvent.id}`,
+        text: `📢 ${nextEvent.title || "팀 운동"} · ${dateStr} ${timeStr} · ${nextEvent.location}`,
+      });
+    }
+
     // 닦달 메시지 (최신순, API에서 이미 2시간 필터링)
     for (const nudge of nudges) {
       const sender = nudge.sender.name || "팀원";
@@ -299,9 +313,6 @@ export default function Feed() {
       {/* 미투표 초대장 */}
       {showInvite && <TrainingInviteCard event={nextEvent!} />}
 
-      {/* 투표 완료 시 일반 배너 */}
-      {nextEvent && nextEvent.myRsvp && <TrainingBanner event={nextEvent} />}
-
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
         {logs.length === 0 ? (
@@ -320,47 +331,67 @@ export default function Feed() {
               첫 기록 남기기
             </Link>
           </div>
-        ) : expandedDate ? (
-          // 펼친 상태: 해당 날짜 캐러셀만 표시
-          <div className={`py-4 ${animState === "collapsing" ? "carousel-exit" : ""}`}>
-            {groupedLogs.map((group) =>
-              group.displayDate === expandedDate ? (
-                <PolaroidDateGroup
-                  key={group.displayDate}
-                  logs={group.logs}
-                  displayDate={group.displayDate}
-                  isExpanded={true}
-                  onExpand={() => handleExpand(group.displayDate)}
-                  onCollapse={handleCollapse}
-                  onLikeToggle={handleLikeToggle}
-                />
-              ) : null
-            )}
-          </div>
         ) : (
-          // 접힌 상태: 폴라로이드 스택들
-          <div className="flex flex-col items-center gap-10 px-4 py-8">
-            {groupedLogs.map((group) => {
-              const isThis = group.displayDate === animatingDate;
-              const isOther = animState === "expanding" && !isThis;
+          <div className="relative">
+            {/* 스택 뷰: 접힌 상태 또는 접히는 중 */}
+            {(!expandedDate || animPhase === "collapsing") && (
+              <div className={`flex flex-col items-center gap-10 px-4 py-8 ${
+                animPhase === "expanding"
+                  ? "absolute inset-x-0 top-0 z-20 pointer-events-none"
+                  : animPhase === "collapsing"
+                    ? "relative z-10 stacks-group-enter"
+                    : "relative"
+              }`}>
+                {groupedLogs.map((group) => {
+                  const isTarget = group.displayDate === animatingDate;
+                  const isOther = animPhase === "expanding" && !isTarget;
+                  return (
+                    <div
+                      key={group.displayDate}
+                      className={
+                        isOther ? "stack-fade-out" :
+                        isTarget && animPhase === "expanding" ? "stack-expanding" : ""
+                      }
+                    >
+                      <PolaroidDateGroup
+                        logs={group.logs}
+                        displayDate={group.displayDate}
+                        isExpanded={false}
+                        isExpanding={isTarget && animPhase === "expanding"}
+                        onExpand={() => handleExpand(group.displayDate)}
+                        onCollapse={handleCollapse}
+                        onLikeToggle={handleLikeToggle}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-              return (
-                <div
-                  key={group.displayDate}
-                  className={isOther ? "stack-fade-out" : animState === "idle" && !expandedDate ? "stack-fade-in" : ""}
-                >
-                  <PolaroidDateGroup
-                    logs={group.logs}
-                    displayDate={group.displayDate}
-                    isExpanded={false}
-                    isExpanding={isThis && animState === "expanding"}
-                    onExpand={() => handleExpand(group.displayDate)}
-                    onCollapse={handleCollapse}
-                    onLikeToggle={handleLikeToggle}
-                  />
-                </div>
-              );
-            })}
+            {/* 캐러셀 뷰: 펼친 상태 또는 펼치는 중 */}
+            {(!!expandedDate || animPhase === "expanding") && (animatingDate || expandedDate) && (
+              <div className={`py-4 ${
+                animPhase === "expanding"
+                  ? "relative z-10 carousel-group-enter"
+                  : animPhase === "collapsing"
+                    ? "absolute inset-x-0 top-0 z-20 pointer-events-none carousel-group-exit"
+                    : "relative"
+              }`}>
+                {groupedLogs.map((group) =>
+                  group.displayDate === (expandedDate || animatingDate) ? (
+                    <PolaroidDateGroup
+                      key={group.displayDate}
+                      logs={group.logs}
+                      displayDate={group.displayDate}
+                      isExpanded={true}
+                      onExpand={() => handleExpand(group.displayDate)}
+                      onCollapse={handleCollapse}
+                      onLikeToggle={handleLikeToggle}
+                    />
+                  ) : null
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>

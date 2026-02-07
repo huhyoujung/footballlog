@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 const userSelect = { id: true, name: true, image: true, position: true, number: true };
 
-// 정기운동 상세 조회
+// 팀 운동 상세 조회
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -32,6 +32,10 @@ export async function GET(
           include: { user: { select: userSelect } },
           orderBy: { checkedInAt: "asc" },
         },
+        lateFees: {
+          include: { user: { select: userSelect } },
+          orderBy: { createdAt: "asc" },
+        },
         sessions: {
           include: {
             teamAssignments: {
@@ -44,7 +48,7 @@ export async function GET(
     });
 
     if (!event) {
-      return NextResponse.json({ error: "공고를 찾을 수 없습니다" }, { status: 404 });
+      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
     if (event.teamId !== session.user.teamId) {
@@ -60,12 +64,12 @@ export async function GET(
       myCheckIn: myCheckIn?.checkedInAt || null,
     });
   } catch (error) {
-    console.error("정기운동 상세 조회 오류:", error);
+    console.error("팀 운동 상세 조회 오류:", error);
     return NextResponse.json({ error: "조회에 실패했습니다" }, { status: 500 });
   }
 }
 
-// 정기운동 수정 (ADMIN)
+// 팀 운동 수정 (ADMIN)
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -83,7 +87,7 @@ export async function PUT(
 
     const event = await prisma.trainingEvent.findUnique({ where: { id } });
     if (!event || event.teamId !== session.user.teamId) {
-      return NextResponse.json({ error: "공고를 찾을 수 없습니다" }, { status: 404 });
+      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
     const body = await req.json();
@@ -102,12 +106,12 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("정기운동 수정 오류:", error);
+    console.error("팀 운동 수정 오류:", error);
     return NextResponse.json({ error: "수정에 실패했습니다" }, { status: 500 });
   }
 }
 
-// 정기운동 삭제 (ADMIN)
+// 팀 운동 삭제 (ADMIN)
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -125,13 +129,13 @@ export async function DELETE(
 
     const event = await prisma.trainingEvent.findUnique({ where: { id } });
     if (!event || event.teamId !== session.user.teamId) {
-      return NextResponse.json({ error: "공고를 찾을 수 없습니다" }, { status: 404 });
+      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
     await prisma.trainingEvent.delete({ where: { id } });
     return NextResponse.json({ message: "삭제되었습니다" });
   } catch (error) {
-    console.error("정기운동 삭제 오류:", error);
+    console.error("팀 운동 삭제 오류:", error);
     return NextResponse.json({ error: "삭제에 실패했습니다" }, { status: 500 });
   }
 }

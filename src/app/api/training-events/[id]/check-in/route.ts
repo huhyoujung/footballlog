@@ -46,7 +46,7 @@ export async function POST(
 
     const event = await prisma.trainingEvent.findUnique({ where: { id } });
     if (!event || event.teamId !== session.user.teamId) {
-      return NextResponse.json({ error: "공고를 찾을 수 없습니다" }, { status: 404 });
+      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
     // RSVP 확인 (ATTEND 또는 LATE만 체크인 가능)

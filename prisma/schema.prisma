@@ -77,7 +77,7 @@ model User {
   nudgesReceived    Nudge[]       @relation("NudgeRecipient")
   createdTeam       Team?         @relation("CreatedBy")
 
-  // 정기운동 관계
+  // 팀 운동 관계
   createdTrainingEvents  TrainingEvent[]         @relation("TrainingEventCreator")
   vestBringerEvents      TrainingEvent[]         @relation("VestBringer")
   vestReceiverEvents     TrainingEvent[]         @relation("VestReceiver")
@@ -170,7 +170,7 @@ model Nudge {
   team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 }
 
-// === 정기운동 공고 ===
+// === 팀 운동 ===
 
 enum RsvpStatus {
   ATTEND

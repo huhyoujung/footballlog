@@ -170,7 +170,7 @@ export default function SettingsPage() {
           <Link href="/my" className="text-gray-500 hover:text-gray-700">
             ← 뒤로
           </Link>
-          <h1 className="text-lg font-semibold text-gray-900">프로필 수정</h1>
+          <h1 className="text-lg font-semibold text-gray-900">내 프로필 수정</h1>
           <button
             onClick={handleSave}
             disabled={saving}

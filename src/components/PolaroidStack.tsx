@@ -52,9 +52,9 @@ export default function PolaroidStack({ logs, displayDate, onClick, isExpanding 
   const visibleLogs = logs.slice(0, 3);
   const configs = useMemo(() => generateStackConfigs(displayDate), [displayDate]);
 
-  // 펼침 시 카드를 가로로 벌리는 위치 계산
+  // 펼침 시 카드를 가로로 벌리는 위치 계산 (캐러셀 위치에 가깝게)
   const getExpandedOffset = (i: number, total: number) => {
-    const spacing = 52;
+    const spacing = 76;
     const center = ((total - 1) * spacing) / 2;
     return i * spacing - center;
   };
@@ -74,10 +74,10 @@ export default function PolaroidStack({ logs, displayDate, onClick, isExpanding 
               key={log.id}
               className="absolute stack-card"
               style={isExpanding ? {
-                top: 20,
+                top: 10,
                 left: '50%',
                 marginLeft: -72 + expandOffset,
-                transform: 'rotate(0deg) scale(1.08)',
+                transform: 'rotate(0deg) scale(1.2)',
                 zIndex: i + 1,
                 opacity: 1,
               } : {

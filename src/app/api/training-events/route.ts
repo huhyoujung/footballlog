@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToTeam } from "@/lib/push";
 
-// 정기운동 목록 조회
+// 팀 운동 목록 조회
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -44,12 +44,12 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ events: result });
   } catch (error) {
-    console.error("정기운동 목록 조회 오류:", error);
+    console.error("팀 운동 목록 조회 오류:", error);
     return NextResponse.json({ error: "조회에 실패했습니다" }, { status: 500 });
   }
 }
 
-// 정기운동 생성 (ADMIN)
+// 팀 운동 생성 (ADMIN)
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -93,8 +93,8 @@ export async function POST(req: Request) {
 
     try {
       await sendPushToTeam(session.user.teamId, session.user.id, {
-        title: "운동 공고",
-        body: `운동 공고가 올라왔어요! ${dateStr}`,
+        title: "팀 운동",
+        body: `새 운동이 올라왔어요! ${dateStr}`,
         url: `/training/${event.id}`,
       });
     } catch {
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(event, { status: 201 });
   } catch (error) {
-    console.error("정기운동 생성 오류:", error);
+    console.error("팀 운동 생성 오류:", error);
     const msg = error instanceof Error ? error.message : "생성에 실패했습니다";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
