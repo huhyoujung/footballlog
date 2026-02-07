@@ -25,6 +25,7 @@ export default function Feed() {
   const { data: session } = useSession();
   const [logs, setLogs] = useState<TrainingLog[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamLogoUrl, setTeamLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
@@ -60,6 +61,7 @@ export default function Feed() {
       if (teamRes.ok) {
         const data = await teamRes.json();
         setTeamMembers(data.members || []);
+        setTeamLogoUrl(data.logoUrl || null);
       }
 
       if (nudgesRes.ok) {
@@ -253,15 +255,14 @@ export default function Feed() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="11" fill="#F5F0EB" stroke="#967B5D" strokeWidth="1.5" />
-            <path d="M12 7 L16 10.2 L14.5 14.8 L9.5 14.8 L8 10.2 Z" fill="#967B5D" />
-            <line x1="12" y1="7" x2="12" y2="1.5" stroke="#967B5D" strokeWidth="1.2" />
-            <line x1="16" y1="10.2" x2="22.5" y2="6.7" stroke="#967B5D" strokeWidth="1.2" />
-            <line x1="14.5" y1="14.8" x2="18.5" y2="20.8" stroke="#967B5D" strokeWidth="1.2" />
-            <line x1="9.5" y1="14.8" x2="5.5" y2="20.8" stroke="#967B5D" strokeWidth="1.2" />
-            <line x1="8" y1="10.2" x2="1.5" y2="6.7" stroke="#967B5D" strokeWidth="1.2" />
-          </svg>
+          {teamLogoUrl ? (
+            <img src={teamLogoUrl} alt="팀 로고" className="w-6 h-6 object-contain" />
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="1" width="18" height="22" rx="1" fill="#E8E0D8" stroke="#967B5D" strokeWidth="1" />
+              <circle cx="12" cy="11" r="4" fill="none" stroke="#967B5D" strokeWidth="1" />
+            </svg>
+          )}
           <Link href="/my" className="text-team-500 hover:text-team-600 transition-colors">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
