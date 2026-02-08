@@ -119,7 +119,7 @@ export default function AdminManagementPage() {
             placeholder="이름, 포지션, 등번호로 검색"
             className="w-full px-4 py-2.5 mb-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2">
             {filteredMembers.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">
                 {searchTerm ? "검색 결과가 없습니다" : "팀원이 없습니다"}
