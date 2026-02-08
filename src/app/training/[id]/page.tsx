@@ -17,6 +17,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showEditRsvp, setShowEditRsvp] = useState(false);
 
   useEffect(() => {
     params.then((p) => setEventId(p.id));
@@ -233,8 +234,8 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* RSVP */}
-        {!isDeadlinePassed && (
+        {/* RSVP - 응답하지 않은 경우에만 표시 */}
+        {!isDeadlinePassed && !event.myRsvp && (
           <div className="bg-white rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">나의 참석 여부</h3>
             <div className="flex gap-2 mb-3">
@@ -260,7 +261,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                 );
               })}
             </div>
-            {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && rsvpStatus !== event.myRsvp && (
+            {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
               <div className="space-y-2">
                 <textarea
                   value={reason}
@@ -286,6 +287,82 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           <h3 className="text-sm font-semibold text-gray-900 mb-3">
             참석 현황 ({event.rsvps.length}명 응답)
           </h3>
+
+          {/* 내 응답 표시 및 수정 */}
+          {event.myRsvp && !isDeadlinePassed && (
+            <div className="mb-4 p-3 bg-team-50 rounded-lg border border-team-100">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-900">내 응답:</span>
+                  <span className={`text-sm font-semibold ${
+                    event.myRsvp === "ATTEND" ? "text-green-600" :
+                    event.myRsvp === "ABSENT" ? "text-red-600" : "text-yellow-600"
+                  }`}>
+                    {event.myRsvp === "ATTEND" ? "✅ 참석" : event.myRsvp === "ABSENT" ? "❌ 불참" : "⏰ 늦참"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowEditRsvp(!showEditRsvp)}
+                  className="text-xs text-team-600 hover:text-team-700 font-medium"
+                >
+                  {showEditRsvp ? "취소" : "수정"}
+                </button>
+              </div>
+
+              {showEditRsvp && (
+                <div className="space-y-2 pt-2 border-t border-team-200">
+                  <div className="flex gap-2">
+                    {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
+                      const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                      const colors = {
+                        ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
+                        ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
+                        LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
+                      };
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            if (s === "ATTEND") {
+                              handleRsvp("ATTEND");
+                              setShowEditRsvp(false);
+                            } else {
+                              setRsvpStatus(s);
+                            }
+                          }}
+                          disabled={submitting}
+                          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${colors[s]}`}
+                        >
+                          {labels[s]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
+                    <div className="space-y-2">
+                      <textarea
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="사유를 입력해주세요"
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+                      />
+                      <button
+                        onClick={() => {
+                          handleRsvp(rsvpStatus);
+                          setShowEditRsvp(false);
+                        }}
+                        disabled={!reason.trim() || submitting}
+                        className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                      >
+                        {submitting ? "전송 중..." : "응답 수정"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {attendees.length > 0 && (
             <div className="mb-3">
@@ -358,8 +435,13 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
             <div className="space-y-3">
               {event.sessions.map((s, idx) => (
                 <div key={s.id} className="border border-gray-100 rounded-lg p-3">
-                  <div className="text-sm font-medium text-gray-900">
-                    세션 {idx + 1}{s.title ? `: ${s.title}` : ""}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                      {idx + 1}
+                    </span>
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      {s.title || `세션 ${idx + 1}`}
+                    </h4>
                   </div>
                   {s.memo && <p className="text-xs text-gray-500 mt-1">{s.memo}</p>}
                   {!s.requiresTeams ? (
@@ -389,15 +471,6 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
-        {/* 관리 버튼 (ADMIN) */}
-        {isAdmin && (
-          <Link
-            href={`/training/${eventId}/manage`}
-            className="block text-center py-3 bg-white rounded-xl text-sm font-medium text-team-600 hover:bg-team-50 transition-colors border border-team-100"
-          >
-            운동 관리하기
-          </Link>
-        )}
       </main>
     </div>
   );

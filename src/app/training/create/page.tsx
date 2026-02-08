@@ -326,7 +326,7 @@ export default function TrainingCreatePage() {
                 <select
                   value={vestBringerId}
                   onChange={(e) => setVestBringerId(e.target.value)}
-                  className="w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
                 >
                   <option value="">선택안함</option>
                   {members.map((m) => (
@@ -339,7 +339,7 @@ export default function TrainingCreatePage() {
                 <select
                   value={vestReceiverId}
                   onChange={(e) => setVestReceiverId(e.target.value)}
-                  className="w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
                 >
                   <option value="">선택안함</option>
                   {members.map((m) => (

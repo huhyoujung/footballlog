@@ -331,12 +331,15 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   };
 
   // 드래그 핸들러
-  const handleDragStart = (userId: string, userName: string, fromTeam: string) => {
+  const handleDragStart = (e: React.DragEvent, userId: string, userName: string, fromTeam: string) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", JSON.stringify({ userId, userName, fromTeam }));
     setDraggedUser({ userId, userName, fromTeam });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     e.currentTarget.classList.add("bg-team-100");
   };
 
@@ -347,10 +350,18 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const handleDrop = (e: React.DragEvent, sessionId: string, toTeam: string) => {
     e.preventDefault();
     e.currentTarget.classList.remove("bg-team-100");
-    if (draggedUser) {
-      moveUserToTeam(sessionId, draggedUser.userId, toTeam);
-      setDraggedUser(null);
+
+    // dataTransfer에서 데이터 가져오기
+    try {
+      const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+      moveUserToTeam(sessionId, data.userId, toTeam);
+    } catch {
+      // fallback to state
+      if (draggedUser) {
+        moveUserToTeam(sessionId, draggedUser.userId, toTeam);
+      }
     }
+    setDraggedUser(null);
   };
 
   if (loading) {
@@ -729,19 +740,36 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           {attendees
                             .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
                             .map((r) => (
-                              <span
+                              <div
                                 key={r.userId}
                                 draggable
-                                onDragStart={() => handleDragStart(r.userId, r.user.name || "이름 없음", "unassigned")}
-                                className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-1.5 rounded-md cursor-grab active:cursor-grabbing select-none"
+                                onDragStart={(e) => handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned")}
+                                className="inline-flex flex-col items-center cursor-grab active:cursor-grabbing select-none"
+                                style={{ width: "60px" }}
                               >
-                                {r.user.name || "이름 없음"}
+                                {/* 선수 아이콘 */}
+                                <svg width="48" height="56" viewBox="0 0 24 28" fill="none" className="text-gray-600">
+                                  {/* 머리 */}
+                                  <circle cx="12" cy="4" r="3" fill="currentColor" />
+                                  {/* 몸통 */}
+                                  <path d="M12 8 L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                  {/* 팔 */}
+                                  <path d="M6 11 L12 10 L18 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                  {/* 다리 */}
+                                  <path d="M12 16 L9 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                  <path d="M12 16 L15 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                                {/* 이름 */}
+                                <span className="text-[9px] font-medium text-gray-700 mt-0.5 text-center leading-tight truncate max-w-full px-0.5">
+                                  {r.user.name || "이름 없음"}
+                                </span>
+                                {/* 포지션 */}
                                 {r.user.position && (
-                                  <span className="text-[9px] font-semibold text-gray-400">
+                                  <span className="text-[7px] font-semibold text-gray-400 uppercase">
                                     {getPositionGroup(r.user.position)}
                                   </span>
                                 )}
-                              </span>
+                              </div>
                             ))}
                         </div>
                       </div>
@@ -772,23 +800,40 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                 <span className="text-[9px] text-team-400 bg-team-50 px-1.5 py-0.5 rounded">{summary}</span>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-2">
                               {teamMembers.map((a) => {
                                 const user = attendees.find((r) => r.userId === a.userId)?.user;
                                 return (
-                                  <span
+                                  <div
                                     key={a.userId}
                                     draggable
-                                    onDragStart={() => handleDragStart(a.userId, user?.name || "이름 없음", label)}
-                                    className="inline-flex items-center gap-1 text-xs bg-white text-team-700 px-2 py-1.5 rounded-md cursor-grab active:cursor-grabbing select-none border border-team-100"
+                                    onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
+                                    className="inline-flex flex-col items-center cursor-grab active:cursor-grabbing select-none"
+                                    style={{ width: "60px" }}
                                   >
-                                    {user?.name || "이름 없음"}
+                                    {/* 선수 아이콘 */}
+                                    <svg width="48" height="56" viewBox="0 0 24 28" fill="none" className="text-team-600">
+                                      {/* 머리 */}
+                                      <circle cx="12" cy="4" r="3" fill="currentColor" />
+                                      {/* 몸통 */}
+                                      <path d="M12 8 L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                      {/* 팔 */}
+                                      <path d="M6 11 L12 10 L18 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                      {/* 다리 */}
+                                      <path d="M12 16 L9 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                      <path d="M12 16 L15 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                    {/* 이름 */}
+                                    <span className="text-[9px] font-medium text-team-700 mt-0.5 text-center leading-tight truncate max-w-full px-0.5">
+                                      {user?.name || "이름 없음"}
+                                    </span>
+                                    {/* 포지션 */}
                                     {user?.position && (
-                                      <span className="text-[9px] font-semibold text-team-400">
+                                      <span className="text-[7px] font-semibold text-team-400 uppercase">
                                         {getPositionGroup(user.position)}
                                       </span>
                                     )}
-                                  </span>
+                                  </div>
                                 );
                               })}
                               {teamMembers.length === 0 && (

@@ -128,122 +128,123 @@ export default function MyPage() {
       </header>
 
       <main className="flex-1 max-w-lg mx-auto p-4 space-y-4">
-        {/* 팀원 목록 + 초대 코드 */}
         {team && (
-          <div className="bg-white rounded-xl p-6">
-            <p className="text-xs text-gray-400 mb-3">
-              우리 팀원 {team.members.length}명
-            </p>
-            <div className="space-y-2">
-              {team.members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center gap-3 py-1.5"
-                >
-                  <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                    {member.image ? (
-                      <Image
-                        src={member.image}
-                        alt={member.name || ""}
-                        width={24}
-                        height={24}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-team-50" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {/* 이름 */}
-                    <span className="text-sm font-medium text-gray-900">
-                      {member.name || "익명"}
-                    </span>
-
-                    {/* 포지션/등번호 */}
-                    {(member.position || member.number) && (
-                      <span className="text-xs text-gray-500">
-                        {member.position || ""}{member.number ? ` #${member.number}` : ""}
-                      </span>
-                    )}
-
-                    {/* 뱃지들 (나, 운영진) */}
-                    <div className="flex items-center gap-1 ml-auto">
-                      {member.id === session?.user?.id && (
-                        <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full">
-                          나
-                        </span>
-                      )}
-                      {member.role === "ADMIN" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-team-600">
-                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
-                        </svg>
+          <>
+            {/* 팀원 목록 */}
+            <div className="bg-white rounded-xl p-6">
+              <p className="text-xs text-gray-400 mb-3">
+                우리 팀원 {team.members.length}명
+              </p>
+              <div className="space-y-2">
+                {team.members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 py-1.5"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                      {member.image ? (
+                        <Image
+                          src={member.image}
+                          alt={member.name || ""}
+                          width={24}
+                          height={24}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-team-50" />
                       )}
                     </div>
-                  </div>
-                  {member.id !== session?.user?.id && (
-                    <button
-                      onClick={() => handleNudge(member.id)}
-                      disabled={
-                        nudging === member.id || nudgedToday.has(member.id)
-                      }
-                      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${
-                        nudgedToday.has(member.id)
-                          ? "bg-gray-100 text-gray-400"
-                          : "bg-team-50 text-team-600 hover:bg-team-100"
-                      } disabled:opacity-50 transition-colors`}
-                    >
-                      {nudging === member.id ? (
-                        "..."
-                      ) : nudgedToday.has(member.id) ? (
-                        "완료"
-                      ) : (
-                        <>
-                          <span className="text-base">👉</span>
-                          닦달
-                        </>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {/* 이름 */}
+                      <span className="text-sm font-medium text-gray-900">
+                        {member.name || "익명"}
+                      </span>
+
+                      {/* 포지션/등번호 */}
+                      {(member.position || member.number) && (
+                        <span className="text-xs text-gray-500">
+                          {member.position || ""}{member.number ? ` #${member.number}` : ""}
+                        </span>
                       )}
-                    </button>
-                  )}
-                </div>
-              ))}
+
+                      {/* 뱃지들 (나, 운영진) */}
+                      <div className="flex items-center gap-1 ml-auto">
+                        {member.id === session?.user?.id && (
+                          <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full">
+                            나
+                          </span>
+                        )}
+                        {member.role === "ADMIN" && (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-team-600">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    {member.id !== session?.user?.id && (
+                      <button
+                        onClick={() => handleNudge(member.id)}
+                        disabled={
+                          nudging === member.id || nudgedToday.has(member.id)
+                        }
+                        className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${
+                          nudgedToday.has(member.id)
+                            ? "bg-gray-100 text-gray-400"
+                            : "bg-team-50 text-team-600 hover:bg-team-100"
+                        } disabled:opacity-50 transition-colors`}
+                      >
+                        {nudging === member.id ? (
+                          "..."
+                        ) : nudgedToday.has(member.id) ? (
+                          "완료"
+                        ) : (
+                          <>
+                            <span className="text-base">👉</span>
+                            닦달
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-          </div>
+            {/* 메뉴 */}
+            <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
+              <Link
+                href="/my/training-events"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">팀 운동</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              <Link
+                href="/my/settings"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">내 프로필 수정</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              <Link
+                href="/my/logs"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">내 운동 일지</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              {isAdmin && (
+                <Link
+                  href="/my/team-settings"
+                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                >
+                  <span className="text-gray-900">팀 프로필 수정</span>
+                  <span className="text-gray-400">&rsaquo;</span>
+                </Link>
+              )}
+            </div>
+          </>
         )}
-
-        {/* 메뉴 */}
-        <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
-          <Link
-            href="/my/training-events"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <span className="text-gray-900">팀 운동</span>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-          <Link
-            href="/my/settings"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <span className="text-gray-900">내 프로필 수정</span>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-          <Link
-            href="/my/logs"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <span className="text-gray-900">내 운동 일지</span>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-          {isAdmin && (
-            <Link
-              href="/my/team-settings"
-              className="flex items-center justify-between p-4 hover:bg-gray-50"
-            >
-              <span className="text-gray-900">팀 프로필 수정</span>
-              <span className="text-gray-400">&rsaquo;</span>
-            </Link>
-          )}
-        </div>
       </main>
 
       {/* 문의하기 */}
