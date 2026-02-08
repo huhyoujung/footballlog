@@ -68,7 +68,10 @@ export default function MyPage() {
   };
 
   const handleNudge = async (recipientId: string) => {
-    setNudging(recipientId);
+    // Optimistic UI: 즉시 완료 상태로 변경
+    setNudgedToday((prev) => new Set(prev).add(recipientId));
+
+    // 백그라운드에서 API 호출
     try {
       const res = await fetch("/api/nudges", {
         method: "POST",
@@ -76,16 +79,25 @@ export default function MyPage() {
         body: JSON.stringify({ recipientId }),
       });
 
-      if (res.ok) {
-        setNudgedToday((prev) => new Set(prev).add(recipientId));
-      } else {
+      if (!res.ok) {
+        // 실패 시 롤백
+        setNudgedToday((prev) => {
+          const next = new Set(prev);
+          next.delete(recipientId);
+          return next;
+        });
         const data = await res.json();
         alert(data.error || "닦달에 실패했습니다");
       }
+      // 성공 시 이미 UI가 업데이트되어 있으므로 추가 작업 불필요
     } catch {
+      // 실패 시 롤백
+      setNudgedToday((prev) => {
+        const next = new Set(prev);
+        next.delete(recipientId);
+        return next;
+      });
       alert("닦달에 실패했습니다");
-    } finally {
-      setNudging(null);
     }
   };
 

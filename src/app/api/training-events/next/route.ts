@@ -34,6 +34,7 @@ export async function GET() {
     return NextResponse.json({
       event: {
         id: event.id,
+        title: event.title,
         date: event.date,
         location: event.location,
         rsvpDeadline: event.rsvpDeadline,
