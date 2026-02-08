@@ -9,6 +9,7 @@ import Link from "next/link";
 import { getPositionGroup } from "@/lib/position";
 import { assignBalanced, assignGrouped } from "@/lib/random-team";
 import AttendanceRateModal from "@/components/AttendanceRateModal";
+import AutoAssignSheet from "@/components/AutoAssignSheet";
 
 interface User {
   id: string;
@@ -402,15 +403,15 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   // 세션 삭제
   const handleDeleteSession = async (sessionId: string) => {
     setDeleteConfirmSession(null);
-    setEditingSessionInfo(null);
+    setEditingSessionId(null);
     const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, { method: "DELETE" });
     if (res.ok) fetchEvent();
   };
 
-  // 팀 배정 편집 시작
-  const startEditingTeams = useCallback((sess: SessionEntry) => {
-    setEditingSession(sess.id);
-    setShowRandomPanel(null);
+  // 세션 편집 시작
+  const startEditing = useCallback((sess: SessionEntry) => {
+    setEditingSessionId(sess.id);
+    setEditTitle(sess.title || "");
 
     const assignments = sess.teamAssignments.map((a) => ({
       userId: a.userId,
@@ -418,48 +419,36 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     }));
 
     const labels = [...new Set(assignments.map((a) => a.teamLabel))];
-    if (labels.length === 0) labels.push("A", "B");
+    const hasTeams = labels.length > 0;
 
+    setEditRequiresTeams(hasTeams);
+    setEditTeamCount(hasTeams ? labels.length : 2);
     setTeamAssignments((prev) => ({ ...prev, [sess.id]: assignments }));
-    setTeamLabels((prev) => ({ ...prev, [sess.id]: labels }));
   }, []);
 
-  // 랜덤 배정 시작 (편집 모드 진입 + 패널 표시)
-  const startRandomAssignment = useCallback((sess: SessionEntry) => {
-    setEditingSession(sess.id);
-    setShowRandomPanel(sess.id);
-    setRandomTeamCount(2);
+  // 편집 취소
+  const cancelEditing = () => {
+    setEditingSessionId(null);
+    setEditTitle("");
+    setEditRequiresTeams(false);
+    setEditTeamCount(2);
+    setShowAutoAssignSheet(false);
+  };
 
-    // 기존 배정 초기화
-    setTeamAssignments((prev) => ({ ...prev, [sess.id]: [] }));
-    setTeamLabels((prev) => ({ ...prev, [sess.id]: ["A", "B"] }));
-  }, []);
-
-  // 랜덤 배정 실행
-  const executeRandomAssignment = (sessionId: string, mode: "balanced" | "grouped") => {
-    if (!event) return;
+  // 자동배정 실행
+  const executeAutoAssignment = (mode: "balanced" | "grouped") => {
+    if (!event || !editingSessionId) return;
 
     const attendeesList = event.rsvps
       .filter((r) => r.status === "ATTEND" || r.status === "LATE")
       .map((r) => ({ userId: r.userId, position: r.user.position }));
 
     const assignments = mode === "balanced"
-      ? assignBalanced(attendeesList, randomTeamCount)
-      : assignGrouped(attendeesList, randomTeamCount);
+      ? assignBalanced(attendeesList, editTeamCount)
+      : assignGrouped(attendeesList, editTeamCount);
 
-    // 팀 라벨 생성
-    const labels = Array.from({ length: randomTeamCount }, (_, i) => String.fromCharCode(65 + i));
-
-    setTeamAssignments((prev) => ({ ...prev, [sessionId]: assignments }));
-    setTeamLabels((prev) => ({ ...prev, [sessionId]: labels }));
-    setShowRandomPanel(null);
-  };
-
-  // 팀 추가
-  const addTeamLabel = (sessionId: string) => {
-    const current = teamLabels[sessionId] || ["A", "B"];
-    const nextChar = String.fromCharCode(65 + current.length);
-    setTeamLabels((prev) => ({ ...prev, [sessionId]: [...current, nextChar] }));
+    setTeamAssignments((prev) => ({ ...prev, [editingSessionId]: assignments }));
+    setShowAutoAssignSheet(false);
   };
 
   // 유저를 팀으로 이동
@@ -472,21 +461,29 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     });
   };
 
-  // 팀 배정 저장
-  const saveTeamAssignments = async (sessionId: string) => {
+  // 세션 저장 (제목 + 팀 배정)
+  const saveSession = async (sessionId: string) => {
     setSubmitting(true);
     try {
-      const assignments = teamAssignments[sessionId] || [];
-      const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/teams`, {
+      // 제목 저장
+      await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignments }),
+        body: JSON.stringify({ title: editTitle }),
       });
-      if (res.ok) {
-        setEditingSession(null);
-        setShowRandomPanel(null);
-        fetchEvent();
+
+      // 팀 배정 저장 (팀 나누기가 활성화된 경우에만)
+      if (editRequiresTeams) {
+        const assignments = teamAssignments[sessionId] || [];
+        await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/teams`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignments }),
+        });
       }
+
+      cancelEditing();
+      fetchEvent();
     } catch {
       // ignore
     } finally {
@@ -944,203 +941,82 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                 className={`bg-white rounded-xl overflow-hidden transition-opacity ${draggedSessionId === sess.id ? 'opacity-50' : ''} ${dragOverSessionIndex === idx ? 'ring-2 ring-team-300' : ''}`}
                 data-session-card="true"
                 data-session-index={idx}
-                draggable={editingSessionInfo !== sess.id && editingSession !== sess.id}
+                draggable={editingSessionId !== sess.id}
                 onDragStart={(e) => handleSessionDragStart(e, sess.id)}
                 onDragOver={(e) => handleSessionDragOver(e, idx)}
                 onDragEnd={handleSessionDragEnd}
-                onTouchStart={() => editingSessionInfo !== sess.id && editingSession !== sess.id && handleSessionTouchStart(sess.id)}
+                onTouchStart={() => editingSessionId !== sess.id && handleSessionTouchStart(sess.id)}
                 onTouchMove={handleSessionTouchMove}
                 onTouchEnd={handleSessionTouchEnd}
               >
-                {/* 세션 헤더 */}
-                <div className="px-5 pt-4 pb-3 border-b border-gray-100">
-                  {editingSessionInfo === sess.id ? (
-                    /* 편집 모드 */
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
-                          {idx + 1}
-                        </span>
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          placeholder={`세션 ${idx + 1}`}
-                          className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-team-300"
-                        />
-                      </div>
-                      <textarea
-                        value={editMemo}
-                        onChange={(e) => setEditMemo(e.target.value)}
-                        placeholder="메모 (선택)"
-                        rows={2}
-                        className="w-full ml-8 px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:border-team-300"
+                {editingSessionId === sess.id ? (
+                  /* 편집 모드 */
+                  <div className="p-5 space-y-4">
+                    {/* 세션명 */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        세션명
+                      </label>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder={`세션 ${idx + 1}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
                       />
-                      <div className="flex items-center justify-between ml-8 mt-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">팀 분배 필요</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setEditRequiresTeams(!editRequiresTeams)}
-                          className={`relative w-9 h-5 rounded-full transition-colors ${editRequiresTeams ? "bg-team-500" : "bg-gray-300"}`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editRequiresTeams ? "translate-x-4" : ""}`}
-                          />
-                        </button>
-                      </div>
-                      <div className="flex gap-2 justify-between mt-2">
-                        <button
-                          onClick={() => setDeleteConfirmSession(sess.id)}
-                          className="text-xs text-red-500 px-3 py-1 border border-red-200 rounded hover:bg-red-50 transition-colors"
-                        >
-                          삭제
-                        </button>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setEditingSessionInfo(null)}
-                            className="text-xs text-gray-500 px-3 py-1 border border-gray-200 rounded"
-                          >
-                            취소
-                          </button>
-                          <button
-                            onClick={() => handleUpdateSession(sess.id)}
-                            disabled={submitting}
-                            className="text-xs text-white bg-team-500 px-3 py-1 rounded disabled:opacity-50"
-                          >
-                            {submitting ? "저장 중..." : "저장"}
-                          </button>
-                        </div>
-                      </div>
                     </div>
-                  ) : (
-                    /* 읽기 모드 */
-                    <>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {/* 드래그 핸들 */}
-                          <div className="cursor-move touch-none p-1 text-gray-300 hover:text-gray-500">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <circle cx="9" cy="5" r="1.5" />
-                              <circle cx="9" cy="12" r="1.5" />
-                              <circle cx="9" cy="19" r="1.5" />
-                              <circle cx="15" cy="5" r="1.5" />
-                              <circle cx="15" cy="12" r="1.5" />
-                              <circle cx="15" cy="19" r="1.5" />
-                            </svg>
-                          </div>
-                          <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <h3 className="text-sm font-semibold text-gray-900">
-                            {sess.title || `세션 ${idx + 1}`}
-                          </h3>
-                        </div>
-                        <div className="flex gap-1.5">
-                          {/* 편집 버튼 */}
-                          <button
-                            onClick={() => {
-                              setEditingSessionInfo(sess.id);
-                              setEditTitle(sess.title || "");
-                              setEditMemo(sess.memo || "");
-                              setEditRequiresTeams(sess.requiresTeams);
-                            }}
-                            className="text-xs text-team-600 hover:text-team-700 px-2 py-1 border border-team-200 rounded transition-colors"
-                          >
-                            편집
-                          </button>
-                        </div>
-                      </div>
-                      {sess.memo && <p className="text-xs text-gray-500 mt-1.5 ml-8">{sess.memo}</p>}
-                    </>
-                  )}
-                </div>
 
-                <div className="p-5">
-                  {!sess.requiresTeams ? (
-                    /* 팀 분배 불필요 */
-                    <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
-                      <span>👥</span>
-                      <span>전체 함께 진행</span>
+                    {/* 팀 나누기 토글 */}
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                      <span className="text-sm font-medium text-gray-700">팀 나누기</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditRequiresTeams(!editRequiresTeams)}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${editRequiresTeams ? "bg-team-500" : "bg-gray-300"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editRequiresTeams ? "translate-x-5" : ""}`}
+                        />
+                      </button>
                     </div>
-                  ) : editingSessionInfo === sess.id ? (
-                    /* 세션 정보 편집 중 - 팀 배정 버튼 표시 */
-                    <div className="space-y-2 py-4">
-                      <p className="text-xs text-gray-400 text-center mb-3">
-                        팀을 분배하려면 아래 버튼을 사용하세요
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => { setEditingSessionInfo(null); startEditingTeams(sess); }}
-                          className="flex-1 py-2.5 text-xs font-medium text-team-600 bg-white border border-team-200 rounded-lg hover:bg-team-50 transition-colors"
-                        >
-                          팀 배정
-                        </button>
-                        <button
-                          onClick={() => { setEditingSessionInfo(null); startRandomAssignment(sess); }}
-                          className="flex-1 py-2.5 text-xs font-semibold text-white bg-team-500 rounded-lg hover:bg-team-600 transition-colors"
-                        >
-                          🔀 랜덤 배정
-                        </button>
-                      </div>
-                    </div>
-                  ) : editingSession === sess.id ? (
-                    <div className="space-y-3">
-                      {/* 랜덤 배정 패널 */}
-                      {showRandomPanel === sess.id && (
-                        <div className="bg-team-50 rounded-lg p-3 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-team-700">팀 수</span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setRandomTeamCount((c) => Math.max(2, c - 1))}
-                                className="w-7 h-7 flex items-center justify-center bg-white border border-team-200 rounded text-team-700 text-sm font-semibold"
-                              >
-                                −
-                              </button>
-                              <span className="text-sm font-bold text-team-700 w-4 text-center">{randomTeamCount}</span>
-                              <button
-                                onClick={() => setRandomTeamCount((c) => Math.min(4, c + 1))}
-                                className="w-7 h-7 flex items-center justify-center bg-white border border-team-200 rounded text-team-700 text-sm font-semibold"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
+
+                    {editRequiresTeams && (
+                      <>
+                        {/* 팀 수 선택 */}
+                        <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                          <span className="text-sm font-medium text-gray-700">팀 수</span>
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => executeRandomAssignment(sess.id, "balanced")}
-                              className="flex-1 py-2 bg-team-500 text-white text-xs font-semibold rounded-lg"
+                              onClick={() => setEditTeamCount((c) => Math.max(2, c - 1))}
+                              className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold"
                             >
-                              🔀 포지션 골고루
+                              −
                             </button>
+                            <span className="text-sm font-bold text-gray-900 w-6 text-center">{editTeamCount}</span>
                             <button
-                              onClick={() => executeRandomAssignment(sess.id, "grouped")}
-                              className="flex-1 py-2 bg-white text-team-700 text-xs font-semibold rounded-lg border border-team-200"
+                              onClick={() => setEditTeamCount((c) => Math.min(4, c + 1))}
+                              className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold"
                             >
-                              🎯 포지션끼리
+                              +
                             </button>
                           </div>
                         </div>
-                      )}
 
-                      {/* 팀별 드롭 영역 및 미배정 풀 (동적 순서) */}
-                      {(() => {
-                        const labels = teamLabels[sess.id] || ["A", "B"];
-                        const currentUnassignedPos = unassignedPosition[sess.id] ?? 0; // 기본값: 맨 위
-                        const sections: React.ReactElement[] = [];
-
-                        // 미배정 섹션 생성
-                        const unassignedSection = (
+                        {/* 미배정 인원 */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-medium text-gray-700">
+                              미배정 인원
+                            </label>
+                            <button
+                              onClick={() => setShowAutoAssignSheet(true)}
+                              className="text-xs text-team-600 font-medium hover:text-team-700 underline"
+                            >
+                              자동배정
+                            </button>
+                          </div>
                           <div
-                            key="unassigned"
-                            draggable
-                            onDragStart={(e) => handleUnassignedDragStart(e, sess.id)}
-                            onTouchStart={(e) => { e.stopPropagation(); handleUnassignedTouchStart(sess.id); }}
-                            onTouchMove={handleUnassignedTouchMove}
-                            onTouchEnd={handleUnassignedTouchEnd}
-                            className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[48px] transition-colors cursor-grab active:cursor-grabbing touch-none"
+                            className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[60px]"
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
@@ -1148,7 +1024,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                             data-session-id={sess.id}
                             data-team-label="unassigned"
                           >
-                            <div className="text-xs font-medium text-gray-400 mb-2">미배정</div>
                             <div className="flex flex-wrap gap-2">
                               {attendees
                                 .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
@@ -1170,198 +1045,153 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                 ))}
                             </div>
                           </div>
-                        );
-
-                        // 각 팀 드롭 영역 생성 및 미배정 삽입
-                        labels.forEach((label, idx) => {
-                          // 드롭존 추가 (미배정 섹션을 이 위치에 드롭 가능)
-                          if (idx === currentUnassignedPos) {
-                            sections.push(unassignedSection);
-                          }
-                          sections.push(
-                            <div
-                              key={`dropzone-before-${label}`}
-                              className={`h-2 border-2 border-dashed rounded transition-colors ${
-                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${idx}`
-                                  ? 'border-team-500'
-                                  : 'border-transparent'
-                              }`}
-                              onDragOver={handleDropZoneDragOver}
-                              onDragLeave={handleDropZoneDragLeave}
-                              onDrop={(e) => handleDropZoneDrop(e, sess.id, idx)}
-                              data-unassigned-drop-zone="true"
-                              data-session-id={sess.id}
-                              data-position={idx}
-                            />
-                          );
-
-                          const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
-                          const summary = getTeamPositionSummary(
-                            teamMembers.map((m) => m.userId),
-                            attendees
-                          );
-                          sections.push(
-                            <div
-                              key={label}
-                              className={`border border-team-200 rounded-lg p-3 min-h-[48px] transition-colors ${
-                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === label
-                                  ? 'bg-team-100'
-                                  : 'bg-team-50/30'
-                              }`}
-                              onDragOver={handleDragOver}
-                              onDragLeave={handleDragLeave}
-                              onDrop={(e) => handleDrop(e, sess.id, label)}
-                              data-drop-target="true"
-                              data-session-id={sess.id}
-                              data-team-label={label}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center">
-                                    {label}
-                                  </span>
-                                  <span className="text-xs font-semibold text-team-700">{teamMembers.length}명</span>
-                                </div>
-                                {summary && (
-                                  <span className="text-[9px] text-team-400 bg-team-50 px-1.5 py-0.5 rounded">{summary}</span>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {teamMembers.map((a) => {
-                                  const user = attendees.find((r) => r.userId === a.userId)?.user;
-                                  return (
-                                    <span
-                                      key={a.userId}
-                                      draggable
-                                      onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
-                                      onTouchStart={() => handleUserTouchStart(a.userId, user?.name || "이름 없음", label, sess.id)}
-                                      onTouchMove={handleUserTouchMove}
-                                      onTouchEnd={handleUserTouchEnd}
-                                      className={`px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors touch-none ${
-                                        touchDragUser?.userId === a.userId ? 'opacity-50' : ''
-                                      }`}
-                                    >
-                                      {user?.name || "이름 없음"}
-                                      {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
-                                    </span>
-                                  );
-                                })}
-                                {teamMembers.length === 0 && (
-                                  <span className="text-xs text-gray-300 py-1">여기에 드래그</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        });
-
-                        // 미배정이 마지막에 위치하는 경우
-                        if (currentUnassignedPos >= labels.length) {
-                          sections.push(
-                            <div
-                              key="dropzone-end"
-                              className={`h-2 border-2 border-dashed rounded transition-colors ${
-                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${labels.length}`
-                                  ? 'border-team-500'
-                                  : 'border-transparent'
-                              }`}
-                              onDragOver={handleDropZoneDragOver}
-                              onDragLeave={handleDropZoneDragLeave}
-                              onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
-                              data-unassigned-drop-zone="true"
-                              data-session-id={sess.id}
-                              data-position={labels.length}
-                            />
-                          );
-                          sections.push(unassignedSection);
-                        } else {
-                          // 마지막 드롭존 추가
-                          sections.push(
-                            <div
-                              key="dropzone-end"
-                              className={`h-2 border-2 border-dashed rounded transition-colors ${
-                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${labels.length}`
-                                  ? 'border-team-500'
-                                  : 'border-transparent'
-                              }`}
-                              onDragOver={handleDropZoneDragOver}
-                              onDragLeave={handleDropZoneDragLeave}
-                              onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
-                              data-unassigned-drop-zone="true"
-                              data-session-id={sess.id}
-                              data-position={labels.length}
-                            />
-                          );
-                        }
-
-                        return sections;
-                      })()}
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={() => addTeamLabel(sess.id)}
-                          className="text-xs text-team-600 hover:text-team-700 px-3 py-1.5 border border-team-100 rounded-lg"
-                        >
-                          + 팀 추가
-                        </button>
-                        <div className="flex-1" />
-                        <button
-                          onClick={() => { setEditingSession(null); setShowRandomPanel(null); }}
-                          className="text-xs text-gray-500 px-3 py-1.5 border border-gray-200 rounded-lg"
-                        >
-                          취소
-                        </button>
-                        <button
-                          onClick={() => saveTeamAssignments(sess.id)}
-                          disabled={submitting}
-                          className="text-xs text-white bg-team-500 px-4 py-1.5 rounded-lg disabled:opacity-50"
-                        >
-                          {submitting ? "저장 중..." : "저장"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* 팀 배정 읽기 모드 */
-                    <div>
-                      {sess.teamAssignments.length > 0 ? (
-                        <div className="space-y-2.5">
-                          {Object.entries(
-                            sess.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
-                              if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
-                              acc[a.teamLabel].push({
-                                name: a.user.name || "이름 없음",
-                                position: a.user.position || null,
-                              });
-                              return acc;
-                            }, {})
-                          ).map(([label, members]) => (
-                            <div key={label} className="bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center gap-1.5 mb-1.5">
-                                <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center">
-                                  {label}
-                                </span>
-                                <span className="text-xs font-semibold text-gray-700">{members.length}명</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {members.map((m, i) => (
-                                  <span key={i} className="inline-flex items-center gap-0.5 text-xs text-gray-600">
-                                    {m.name}
-                                    {m.position && <span className="text-[9px] text-gray-400">{getPositionGroup(m.position)}</span>}
-                                    {i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
                         </div>
-                      ) : (
-                        <p className="text-xs text-gray-400 text-center py-2">팀이 아직 배정되지 않았어요</p>
-                      )}
+
+                        {/* 팀 드롭존 */}
+                        <div className="space-y-2">
+                          {Array.from({ length: editTeamCount }, (_, i) => {
+                            const label = String.fromCharCode(65 + i);
+                            const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
+                            return (
+                              <div key={label}>
+                                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                  {label}팀 ({teamMembers.length}명)
+                                </label>
+                                <div
+                                  className={`border border-team-200 rounded-lg p-3 min-h-[60px] transition-colors ${
+                                    dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === label
+                                      ? 'bg-team-100'
+                                      : 'bg-team-50/30'
+                                  }`}
+                                  onDragOver={handleDragOver}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={(e) => handleDrop(e, sess.id, label)}
+                                  data-drop-target="true"
+                                  data-session-id={sess.id}
+                                  data-team-label={label}
+                                >
+                                  <div className="flex flex-wrap gap-2">
+                                    {teamMembers.map((a) => {
+                                      const user = attendees.find((r) => r.userId === a.userId);
+                                      if (!user) return null;
+                                      return (
+                                        <span
+                                          key={a.userId}
+                                          draggable
+                                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, a.userId, user.user.name || "이름 없음", label); }}
+                                          onTouchStart={(e) => { e.stopPropagation(); handleUserTouchStart(a.userId, user.user.name || "이름 없음", label, sess.id); }}
+                                          onTouchMove={handleUserTouchMove}
+                                          onTouchEnd={handleUserTouchEnd}
+                                          className={`px-2.5 py-1.5 bg-white border border-team-200 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-50 transition-colors touch-none ${
+                                            touchDragUser?.userId === a.userId ? 'opacity-50' : ''
+                                          }`}
+                                        >
+                                          {user.user.name || "이름 없음"}
+                                          {user.user.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.user.position)}</span>}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    {/* 버튼 영역 */}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => setDeleteConfirmSession(sess.id)}
+                        className="text-sm text-red-500 px-4 py-2 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        삭제
+                      </button>
+                      <div className="flex-1" />
+                      <button
+                        onClick={cancelEditing}
+                        className="text-sm text-gray-600 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button
+                        onClick={() => saveSession(sess.id)}
+                        disabled={submitting}
+                        className="text-sm text-white bg-team-500 px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-team-600 transition-colors"
+                      >
+                        {submitting ? "저장 중..." : "저장"}
+                      </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  /* 읽기 모드 */
+                  <div className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {/* 드래그 핸들 */}
+                        <div className="cursor-move touch-none p-1 text-gray-300 hover:text-gray-500">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="9" cy="5" r="1.5" />
+                            <circle cx="9" cy="12" r="1.5" />
+                            <circle cx="9" cy="19" r="1.5" />
+                            <circle cx="15" cy="5" r="1.5" />
+                            <circle cx="15" cy="12" r="1.5" />
+                            <circle cx="15" cy="19" r="1.5" />
+                          </svg>
+                        </div>
+                        <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          {sess.title || `세션 ${idx + 1}`}
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => startEditing(sess)}
+                        className="text-xs text-team-600 hover:text-team-700 px-3 py-1.5 border border-team-200 rounded-lg transition-colors"
+                      >
+                        편집
+                      </button>
+                    </div>
+
+                    {/* 팀 배정 정보 */}
+                    {sess.teamAssignments.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {Object.entries(
+                          sess.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
+                            if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
+                            acc[a.teamLabel].push({
+                              name: a.user.name || "이름 없음",
+                              position: a.user.position || null,
+                            });
+                            return acc;
+                          }, {})
+                        ).map(([label, members]) => (
+                          <div key={label} className="bg-gray-50 rounded-lg p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center">
+                                {label}
+                              </span>
+                              <span className="text-xs font-semibold text-gray-700">{members.length}명</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {members.map((m, i) => (
+                                <span key={i} className="inline-flex items-center gap-0.5 text-xs text-gray-600">
+                                  {m.name}
+                                  {m.position && <span className="text-[9px] text-gray-400">{getPositionGroup(m.position)}</span>}
+                                  {i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
-
             {/* 세션 추가 */}
             {!showSessionForm ? (
               <button
@@ -1547,6 +1377,14 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         </div>
+      )}
+
+      {/* 자동배정 바텀시트 */}
+      {showAutoAssignSheet && (
+        <AutoAssignSheet
+          onSelect={executeAutoAssignment}
+          onClose={() => setShowAutoAssignSheet(false)}
+        />
       )}
 
       {/* 터치 드래그 고스트 요소 */}
