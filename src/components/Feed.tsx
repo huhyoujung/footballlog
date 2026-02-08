@@ -29,7 +29,7 @@ export default function Feed() {
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
-  const [nextEvent, setNextEvent] = useState<TrainingEventSummary | null>(null);
+  const [nextEvents, setNextEvents] = useState<TrainingEventSummary[]>([]);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
@@ -74,7 +74,7 @@ export default function Feed() {
 
       if (eventRes.ok) {
         const data = await eventRes.json();
-        setNextEvent(data.event || null);
+        setNextEvents(data.events || []);
       }
     } catch (error) {
       console.error("데이터 로드 실패:", error);
@@ -210,13 +210,13 @@ export default function Feed() {
     const messages: { key: string; text: string }[] = [];
 
     // 팀 운동 (최우선)
-    if (nextEvent) {
-      const d = new Date(nextEvent.date);
+    for (const event of nextEvents) {
+      const d = new Date(event.date);
       const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
       const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
       messages.push({
-        key: `event-${nextEvent.id}`,
-        text: `📢 ${nextEvent.title || "팀 운동"} · ${dateStr} ${timeStr} · ${nextEvent.location}`,
+        key: `event-${event.id}`,
+        text: `📢 ${event.title || "팀 운동"} · ${dateStr} ${timeStr} · ${event.location}`,
       });
     }
 
@@ -246,8 +246,10 @@ export default function Feed() {
 
   const groupedLogs = groupLogsByDate();
 
-  // 미투표 초대장 표시 여부 (마감 시간 전까지만)
-  const showInvite = nextEvent && !nextEvent.myRsvp && new Date() < new Date(nextEvent.rsvpDeadline);
+  // 미투표 초대장 목록 (마감 시간 전까지만)
+  const pendingInvites = nextEvents.filter(
+    (event) => !event.myRsvp && new Date() < new Date(event.rsvpDeadline)
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -276,8 +278,14 @@ export default function Feed() {
       {/* 전광판 */}
       {!loading && <TickerBanner messages={getTickerMessages()} />}
 
-      {/* 미투표 초대장 */}
-      {!loading && showInvite && <TrainingInviteCard event={nextEvent!} />}
+      {/* 미투표 초대장들 */}
+      {!loading && pendingInvites.length > 0 && (
+        <div className="space-y-0">
+          {pendingInvites.map((event) => (
+            <TrainingInviteCard key={event.id} event={event} />
+          ))}
+        </div>
+      )}
 
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
