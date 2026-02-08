@@ -119,17 +119,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [draggedUser, setDraggedUser] = useState<{ userId: string; userName: string; fromTeam: string } | null>(null);
   const [unassignedPosition, setUnassignedPosition] = useState<Record<string, number>>({});
 
+  // 터치 드래그 상태
+  const [touchDragUser, setTouchDragUser] = useState<{ userId: string; userName: string; fromTeam: string; sessionId: string } | null>(null);
+  const [touchDragUnassigned, setTouchDragUnassigned] = useState<{ sessionId: string } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ sessionId: string; teamLabel: string } | null>(null);
+
   // 랜덤 배정 상태
   const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
   const [randomTeamCount, setRandomTeamCount] = useState(2);
 
-  // 스와이프 상태
-  const [swipedSession, setSwipedSession] = useState<string | null>(null);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchCurrent, setTouchCurrent] = useState<number | null>(null);
-
-  // 삭제 모달 상태
-  const [deleteModalSession, setDeleteModalSession] = useState<string | null>(null);
+  // 삭제 확인 상태
+  const [deleteConfirmSession, setDeleteConfirmSession] = useState<string | null>(null);
 
   // 출석률 모달 상태
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -249,39 +249,10 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
   // 세션 삭제
   const handleDeleteSession = async (sessionId: string) => {
-    setDeleteModalSession(null);
-    setSwipedSession(null);
+    setDeleteConfirmSession(null);
+    setEditingSessionInfo(null);
     const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, { method: "DELETE" });
     if (res.ok) fetchEvent();
-  };
-
-  // 터치 핸들러
-  const handleTouchStart = (e: React.TouchEvent, sessionId: string) => {
-    if (editingSession === sessionId || editingSessionInfo === sessionId) return;
-    setTouchStart(e.touches[0].clientX);
-    setTouchCurrent(e.touches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStart === null) return;
-    setTouchCurrent(e.touches[0].clientX);
-  };
-
-  const handleTouchEnd = (sessionId: string) => {
-    if (touchStart === null || touchCurrent === null) return;
-
-    const diff = touchStart - touchCurrent;
-
-    if (diff > 80) {
-      // 왼쪽으로 스와이프 -> 버튼 표시
-      setSwipedSession(sessionId);
-    } else if (diff < -80 || Math.abs(diff) < 10) {
-      // 오른쪽으로 스와이프 또는 탭 -> 버튼 숨김
-      setSwipedSession(null);
-    }
-
-    setTouchStart(null);
-    setTouchCurrent(null);
   };
 
   // 팀 배정 편집 시작
@@ -448,6 +419,90 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     } catch {
       // ignore
     }
+  };
+
+  // 터치 드래그 핸들러
+  const handleUserTouchStart = (userId: string, userName: string, fromTeam: string, sessionId: string) => {
+    setTouchDragUser({ userId, userName, fromTeam, sessionId });
+    setDragOverTarget(null);
+  };
+
+  const handleUserTouchMove = (e: React.TouchEvent) => {
+    if (!touchDragUser) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    // 드롭 영역 찾기
+    const dropZone = element.closest('[data-drop-target]');
+    if (dropZone) {
+      const sessionId = dropZone.getAttribute('data-session-id');
+      const teamLabel = dropZone.getAttribute('data-team-label');
+      if (sessionId && teamLabel) {
+        setDragOverTarget({ sessionId, teamLabel });
+      }
+    } else {
+      setDragOverTarget(null);
+    }
+  };
+
+  const handleUserTouchEnd = () => {
+    if (!touchDragUser || !dragOverTarget) {
+      setTouchDragUser(null);
+      setDragOverTarget(null);
+      return;
+    }
+
+    if (touchDragUser.sessionId === dragOverTarget.sessionId) {
+      moveUserToTeam(touchDragUser.sessionId, touchDragUser.userId, dragOverTarget.teamLabel);
+    }
+
+    setTouchDragUser(null);
+    setDragOverTarget(null);
+  };
+
+  const handleUnassignedTouchStart = (sessionId: string) => {
+    setTouchDragUnassigned({ sessionId });
+    setDragOverTarget(null);
+  };
+
+  const handleUnassignedTouchMove = (e: React.TouchEvent) => {
+    if (!touchDragUnassigned) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    // 드롭존 찾기
+    const dropZone = element.closest('[data-unassigned-drop-zone]');
+    if (dropZone) {
+      const sessionId = dropZone.getAttribute('data-session-id');
+      const position = dropZone.getAttribute('data-position');
+      if (sessionId && position) {
+        setDragOverTarget({ sessionId, teamLabel: `position-${position}` });
+      }
+    } else {
+      setDragOverTarget(null);
+    }
+  };
+
+  const handleUnassignedTouchEnd = () => {
+    if (!touchDragUnassigned || !dragOverTarget) {
+      setTouchDragUnassigned(null);
+      setDragOverTarget(null);
+      return;
+    }
+
+    if (dragOverTarget.teamLabel.startsWith('position-')) {
+      const position = parseInt(dragOverTarget.teamLabel.replace('position-', ''));
+      setUnassignedPosition((prev) => ({ ...prev, [touchDragUnassigned.sessionId]: position }));
+    }
+
+    setTouchDragUnassigned(null);
+    setDragOverTarget(null);
   };
 
   if (loading) {
@@ -683,17 +738,9 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </div>
 
             {event.sessions.map((sess, idx) => (
-              <div key={sess.id} className="bg-white rounded-xl overflow-hidden relative">
+              <div key={sess.id} className="bg-white rounded-xl overflow-hidden">
                 {/* 세션 헤더 */}
-                <div className="relative">
-                  <div
-                    className={`px-5 pt-4 pb-3 border-b border-gray-100 bg-white transition-transform duration-200 ease-out ${
-                      swipedSession === sess.id ? "-translate-x-32" : ""
-                    }`}
-                    onTouchStart={(e) => handleTouchStart(e, sess.id)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(sess.id)}
-                  >
+                <div className="px-5 pt-4 pb-3 border-b border-gray-100">
                   {editingSessionInfo === sess.id ? (
                     /* 편집 모드 */
                     <div className="space-y-2">
@@ -730,20 +777,28 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           />
                         </button>
                       </div>
-                      <div className="flex gap-2 justify-end mt-2">
+                      <div className="flex gap-2 justify-between mt-2">
                         <button
-                          onClick={() => setEditingSessionInfo(null)}
-                          className="text-xs text-gray-500 px-3 py-1 border border-gray-200 rounded"
+                          onClick={() => setDeleteConfirmSession(sess.id)}
+                          className="text-xs text-red-500 px-3 py-1 border border-red-200 rounded hover:bg-red-50 transition-colors"
                         >
-                          취소
+                          삭제
                         </button>
-                        <button
-                          onClick={() => handleUpdateSession(sess.id)}
-                          disabled={submitting}
-                          className="text-xs text-white bg-team-500 px-3 py-1 rounded disabled:opacity-50"
-                        >
-                          {submitting ? "저장 중..." : "저장"}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingSessionInfo(null)}
+                            className="text-xs text-gray-500 px-3 py-1 border border-gray-200 rounded"
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={() => handleUpdateSession(sess.id)}
+                            disabled={submitting}
+                            className="text-xs text-white bg-team-500 px-3 py-1 rounded disabled:opacity-50"
+                          >
+                            {submitting ? "저장 중..." : "저장"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -758,8 +813,8 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                             {sess.title || `세션 ${idx + 1}`}
                           </h3>
                         </div>
-                        <div className="flex gap-1">
-                          {/* 순서 변경 버튼만 유지 */}
+                        <div className="flex gap-1.5">
+                          {/* 순서 변경 버튼 */}
                           <button
                             onClick={() => handleReorderSession(sess.id, "up")}
                             disabled={idx === 0}
@@ -778,41 +833,23 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                               <polyline points="6 9 12 15 18 9" />
                             </svg>
                           </button>
+                          {/* 편집 버튼 */}
+                          <button
+                            onClick={() => {
+                              setEditingSessionInfo(sess.id);
+                              setEditTitle(sess.title || "");
+                              setEditMemo(sess.memo || "");
+                              setEditRequiresTeams(sess.requiresTeams);
+                            }}
+                            className="text-xs text-team-600 hover:text-team-700 px-2 py-1 border border-team-200 rounded transition-colors"
+                          >
+                            편집
+                          </button>
                         </div>
                       </div>
                       {sess.memo && <p className="text-xs text-gray-500 mt-1.5 ml-8">{sess.memo}</p>}
                     </>
                   )}
-                  </div>
-
-                  {/* 스와이프 시 나타나는 버튼 */}
-                  <div className="absolute right-0 top-0 bottom-0 flex items-center">
-                    <button
-                      onClick={() => {
-                        setEditingSessionInfo(sess.id);
-                        setEditTitle(sess.title || "");
-                        setEditMemo(sess.memo || "");
-                        setEditRequiresTeams(sess.requiresTeams);
-                        setSwipedSession(null);
-                      }}
-                      className="h-full w-16 bg-team-500 text-white flex items-center justify-center hover:bg-team-600 transition-colors"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => setDeleteModalSession(sess.id)}
-                      className="h-full w-16 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </div>
                 </div>
 
                 <div className="p-5">
@@ -874,10 +911,16 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                             key="unassigned"
                             draggable
                             onDragStart={(e) => handleUnassignedDragStart(e, sess.id)}
-                            className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[48px] transition-colors cursor-grab active:cursor-grabbing"
+                            onTouchStart={(e) => { e.stopPropagation(); handleUnassignedTouchStart(sess.id); }}
+                            onTouchMove={handleUnassignedTouchMove}
+                            onTouchEnd={handleUnassignedTouchEnd}
+                            className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[48px] transition-colors cursor-grab active:cursor-grabbing touch-none"
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
+                            data-drop-target="true"
+                            data-session-id={sess.id}
+                            data-team-label="unassigned"
                           >
                             <div className="text-xs font-medium text-gray-400 mb-2">미배정</div>
                             <div className="flex flex-wrap gap-2">
@@ -888,7 +931,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                     key={r.userId}
                                     draggable
                                     onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned"); }}
-                                    className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors"
+                                    onTouchStart={(e) => { e.stopPropagation(); handleUserTouchStart(r.userId, r.user.name || "이름 없음", "unassigned", sess.id); }}
+                                    onTouchMove={handleUserTouchMove}
+                                    onTouchEnd={handleUserTouchEnd}
+                                    className={`px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors touch-none ${
+                                      touchDragUser?.userId === r.userId ? 'opacity-50' : ''
+                                    }`}
                                   >
                                     {r.user.name || "이름 없음"}
                                     {r.user.position && <span className="ml-1 text-[10px] text-gray-400">{getPositionGroup(r.user.position)}</span>}
@@ -907,10 +955,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           sections.push(
                             <div
                               key={`dropzone-before-${label}`}
-                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              className={`h-2 border-2 border-dashed rounded transition-colors ${
+                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${idx}`
+                                  ? 'border-team-500'
+                                  : 'border-transparent'
+                              }`}
                               onDragOver={handleDropZoneDragOver}
                               onDragLeave={handleDropZoneDragLeave}
                               onDrop={(e) => handleDropZoneDrop(e, sess.id, idx)}
+                              data-unassigned-drop-zone="true"
+                              data-session-id={sess.id}
+                              data-position={idx}
                             />
                           );
 
@@ -922,10 +977,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           sections.push(
                             <div
                               key={label}
-                              className="border border-team-200 bg-team-50/30 rounded-lg p-3 min-h-[48px] transition-colors"
+                              className={`border border-team-200 rounded-lg p-3 min-h-[48px] transition-colors ${
+                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === label
+                                  ? 'bg-team-100'
+                                  : 'bg-team-50/30'
+                              }`}
                               onDragOver={handleDragOver}
                               onDragLeave={handleDragLeave}
                               onDrop={(e) => handleDrop(e, sess.id, label)}
+                              data-drop-target="true"
+                              data-session-id={sess.id}
+                              data-team-label={label}
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-1.5">
@@ -946,7 +1008,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                       key={a.userId}
                                       draggable
                                       onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
-                                      className="px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors"
+                                      onTouchStart={() => handleUserTouchStart(a.userId, user?.name || "이름 없음", label, sess.id)}
+                                      onTouchMove={handleUserTouchMove}
+                                      onTouchEnd={handleUserTouchEnd}
+                                      className={`px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors touch-none ${
+                                        touchDragUser?.userId === a.userId ? 'opacity-50' : ''
+                                      }`}
                                     >
                                       {user?.name || "이름 없음"}
                                       {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
@@ -966,10 +1033,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           sections.push(
                             <div
                               key="dropzone-end"
-                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              className={`h-2 border-2 border-dashed rounded transition-colors ${
+                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${labels.length}`
+                                  ? 'border-team-500'
+                                  : 'border-transparent'
+                              }`}
                               onDragOver={handleDropZoneDragOver}
                               onDragLeave={handleDropZoneDragLeave}
                               onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
+                              data-unassigned-drop-zone="true"
+                              data-session-id={sess.id}
+                              data-position={labels.length}
                             />
                           );
                           sections.push(unassignedSection);
@@ -978,10 +1052,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           sections.push(
                             <div
                               key="dropzone-end"
-                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              className={`h-2 border-2 border-dashed rounded transition-colors ${
+                                dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === `position-${labels.length}`
+                                  ? 'border-team-500'
+                                  : 'border-transparent'
+                              }`}
                               onDragOver={handleDropZoneDragOver}
                               onDragLeave={handleDropZoneDragLeave}
                               onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
+                              data-unassigned-drop-zone="true"
+                              data-session-id={sess.id}
+                              data-position={labels.length}
                             />
                           );
                         }
@@ -1150,7 +1231,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       />
 
       {/* 세션 삭제 확인 모달 */}
-      {deleteModalSession && (
+      {deleteConfirmSession && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">세션 삭제</h3>
@@ -1159,13 +1240,13 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setDeleteModalSession(null)}
+                onClick={() => setDeleteConfirmSession(null)}
                 className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
               >
                 취소
               </button>
               <button
-                onClick={() => handleDeleteSession(deleteModalSession)}
+                onClick={() => handleDeleteSession(deleteConfirmSession)}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
               >
                 삭제

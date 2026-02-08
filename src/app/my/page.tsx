@@ -114,7 +114,7 @@ export default function MyPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <BackButton href="/" />
           <h1 className="text-lg font-semibold text-gray-900">OURPAGE</h1>
           <button onClick={handleLogout} className="text-gray-400 hover:text-gray-600 p-3 -mr-3 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function MyPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl mx-auto p-4 space-y-4">
+      <main className="flex-1 max-w-5xl mx-auto px-6 py-4 w-full space-y-4">
         {team && (
           <>
             {/* 팀원 목록 */}
