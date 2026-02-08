@@ -269,39 +269,52 @@ function WritePageContent() {
             <label className="text-sm font-medium text-gray-700">
               운동 분류
             </label>
-            <button
-              type="button"
-              onClick={() => {
-                const newType = formData.logType === "team" ? "personal" : "team";
-                const selectedEvent = newType === "team" ? upcomingEvents[0] : null;
-                setFormData({
-                  ...formData,
-                  logType: newType,
-                  title: newType === "team" ? "" : formData.title,
-                  trainingEventId: selectedEvent?.id || null,
-                  trainingDate: selectedEvent
-                    ? new Date(selectedEvent.date).toISOString().split("T")[0]
-                    : formData.trainingDate,
-                });
-              }}
-              className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-team-500 focus:ring-offset-2"
-              style={{
-                backgroundColor: formData.logType === "team" ? "#967B5D" : "#D1D5DB"
-              }}
-            >
-              <span
-                className="inline-block h-5 w-5 transform rounded-full bg-white transition-transform"
-                style={{
-                  transform: formData.logType === "team" ? "translateX(34px)" : "translateX(4px)"
+            <div className="inline-flex bg-gray-200 rounded-full p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (formData.logType !== "personal") {
+                    setFormData({
+                      ...formData,
+                      logType: "personal",
+                      trainingEventId: null,
+                      title: "",
+                    });
+                  }
                 }}
-              />
-              <span className="absolute left-1.5 text-[10px] font-medium text-white pointer-events-none" style={{ opacity: formData.logType === "personal" ? 1 : 0 }}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  formData.logType === "personal"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600"
+                }`}
+              >
                 개인
-              </span>
-              <span className="absolute right-1.5 text-[10px] font-medium text-white pointer-events-none" style={{ opacity: formData.logType === "team" ? 1 : 0 }}>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (formData.logType !== "team") {
+                    const selectedEvent = upcomingEvents[0];
+                    setFormData({
+                      ...formData,
+                      logType: "team",
+                      title: "",
+                      trainingEventId: selectedEvent?.id || null,
+                      trainingDate: selectedEvent
+                        ? new Date(selectedEvent.date).toISOString().split("T")[0]
+                        : formData.trainingDate,
+                    });
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  formData.logType === "team"
+                    ? "bg-team-500 text-white shadow-sm"
+                    : "text-gray-600"
+                }`}
+              >
                 팀
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
 
           {formData.logType === "team" && upcomingEvents.length > 0 ? (
