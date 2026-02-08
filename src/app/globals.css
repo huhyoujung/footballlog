@@ -142,3 +142,17 @@ input:-webkit-autofill:active {
     transform: translateY(0);
   }
 }
+
+/* Fade in animation */
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
