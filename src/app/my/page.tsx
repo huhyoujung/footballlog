@@ -280,7 +280,7 @@ export default function MyPage() {
           rel="noopener noreferrer"
           className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
-          💬 사용하시는데 어려움이 있거나 건의사항이 있으시면 언제든 문의해주세요
+          💬 문의하기
         </a>
       </footer>
     </div>
