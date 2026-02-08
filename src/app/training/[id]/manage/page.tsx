@@ -1,7 +1,7 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -110,12 +110,14 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [editingSessionInfo, setEditingSessionInfo] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editMemo, setEditMemo] = useState("");
+  const [editRequiresTeams, setEditRequiresTeams] = useState(false);
 
   // 팀 배정 상태
   const [editingSession, setEditingSession] = useState<string | null>(null);
   const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
   const [teamLabels, setTeamLabels] = useState<Record<string, string[]>>({});
   const [draggedUser, setDraggedUser] = useState<{ userId: string; userName: string; fromTeam: string } | null>(null);
+  const [unassignedPosition, setUnassignedPosition] = useState<Record<string, number>>({});
 
   // 랜덤 배정 상태
   const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
@@ -231,6 +233,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         body: JSON.stringify({
           title: editTitle || null,
           memo: editMemo || null,
+          requiresTeams: editRequiresTeams,
         }),
       });
       if (res.ok) {
@@ -414,6 +417,37 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       }
     }
     setDraggedUser(null);
+  };
+
+  // 미배정 섹션 드래그 핸들러
+  const handleUnassignedDragStart = (e: React.DragEvent, sessionId: string) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", JSON.stringify({ type: "unassigned-section", sessionId }));
+    e.stopPropagation();
+  };
+
+  const handleDropZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    e.currentTarget.classList.add("border-team-500");
+  };
+
+  const handleDropZoneDragLeave = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove("border-team-500");
+  };
+
+  const handleDropZoneDrop = (e: React.DragEvent, sessionId: string, position: number) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("border-team-500");
+
+    try {
+      const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+      if (data.type === "unassigned-section" && data.sessionId === sessionId) {
+        setUnassignedPosition((prev) => ({ ...prev, [sessionId]: position }));
+      }
+    } catch {
+      // ignore
+    }
   };
 
   if (loading) {
@@ -682,7 +716,21 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                         rows={2}
                         className="w-full ml-8 px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:border-team-300"
                       />
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex items-center justify-between ml-8 mt-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">팀 분배 필요</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditRequiresTeams(!editRequiresTeams)}
+                          className={`relative w-9 h-5 rounded-full transition-colors ${editRequiresTeams ? "bg-team-500" : "bg-gray-300"}`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editRequiresTeams ? "translate-x-4" : ""}`}
+                          />
+                        </button>
+                      </div>
+                      <div className="flex gap-2 justify-end mt-2">
                         <button
                           onClick={() => setEditingSessionInfo(null)}
                           className="text-xs text-gray-500 px-3 py-1 border border-gray-200 rounded"
@@ -744,6 +792,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                         setEditingSessionInfo(sess.id);
                         setEditTitle(sess.title || "");
                         setEditMemo(sess.memo || "");
+                        setEditRequiresTeams(sess.requiresTeams);
                         setSwipedSession(null);
                       }}
                       className="h-full w-16 bg-team-500 text-white flex items-center justify-center hover:bg-team-600 transition-colors"
@@ -813,79 +862,132 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                         </div>
                       )}
 
-                      {/* 미배정 풀 */}
-                      <div
-                        className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[48px] transition-colors"
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
-                      >
-                        <div className="text-xs font-medium text-gray-400 mb-2">미배정</div>
-                        <div className="flex flex-wrap gap-2">
-                          {attendees
-                            .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
-                            .map((r) => (
-                              <span
-                                key={r.userId}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned")}
-                                className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors"
-                              >
-                                {r.user.name || "이름 없음"}
-                                {r.user.position && <span className="ml-1 text-[10px] text-gray-400">{getPositionGroup(r.user.position)}</span>}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
+                      {/* 팀별 드롭 영역 및 미배정 풀 (동적 순서) */}
+                      {(() => {
+                        const labels = teamLabels[sess.id] || ["A", "B"];
+                        const currentUnassignedPos = unassignedPosition[sess.id] ?? 0; // 기본값: 맨 위
+                        const sections: React.ReactElement[] = [];
 
-                      {/* 팀별 드롭 영역 */}
-                      {(teamLabels[sess.id] || ["A", "B"]).map((label) => {
-                        const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
-                        const summary = getTeamPositionSummary(
-                          teamMembers.map((m) => m.userId),
-                          attendees
-                        );
-                        return (
+                        // 미배정 섹션 생성
+                        const unassignedSection = (
                           <div
-                            key={label}
-                            className="border border-team-200 bg-team-50/30 rounded-lg p-3 min-h-[48px] transition-colors"
+                            key="unassigned"
+                            draggable
+                            onDragStart={(e) => handleUnassignedDragStart(e, sess.id)}
+                            className="border-2 border-dashed border-gray-200 rounded-lg p-3 min-h-[48px] transition-colors cursor-grab active:cursor-grabbing"
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, sess.id, label)}
+                            onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center">
-                                  {label}
-                                </span>
-                                <span className="text-xs font-semibold text-team-700">{teamMembers.length}명</span>
-                              </div>
-                              {summary && (
-                                <span className="text-[9px] text-team-400 bg-team-50 px-1.5 py-0.5 rounded">{summary}</span>
-                              )}
-                            </div>
+                            <div className="text-xs font-medium text-gray-400 mb-2">미배정</div>
                             <div className="flex flex-wrap gap-2">
-                              {teamMembers.map((a) => {
-                                const user = attendees.find((r) => r.userId === a.userId)?.user;
-                                return (
+                              {attendees
+                                .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
+                                .map((r) => (
                                   <span
-                                    key={a.userId}
+                                    key={r.userId}
                                     draggable
-                                    onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
-                                    className="px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors"
+                                    onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned"); }}
+                                    className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors"
                                   >
-                                    {user?.name || "이름 없음"}
-                                    {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
+                                    {r.user.name || "이름 없음"}
+                                    {r.user.position && <span className="ml-1 text-[10px] text-gray-400">{getPositionGroup(r.user.position)}</span>}
                                   </span>
-                                );
-                              })}
-                              {teamMembers.length === 0 && (
-                                <span className="text-xs text-gray-300 py-1">여기에 드래그</span>
-                              )}
+                                ))}
                             </div>
                           </div>
                         );
-                      })}
+
+                        // 각 팀 드롭 영역 생성 및 미배정 삽입
+                        labels.forEach((label, idx) => {
+                          // 드롭존 추가 (미배정 섹션을 이 위치에 드롭 가능)
+                          if (idx === currentUnassignedPos) {
+                            sections.push(unassignedSection);
+                          }
+                          sections.push(
+                            <div
+                              key={`dropzone-before-${label}`}
+                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              onDragOver={handleDropZoneDragOver}
+                              onDragLeave={handleDropZoneDragLeave}
+                              onDrop={(e) => handleDropZoneDrop(e, sess.id, idx)}
+                            />
+                          );
+
+                          const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
+                          const summary = getTeamPositionSummary(
+                            teamMembers.map((m) => m.userId),
+                            attendees
+                          );
+                          sections.push(
+                            <div
+                              key={label}
+                              className="border border-team-200 bg-team-50/30 rounded-lg p-3 min-h-[48px] transition-colors"
+                              onDragOver={handleDragOver}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, sess.id, label)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center">
+                                    {label}
+                                  </span>
+                                  <span className="text-xs font-semibold text-team-700">{teamMembers.length}명</span>
+                                </div>
+                                {summary && (
+                                  <span className="text-[9px] text-team-400 bg-team-50 px-1.5 py-0.5 rounded">{summary}</span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {teamMembers.map((a) => {
+                                  const user = attendees.find((r) => r.userId === a.userId)?.user;
+                                  return (
+                                    <span
+                                      key={a.userId}
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
+                                      className="px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors"
+                                    >
+                                      {user?.name || "이름 없음"}
+                                      {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
+                                    </span>
+                                  );
+                                })}
+                                {teamMembers.length === 0 && (
+                                  <span className="text-xs text-gray-300 py-1">여기에 드래그</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+
+                        // 미배정이 마지막에 위치하는 경우
+                        if (currentUnassignedPos >= labels.length) {
+                          sections.push(
+                            <div
+                              key="dropzone-end"
+                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              onDragOver={handleDropZoneDragOver}
+                              onDragLeave={handleDropZoneDragLeave}
+                              onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
+                            />
+                          );
+                          sections.push(unassignedSection);
+                        } else {
+                          // 마지막 드롭존 추가
+                          sections.push(
+                            <div
+                              key="dropzone-end"
+                              className="h-2 border-2 border-dashed border-transparent rounded transition-colors"
+                              onDragOver={handleDropZoneDragOver}
+                              onDragLeave={handleDropZoneDragLeave}
+                              onDrop={(e) => handleDropZoneDrop(e, sess.id, labels.length)}
+                            />
+                          );
+                        }
+
+                        return sections;
+                      })()}
 
                       <div className="flex gap-2 pt-1">
                         <button
