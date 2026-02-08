@@ -106,6 +106,11 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [sessionMemo, setSessionMemo] = useState("");
   const [sessionRequiresTeams, setSessionRequiresTeams] = useState(false);
 
+  // 세션 수정 상태
+  const [editingSessionInfo, setEditingSessionInfo] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMemo, setEditMemo] = useState("");
+
   // 팀 배정 상태
   const [editingSession, setEditingSession] = useState<string | null>(null);
   const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
@@ -199,6 +204,29 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         setSessionTitle("");
         setSessionMemo("");
         setSessionRequiresTeams(false);
+        fetchEvent();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 세션 수정
+  const handleUpdateSession = async (sessionId: string) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle || null,
+          memo: editMemo || null,
+        }),
+      });
+      if (res.ok) {
+        setEditingSessionInfo(null);
         fetchEvent();
       }
     } catch {
@@ -561,27 +589,85 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
               <div key={sess.id} className="bg-white rounded-xl overflow-hidden">
                 {/* 세션 헤더 */}
                 <div className="px-5 pt-4 pb-3 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <h3 className="text-sm font-semibold text-gray-900">
-                        {sess.title || `세션 ${idx + 1}`}
-                      </h3>
+                  {editingSessionInfo === sess.id ? (
+                    /* 편집 모드 */
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          placeholder={`세션 ${idx + 1}`}
+                          className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-team-300"
+                        />
+                      </div>
+                      <textarea
+                        value={editMemo}
+                        onChange={(e) => setEditMemo(e.target.value)}
+                        placeholder="메모 (선택)"
+                        rows={2}
+                        className="w-full ml-8 px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:border-team-300"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setEditingSessionInfo(null)}
+                          className="text-xs text-gray-500 px-3 py-1 border border-gray-200 rounded"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={() => handleUpdateSession(sess.id)}
+                          disabled={submitting}
+                          className="text-xs text-white bg-team-500 px-3 py-1 rounded disabled:opacity-50"
+                        >
+                          {submitting ? "저장 중..." : "저장"}
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteSession(sess.id)}
-                      className="text-xs text-gray-400 hover:text-red-500 p-1 transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </div>
-                  {sess.memo && <p className="text-xs text-gray-500 mt-1.5 ml-8">{sess.memo}</p>}
+                  ) : (
+                    /* 읽기 모드 */
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <h3 className="text-sm font-semibold text-gray-900">
+                            {sess.title || `세션 ${idx + 1}`}
+                          </h3>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingSessionInfo(sess.id);
+                              setEditTitle(sess.title || "");
+                              setEditMemo(sess.memo || "");
+                            }}
+                            className="text-xs text-gray-400 hover:text-team-500 p-1 transition-colors"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSession(sess.id)}
+                            className="text-xs text-gray-400 hover:text-red-500 p-1 transition-colors"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      {sess.memo && <p className="text-xs text-gray-500 mt-1.5 ml-8">{sess.memo}</p>}
+                    </>
+                  )}
                 </div>
 
                 <div className="p-5">
