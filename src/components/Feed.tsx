@@ -7,7 +7,7 @@ import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
 import Toast from "./Toast";
-import FeedSkeleton from "./FeedSkeleton";
+import LoadingSpinner from "./LoadingSpinner";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
 import { timeAgo } from "@/lib/timeAgo";
@@ -290,7 +290,7 @@ export default function Feed() {
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
         {loading ? (
-          <FeedSkeleton />
+          <LoadingSpinner />
         ) : logs.length === 0 ? (
           <div className="text-center py-20 px-6">
             <div className="text-6xl mb-4">⚽</div>

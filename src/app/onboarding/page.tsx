@@ -120,8 +120,10 @@ export default function OnboardingPage() {
 
   const handleProfileSubmit = async () => {
     setLoading(true);
+    setError("");
+
     try {
-      await fetch("/api/profile", {
+      const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,12 +131,15 @@ export default function OnboardingPage() {
           number: number ? parseInt(number) : null,
         }),
       });
+
+      if (!res.ok) {
+        throw new Error("프로필 저장에 실패했습니다");
+      }
+
       router.push("/");
       router.refresh();
-    } catch {
-      router.push("/");
-      router.refresh();
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
     }
   };
@@ -366,6 +371,8 @@ export default function OnboardingPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
+
+              {error && <p className="text-red-500 text-sm">{error}</p>}
 
               <button
                 onClick={handleProfileSubmit}

@@ -8,7 +8,7 @@ export interface ConditionLevel {
 export const CONDITION_LEVELS: ConditionLevel[] = [
   { level: 0, label: "운동 불가", description: "부상이나 극심한 피로", color: "#DC2626" },
   { level: 1, label: "극도로 낮음", description: "몸이 매우 무거운 상태", color: "#EF4444" },
-  { level: 2, label: "매우 낮음", description: "천천히 걷는 수준", color: "#F97316" },
+  { level: 2, label: "매우 낮음", description: "몸이 무겁고 힘듦", color: "#F97316" },
   { level: 3, label: "낮음", description: "가벼운 활동만 가능", color: "#FB923C" },
   { level: 4, label: "다소 낮음", description: "평소보다 힘이 없음", color: "#FBBF24" },
   { level: 5, label: "보통", description: "무난한 컨디션", color: "#EAB308" },
