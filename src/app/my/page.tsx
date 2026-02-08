@@ -6,6 +6,8 @@ import Image from "next/image";
 import Link from "next/link";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import useSWR from "swr";
 
@@ -40,6 +42,7 @@ export default function MyPage() {
     id: string;
     name: string | null;
   } | null>(null);
+  const { toast, showToast, hideToast } = useToast();
 
   const isAdmin = session?.user?.role === "ADMIN";
 
@@ -57,6 +60,8 @@ export default function MyPage() {
   const userImage = profileData?.image || session?.user?.image || null;
 
   const handleNudge = async (recipientId: string) => {
+    const recipientName = selectedMember?.name || "팀원";
+
     // 모달 닫기
     setSelectedMember(null);
 
@@ -80,8 +85,10 @@ export default function MyPage() {
         });
         const data = await res.json();
         alert(data.error || "닦달에 실패했습니다");
+      } else {
+        // 성공 시 토스트 표시
+        showToast(`${recipientName}님에게 닦달했습니다! 👉`);
       }
-      // 성공 시 이미 UI가 업데이트되어 있으므로 추가 작업 불필요
     } catch {
       // 실패 시 롤백
       setNudgedToday((prev) => {
@@ -280,7 +287,7 @@ export default function MyPage() {
               {nudgedToday.has(selectedMember.id) ? (
                 <>✅ 오늘 닦달 완료</>
               ) : (
-                <>💪 닦달하기</>
+                <>👉 닦달하기</>
               )}
             </button>
 
@@ -302,6 +309,9 @@ export default function MyPage() {
           </div>
         </div>
       )}
+
+      {/* 토스트 */}
+      <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
     </div>
   );
 }

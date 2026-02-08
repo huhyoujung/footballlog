@@ -256,7 +256,7 @@ export default function Feed() {
       const recipient = nudge.recipient.name || "팀원";
       messages.push({
         key: `nudge-${nudge.id}`,
-        text: `💪 ${sender}님이 ${recipient}님을 닦달했습니다 · ${timeAgo(nudge.createdAt)}`,
+        text: `👉 ${sender}님이 ${recipient}님을 닦달했습니다 · ${timeAgo(nudge.createdAt)}`,
       });
     }
 
