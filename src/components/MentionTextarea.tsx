@@ -11,7 +11,7 @@ interface TeamMember {
 
 interface Props {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, mentions: string[]) => void;
   teamMembers: TeamMember[];
   placeholder?: string;
   rows?: number;
@@ -64,6 +64,23 @@ export default function MentionTextarea({
     member.name?.toLowerCase().includes(mentionQuery.toLowerCase())
   );
 
+  // 멘션 ID 추출 함수
+  const extractMentions = (text: string): string[] => {
+    const mentionPattern = /@(\S+)/g;
+    const foundMentions: string[] = [];
+    let match;
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+      const mentionName = match[1];
+      const member = teamMembers.find((m) => m.name === mentionName);
+      if (member && !foundMentions.includes(member.id)) {
+        foundMentions.push(member.id);
+      }
+    }
+
+    return foundMentions;
+  };
+
   // 팀원 선택
   const selectMember = (member: TeamMember) => {
     if (mentionStartPos === null || !textareaRef.current) return;
@@ -72,7 +89,8 @@ export default function MentionTextarea({
     const after = value.substring(textareaRef.current.selectionStart);
     const newValue = `${before}@${member.name} ${after}`;
 
-    onChange(newValue);
+    const mentions = extractMentions(newValue);
+    onChange(newValue, mentions);
     setShowSuggestions(false);
 
     // 커서 위치 조정
@@ -106,16 +124,76 @@ export default function MentionTextarea({
     }
   };
 
+  // 텍스트 렌더링 (하이라이트용)
+  const renderHighlightedText = () => {
+    if (!value) return null;
+
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const mentionPattern = /@(\S+)/g;
+    let match;
+
+    while ((match = mentionPattern.exec(value)) !== null) {
+      const mentionName = match[1];
+      const member = teamMembers.find((m) => m.name === mentionName);
+
+      if (member) {
+        // 멘션 이전 텍스트
+        if (match.index > lastIndex) {
+          parts.push(value.substring(lastIndex, match.index));
+        }
+
+        // 멘션 (하이라이트)
+        parts.push(
+          <span
+            key={`mention-${match.index}`}
+            className="bg-team-100 text-team-700 px-0.5 rounded font-medium"
+          >
+            @{mentionName}
+          </span>
+        );
+
+        lastIndex = match.index + match[0].length;
+      }
+    }
+
+    // 남은 텍스트
+    if (lastIndex < value.length) {
+      parts.push(value.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : value;
+  };
+
   return (
     <div className="relative">
+      {/* 하이라이트 레이어 (읽기 전용, 배경) */}
+      <div
+        className={`absolute inset-0 pointer-events-none whitespace-pre-wrap break-words overflow-hidden ${className}`}
+        style={{
+          color: "transparent",
+          padding: "inherit",
+          border: "1px solid transparent",
+          lineHeight: "inherit",
+        }}
+      >
+        {renderHighlightedText()}
+      </div>
+
+      {/* 실제 텍스트 영역 */}
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          const mentions = extractMentions(newValue);
+          onChange(newValue, mentions);
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={rows}
-        className={className}
+        className={`${className} relative bg-transparent`}
+        style={{ caretColor: "auto" }}
       />
 
       {/* 자동완성 드롭다운 */}

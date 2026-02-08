@@ -9,10 +9,12 @@ import Image from "next/image";
 import ConditionBadge from "@/components/ConditionBadge";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import MentionTextarea from "@/components/MentionTextarea";
 
 interface Comment {
   id: string;
   content: string;
+  mentions: string[];
   createdAt: string;
   updatedAt: string;
   user: {
@@ -20,6 +22,14 @@ interface Comment {
     name: string | null;
     image: string | null;
   };
+}
+
+interface TeamMember {
+  id: string;
+  name: string | null;
+  image: string | null;
+  position: string | null;
+  number: number | null;
 }
 
 interface TrainingLog {
@@ -61,10 +71,13 @@ export default function LogDetailPage({
   const [log, setLog] = useState<TrainingLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState("");
+  const [commentMentions, setCommentMentions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState("");
+  const [editCommentMentions, setEditCommentMentions] = useState<string[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const { toast, showToast, hideToast } = useToast();
 
   const isMyPost = log && session?.user?.id === log.user.id;
@@ -72,6 +85,7 @@ export default function LogDetailPage({
 
   useEffect(() => {
     fetchLog();
+    fetchTeamMembers();
   }, [id]);
 
   const fetchLog = async () => {
@@ -85,6 +99,18 @@ export default function LogDetailPage({
       console.error("로드 실패:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTeamMembers = async () => {
+    try {
+      const res = await fetch("/api/teams");
+      if (res.ok) {
+        const data = await res.json();
+        setTeamMembers(data.members || []);
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -159,7 +185,7 @@ export default function LogDetailPage({
       const res = await fetch(`/api/training-logs/${id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: comment }),
+        body: JSON.stringify({ content: comment, mentions: commentMentions }),
       });
 
       if (res.ok) {
@@ -168,6 +194,7 @@ export default function LogDetailPage({
           prev ? { ...prev, comments: [...prev.comments, newComment] } : null
         );
         setComment("");
+        setCommentMentions([]);
         showToast("댓글을 남겼어요");
       }
     } catch (error) {
@@ -184,7 +211,7 @@ export default function LogDetailPage({
       const res = await fetch(`/api/training-logs/${id}/comments/${commentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: editCommentContent }),
+        body: JSON.stringify({ content: editCommentContent, mentions: editCommentMentions }),
       });
 
       if (res.ok) {
@@ -194,13 +221,14 @@ export default function LogDetailPage({
             ? {
                 ...prev,
                 comments: prev.comments.map((c) =>
-                  c.id === commentId ? { ...c, content: updated.content, updatedAt: updated.updatedAt } : c
+                  c.id === commentId ? { ...c, content: updated.content, mentions: updated.mentions, updatedAt: updated.updatedAt } : c
                 ),
               }
             : null
         );
         setEditingCommentId(null);
         setEditCommentContent("");
+        setEditCommentMentions([]);
         showToast("댓글을 수정했어요");
       }
     } catch (error) {
@@ -245,6 +273,54 @@ export default function LogDetailPage({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // 멘션 하이라이트 렌더링
+  const renderMentionedText = (text: string) => {
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const mentionPattern = /@(\S+)/g;
+    let match;
+    let key = 0;
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+      const mentionName = match[1];
+      const member = teamMembers.find((m) => m.name === mentionName);
+
+      if (member) {
+        // 멘션 이전 텍스트
+        if (match.index > lastIndex) {
+          parts.push(
+            <span key={`text-${key++}`}>
+              {text.substring(lastIndex, match.index)}
+            </span>
+          );
+        }
+
+        // 멘션 (하이라이트)
+        parts.push(
+          <span
+            key={`mention-${key++}`}
+            className="bg-team-100 text-team-700 px-1 rounded font-medium"
+          >
+            @{mentionName}
+          </span>
+        );
+
+        lastIndex = match.index + match[0].length;
+      }
+    }
+
+    // 남은 텍스트
+    if (lastIndex < text.length) {
+      parts.push(
+        <span key={`text-${key++}`}>
+          {text.substring(lastIndex)}
+        </span>
+      );
+    }
+
+    return parts.length > 0 ? parts : text;
   };
 
   if (loading) {
@@ -484,12 +560,16 @@ export default function LogDetailPage({
 
                         {editingCommentId === c.id ? (
                           <div className="mt-1.5">
-                            <input
-                              type="text"
+                            <MentionTextarea
                               value={editCommentContent}
-                              onChange={(e) => setEditCommentContent(e.target.value)}
-                              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                              autoFocus
+                              onChange={(val, mentions) => {
+                                setEditCommentContent(val);
+                                setEditCommentMentions(mentions);
+                              }}
+                              teamMembers={teamMembers}
+                              placeholder="댓글 수정..."
+                              rows={2}
+                              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
                             />
                             <div className="flex gap-2 mt-1.5">
                               <button
@@ -502,6 +582,7 @@ export default function LogDetailPage({
                                 onClick={() => {
                                   setEditingCommentId(null);
                                   setEditCommentContent("");
+                                  setEditCommentMentions([]);
                                 }}
                                 className="text-xs text-gray-400"
                               >
@@ -512,7 +593,7 @@ export default function LogDetailPage({
                         ) : (
                           <>
                             <p className="text-gray-700 text-sm mt-1">
-                              {c.content}
+                              {renderMentionedText(c.content)}
                             </p>
                             {(isMyComment || canDelete) && (
                               <div className="flex items-center gap-3 mt-1.5">
@@ -521,6 +602,7 @@ export default function LogDetailPage({
                                     onClick={() => {
                                       setEditingCommentId(c.id);
                                       setEditCommentContent(c.content);
+                                      setEditCommentMentions(c.mentions || []);
                                     }}
                                     className="text-xs text-gray-400 hover:text-gray-600"
                                   >
@@ -556,19 +638,25 @@ export default function LogDetailPage({
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
         <form
           onSubmit={handleComment}
-          className="max-w-lg mx-auto px-4 py-3 flex gap-2"
+          className="max-w-lg mx-auto px-4 py-3 flex gap-2 items-end"
         >
-          <input
-            type="text"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="댓글을 입력하세요..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-          />
+          <div className="flex-1">
+            <MentionTextarea
+              value={comment}
+              onChange={(val, mentions) => {
+                setComment(val);
+                setCommentMentions(mentions);
+              }}
+              teamMembers={teamMembers}
+              placeholder="댓글을 입력하세요... (@멘션 가능)"
+              rows={1}
+              className="w-full px-4 py-2 border border-gray-300 rounded-full text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+            />
+          </div>
           <button
             type="submit"
             disabled={!comment.trim() || submitting}
-            className="px-4 py-2 bg-team-500 text-white rounded-full font-medium disabled:opacity-50"
+            className="px-4 py-2 bg-team-500 text-white rounded-full font-medium disabled:opacity-50 flex-shrink-0"
           >
             {submitting ? "..." : "등록"}
           </button>

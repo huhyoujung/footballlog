@@ -148,6 +148,7 @@ model TrainingLog {
 model Comment {
   id            String   @id @default(cuid())
   content       String   @db.Text
+  mentions      String[] @default([])  // 멘션된 유저 ID 배열
   userId        String
   trainingLogId String
   createdAt     DateTime @default(now())

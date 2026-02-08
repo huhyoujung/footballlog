@@ -40,7 +40,7 @@ export async function POST(
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
-    const { content } = await req.json();
+    const { content, mentions = [] } = await req.json();
 
     if (!content?.trim()) {
       return NextResponse.json(
@@ -49,9 +49,24 @@ export async function POST(
       );
     }
 
+    // 멘션 유효성 검사 (최대 5명, 같은 팀, 자기 자신 제외)
+    const validMentions: string[] = [];
+    if (mentions.length > 0) {
+      const mentionedUsers = await prisma.user.findMany({
+        where: {
+          id: { in: mentions },
+          teamId: session.user.teamId,
+          NOT: { id: session.user.id },
+        },
+        select: { id: true },
+      });
+      validMentions.push(...mentionedUsers.map((u) => u.id).slice(0, 5));
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content: content.trim(),
+        mentions: validMentions,
         userId: session.user.id,
         trainingLogId,
       },
@@ -66,17 +81,34 @@ export async function POST(
       },
     });
 
-    // 푸시 알림: 일지 작성자에게 (본인 댓글 제외)
-    if (log.userId !== session.user.id) {
-      try {
-        await sendPushToUsers([log.userId], {
+    // 푸시 알림
+    try {
+      const notifyUsers: string[] = [];
+
+      // 1. 일지 작성자에게 (본인 제외)
+      if (log.userId !== session.user.id && !validMentions.includes(log.userId)) {
+        notifyUsers.push(log.userId);
+      }
+
+      // 2. 멘션된 사용자들에게
+      if (validMentions.length > 0) {
+        await sendPushToUsers(validMentions, {
+          title: "💬 댓글에서 멘션",
+          body: `${session.user.name || "팀원"}님이 댓글에서 회원님을 멘션했어요`,
+          url: `/log/${trainingLogId}`,
+        });
+      }
+
+      // 3. 일지 작성자에게 (멘션되지 않은 경우)
+      if (notifyUsers.length > 0) {
+        await sendPushToUsers(notifyUsers, {
           title: "새 댓글",
           body: `${session.user.name || "팀원"}님이 회원님의 일지에 댓글을 남겼어요`,
           url: `/log/${trainingLogId}`,
         });
-      } catch {
-        // 푸시 실패해도 댓글 작성은 성공
       }
+    } catch {
+      // 푸시 실패해도 댓글 작성은 성공
     }
 
     return NextResponse.json(comment, { status: 201 });
