@@ -292,32 +292,32 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* POM 투표 (체크인한 사람들 대상) - 상단에 우선 표시 */}
         {event.checkIns.length > 0 && (
-          <div className="space-y-3">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
+              <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </div>
             {showPomVoting && (
-              <PomVoting
-                eventId={event.id}
-                eventDate={event.date}
-                pomVotingDeadline={event.pomVotingDeadline}
-                checkIns={event.checkIns}
-              />
+              <div className="pt-3 border-t border-gray-100">
+                <PomVoting
+                  eventId={event.id}
+                  eventDate={event.date}
+                  pomVotingDeadline={event.pomVotingDeadline}
+                  checkIns={event.checkIns}
+                />
+              </div>
             )}
           </div>
         )}

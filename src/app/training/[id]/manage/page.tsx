@@ -211,17 +211,26 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
   const fetchEquipments = async () => {
     try {
-      const res = await fetch(`/api/training-events/${eventId}/equipment`);
-      if (res.ok) {
-        const data = await res.json();
-        setEquipments(data);
+      // 장비 목록과 배정 정보 가져오기
+      const [equipRes, teamRes] = await Promise.all([
+        fetch(`/api/training-events/${eventId}/equipment`),
+        fetch(`/api/teams/equipment`), // 팀 전체 장비 + 관리자 목록
+      ]);
 
-        // 현재 배정 상태를 state에 설정
+      if (equipRes.ok && teamRes.ok) {
+        const data = await equipRes.json();
+        const teamEquip = await teamRes.json();
+
+        setEquipments(teamEquip); // 팀 전체 장비 목록
+
+        // 현재 이벤트의 배정 상태를 state에 설정
         const assignments: Record<string, { userId: string | null; memo: string }> = {};
-        data.forEach((eq: EquipmentWithAssignment) => {
+        teamEquip.forEach((eq: EquipmentWithAssignment) => {
+          // 이 이벤트에 배정된 정보가 있으면 사용, 없으면 null
+          const eventAssignment = data.find((d: any) => d.id === eq.id)?.assignment;
           assignments[eq.id] = {
-            userId: eq.assignment?.userId || null,
-            memo: eq.assignment?.memo || "",
+            userId: eventAssignment?.userId || null,
+            memo: eventAssignment?.memo || "",
           };
         });
         setEquipmentAssignments(assignments);
@@ -234,15 +243,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const saveEquipmentAssignments = async () => {
     setSavingEquipment(true);
     try {
-      // 각 장비의 owner를 userId로 사용 (장비 관리자가 담당)
-      const assignments = Object.entries(equipmentAssignments).map(([equipmentId, { memo }]) => {
-        const equipment = equipments.find((eq) => eq.id === equipmentId);
-        return {
-          equipmentId,
-          userId: equipment?.owner?.id || null,
-          memo: memo.trim() || undefined,
-        };
-      });
+      // equipmentAssignments에서 바로 userId와 memo 사용
+      const assignments = Object.entries(equipmentAssignments).map(([equipmentId, { userId, memo }]) => ({
+        equipmentId,
+        userId,
+        memo: memo.trim() || undefined,
+      }));
 
       const res = await fetch(`/api/training-events/${eventId}/equipment`, {
         method: "PUT",
@@ -261,6 +267,31 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     } finally {
       setSavingEquipment(false);
     }
+  };
+
+  // 장비 드래그 핸들러
+  const handleEquipmentDragStart = (e: React.DragEvent, equipmentId: string) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("equipmentId", equipmentId);
+  };
+
+  const handleEquipmentDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleEquipmentDrop = (e: React.DragEvent, targetUserId: string | null) => {
+    e.preventDefault();
+    const equipmentId = e.dataTransfer.getData("equipmentId");
+    if (!equipmentId) return;
+
+    setEquipmentAssignments((prev) => ({
+      ...prev,
+      [equipmentId]: {
+        ...prev[equipmentId],
+        userId: targetUserId,
+      },
+    }));
   };
 
   // 지각비 부과
@@ -1183,56 +1214,103 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
               </div>
             ) : (
               <>
-                <div className="space-y-3">
-                  {equipments.map((eq) => {
-                    const assignment = equipmentAssignments[eq.id] || { userId: null, memo: "" };
-                    return (
-                      <div key={eq.id} className="bg-white rounded-xl p-4">
-                        <div className="mb-3">
-                          <h4 className="text-sm font-semibold text-gray-900">{eq.name}</h4>
+                {/* 미배정 장비 */}
+                <div className="bg-white rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <span>미배정 장비</span>
+                    <span className="text-xs text-gray-400 font-normal">
+                      ({equipments.filter((eq) => !equipmentAssignments[eq.id]?.userId).length}개)
+                    </span>
+                  </h3>
+                  <div
+                    className="min-h-[100px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
+                    onDragOver={handleEquipmentDragOver}
+                    onDrop={(e) => handleEquipmentDrop(e, null)}
+                  >
+                    {equipments
+                      .filter((eq) => !equipmentAssignments[eq.id]?.userId)
+                      .map((eq) => (
+                        <div
+                          key={eq.id}
+                          draggable
+                          onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
+                          className="bg-team-50 border border-team-200 rounded-lg p-3 cursor-move hover:bg-team-100 transition-colors"
+                        >
+                          <div className="font-medium text-sm text-gray-900">{eq.name}</div>
                           {eq.description && (
-                            <p className="text-xs text-gray-500 mt-0.5">{eq.description}</p>
+                            <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          {/* 장비 관리자 표시 (읽기 전용) */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              장비 관리자
-                            </label>
-                            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
-                              {eq.owner ? (
-                                <span>{eq.owner.name || "이름 없음"}</span>
-                              ) : (
-                                <span className="text-gray-400">미지정</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 메모 */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              메모 (선택)
-                            </label>
-                            <input
-                              type="text"
-                              value={assignment.memo}
-                              onChange={(e) =>
-                                setEquipmentAssignments((prev) => ({
-                                  ...prev,
-                                  [eq.id]: { ...prev[eq.id], memo: e.target.value },
-                                }))
-                              }
-                              placeholder="예: 공 2개, 펌프 포함"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    {equipments.filter((eq) => !equipmentAssignments[eq.id]?.userId).length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-8">
+                        모든 장비가 배정되었습니다
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                {/* 장비 관리자별 배정 */}
+                {[...new Set(equipments.filter((eq) => eq.owner).map((eq) => eq.owner!))].map((manager) => {
+                  const assignedEquipments = equipments.filter(
+                    (eq) => equipmentAssignments[eq.id]?.userId === manager.id
+                  );
+
+                  return (
+                    <div key={manager.id} className="bg-white rounded-xl p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <span>{manager.name || "익명"}</span>
+                        <span className="text-xs px-2 py-0.5 bg-team-50 text-team-600 rounded-full">
+                          관리자
+                        </span>
+                        <span className="text-xs text-gray-400 font-normal ml-auto">
+                          ({assignedEquipments.length}개)
+                        </span>
+                      </h3>
+                      <div
+                        className="min-h-[80px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
+                        onDragOver={handleEquipmentDragOver}
+                        onDrop={(e) => handleEquipmentDrop(e, manager.id)}
+                      >
+                        {assignedEquipments.map((eq) => {
+                          const assignment = equipmentAssignments[eq.id];
+                          return (
+                            <div key={eq.id} className="space-y-2">
+                              <div
+                                draggable
+                                onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
+                                className="bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="font-medium text-sm text-gray-900">{eq.name}</div>
+                                {eq.description && (
+                                  <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
+                                )}
+                              </div>
+                              {/* 메모 입력 */}
+                              <input
+                                type="text"
+                                value={assignment?.memo || ""}
+                                onChange={(e) =>
+                                  setEquipmentAssignments((prev) => ({
+                                    ...prev,
+                                    [eq.id]: { ...prev[eq.id], memo: e.target.value },
+                                  }))
+                                }
+                                placeholder="메모 (예: 공 2개, 펌프 포함)"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                              />
+                            </div>
+                          );
+                        })}
+                        {assignedEquipments.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-6">
+                            장비를 드래그하여 배정하세요
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 <div className="flex gap-3">
                   <button
