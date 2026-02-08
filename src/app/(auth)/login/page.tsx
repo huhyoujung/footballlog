@@ -27,7 +27,6 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm relative z-10">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-6">네모의 꿈</h1>
           <div className="flex items-center justify-center mx-auto mb-4">
             <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
               <rect x="14" y="10" width="36" height="44" rx="2" fill="#A7F3D0" stroke="#065F46" strokeWidth="1.5" />
@@ -37,6 +36,7 @@ export default function LoginPage() {
               <rect x="20" y="44" width="24" height="10" stroke="#065F46" strokeWidth="1.5" fill="none" />
             </svg>
           </div>
+          <h1 className="text-3xl font-bold text-white mb-2">네모의 꿈</h1>
           <p className="text-white text-lg font-medium">둥근 팀을 만들기</p>
         </div>
 
