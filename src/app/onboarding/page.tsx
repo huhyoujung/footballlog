@@ -153,13 +153,13 @@ export default function OnboardingPage() {
             <div className="space-y-3">
               <button
                 onClick={() => setMode("find")}
-                className="w-full py-4 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors"
+                className="w-full py-4 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors"
               >
                 기존 팀 찾아서 가입하기
               </button>
               <button
                 onClick={() => setMode("create")}
-                className="w-full py-4 bg-white border-2 border-team-500 text-team-500 rounded-xl font-semibold hover:bg-team-50 transition-colors"
+                className="w-full py-4 bg-white border-2 border-green-500 text-green-500 rounded-xl font-semibold hover:bg-green-50 transition-colors"
               >
                 새로운 팀 만들기
               </button>
@@ -195,7 +195,7 @@ export default function OnboardingPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="팀 이름을 검색하세요"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -213,8 +213,8 @@ export default function OnboardingPage() {
                       {team.logoUrl ? (
                         <img src={team.logoUrl} alt={team.name} className="w-12 h-12 rounded-full object-cover" />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
-                          <span className="text-team-600 font-semibold">{team.name[0]}</span>
+                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="text-green-600 font-semibold">{team.name[0]}</span>
                         </div>
                       )}
                       <div className="flex-1 text-left">
@@ -227,12 +227,12 @@ export default function OnboardingPage() {
               </>
             ) : (
               <form onSubmit={handleJoinTeam} className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-team-50 rounded-lg">
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
                   {selectedTeam.logoUrl ? (
                     <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="w-12 h-12 rounded-full object-cover" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
-                      <span className="text-team-600 font-semibold">{selectedTeam.name[0]}</span>
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                      <span className="text-green-600 font-semibold">{selectedTeam.name[0]}</span>
                     </div>
                   )}
                   <div className="flex-1">
@@ -250,7 +250,7 @@ export default function OnboardingPage() {
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="팀 운영진에게 받은 초대 코드를 입력하세요"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     required
                   />
                 </div>
@@ -272,7 +272,7 @@ export default function OnboardingPage() {
                   <button
                     type="submit"
                     disabled={loading || !inviteCode.trim()}
-                    className="flex-1 py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+                    className="flex-1 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50"
                   >
                     {loading ? "가입 중..." : "가입하기"}
                   </button>
@@ -311,7 +311,7 @@ export default function OnboardingPage() {
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   placeholder="예: 네모의 꿈 FC"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -321,7 +321,7 @@ export default function OnboardingPage() {
               <button
                 type="submit"
                 disabled={loading || !teamName.trim()}
-                className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50"
               >
                 {loading ? "생성 중..." : "팀 만들기"}
               </button>
@@ -343,7 +343,7 @@ export default function OnboardingPage() {
                 <select
                   value={position}
                   onChange={(e) => setPosition(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
                   <option value="">선택 안함</option>
                   {POSITIONS.map((pos) => (
@@ -363,14 +363,14 @@ export default function OnboardingPage() {
                   placeholder="예: 10"
                   min="0"
                   max="99"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
 
               <button
                 onClick={handleProfileSubmit}
                 disabled={loading}
-                className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50"
               >
                 {loading ? "저장 중..." : "시작하기"}
               </button>
