@@ -149,6 +149,9 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   // 출석률 모달 상태
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
 
+  // 운동 삭제 확인 상태
+  const [showDeleteEventModal, setShowDeleteEventModal] = useState(false);
+
   // 장비 상태
   const [equipments, setEquipments] = useState<EquipmentWithAssignment[]>([]);
   const [equipmentAssignments, setEquipmentAssignments] = useState<Record<string, { userId: string | null; memo: string }>>({});
@@ -412,6 +415,21 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     setEditingSessionId(null);
     const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, { method: "DELETE" });
     if (res.ok) fetchEvent();
+  };
+
+  // 운동 삭제
+  const handleDeleteEvent = async () => {
+    try {
+      const res = await fetch(`/api/training-events/${eventId}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/");
+      } else {
+        const data = await res.json();
+        alert(data.error || "삭제에 실패했습니다");
+      }
+    } catch {
+      alert("삭제에 실패했습니다");
+    }
   };
 
   // 세션 편집 시작
@@ -1333,6 +1351,24 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             )}
           </>
         )}
+
+        {/* 위험 영역 */}
+        <div className="mt-8 pt-6 border-t-2 border-red-100">
+          <h3 className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>위험 영역</span>
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            운동과 관련된 모든 데이터가 영구 삭제됩니다
+          </p>
+          <button
+            onClick={() => setShowDeleteEventModal(true)}
+            className="w-full py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>🗑️</span>
+            <span>이 운동 삭제하기</span>
+          </button>
+        </div>
       </main>
 
       {/* 출석률 모달 */}
@@ -1358,6 +1394,74 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
               </button>
               <button
                 onClick={() => handleDeleteSession(deleteConfirmSession)}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 운동 삭제 확인 모달 */}
+      {showDeleteEventModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-red-600 mb-2 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>운동 삭제</span>
+            </h3>
+            <p className="text-sm text-gray-900 font-medium mb-4">
+              이 운동을 삭제하시겠습니까?
+            </p>
+
+            {/* 운동 정보 */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <span>📅</span>
+                <span className="text-gray-900">
+                  {new Date(event.date).toLocaleDateString("ko-KR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    weekday: "short",
+                  })}{" "}
+                  {new Date(event.date).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span>📍</span>
+                <span className="text-gray-900">{event.location}</span>
+              </div>
+            </div>
+
+            {/* 삭제될 데이터 */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-700 mb-2">다음 데이터가 모두 삭제됩니다:</p>
+              <ul className="space-y-1 text-xs text-gray-600">
+                <li>• 참석 응답 ({event.rsvps.length}건)</li>
+                <li>• 체크인 기록 ({event.checkIns.length}건)</li>
+                <li>• 지각비 내역 ({event.lateFees.length}건)</li>
+                <li>• 세션 및 팀 배정 ({event.sessions.length}개 세션)</li>
+              </ul>
+            </div>
+
+            <p className="text-xs text-red-600 font-medium mb-6">
+              ⚠️ 이 작업은 되돌릴 수 없습니다
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteEventModal(false)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteEvent}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
               >
                 삭제
