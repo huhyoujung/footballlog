@@ -49,6 +49,14 @@ export async function POST(
       return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
+    // 시간 검증: 운동 시작 2시간 전부터 체크인 가능
+    const now = new Date();
+    const twoHoursBefore = new Date(event.date.getTime() - 2 * 60 * 60 * 1000);
+
+    if (now < twoHoursBefore) {
+      return NextResponse.json({ error: "운동 2시간 전부터 체크인할 수 있습니다" }, { status: 400 });
+    }
+
     // RSVP 확인 (ATTEND 또는 LATE만 체크인 가능)
     const rsvp = await prisma.rsvp.findUnique({
       where: {
@@ -77,7 +85,6 @@ export async function POST(
       return NextResponse.json({ error: "이미 체크인했습니다" }, { status: 409 });
     }
 
-    const now = new Date();
     const isLate = now > event.date;
 
     const checkIn = await prisma.checkIn.create({
@@ -96,5 +103,54 @@ export async function POST(
   } catch (error) {
     console.error("체크인 오류:", error);
     return NextResponse.json({ error: "체크인에 실패했습니다" }, { status: 500 });
+  }
+}
+
+// 체크인 취소
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    const { id } = await params;
+
+    if (!session?.user?.id || !session.user.teamId) {
+      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+    }
+
+    const event = await prisma.trainingEvent.findUnique({ where: { id } });
+    if (!event || event.teamId !== session.user.teamId) {
+      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
+    }
+
+    // 체크인 기록 확인
+    const existing = await prisma.checkIn.findUnique({
+      where: {
+        trainingEventId_userId: {
+          trainingEventId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "체크인 기록이 없습니다" }, { status: 404 });
+    }
+
+    // 체크인 삭제
+    await prisma.checkIn.delete({
+      where: {
+        trainingEventId_userId: {
+          trainingEventId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    return NextResponse.json({ message: "체크인이 취소되었습니다" });
+  } catch (error) {
+    console.error("체크인 취소 오류:", error);
+    return NextResponse.json({ error: "취소에 실패했습니다" }, { status: 500 });
   }
 }

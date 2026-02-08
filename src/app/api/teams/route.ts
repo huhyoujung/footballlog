@@ -120,7 +120,14 @@ export async function GET() {
       where: { id: session.user.id },
       include: {
         team: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            inviteCode: true,
+            logoUrl: true,
+            primaryColor: true,
+            createdAt: true,
+            createdBy: true,
             members: {
               select: {
                 id: true,

@@ -241,13 +241,6 @@ export default function MyPage() {
                 <span className="text-gray-900">팀 프로필 수정</span>
                 <span className="text-gray-400">&rsaquo;</span>
               </Link>
-              <Link
-                href="/my/training"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">팀 운동 관리</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
             </div>
           </div>
         )}

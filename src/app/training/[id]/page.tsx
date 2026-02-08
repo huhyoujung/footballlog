@@ -71,6 +71,29 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
       });
       if (res.ok) {
         fetchEvent();
+      } else {
+        const data = await res.json();
+        alert(data.error || "체크인에 실패했습니다");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelCheckIn = async () => {
+    if (!confirm("체크인을 취소하시겠습니까?")) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/check-in`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchEvent();
+      } else {
+        const data = await res.json();
+        alert(data.error || "취소에 실패했습니다");
       }
     } catch {
       // ignore
@@ -99,7 +122,12 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
   const isAdmin = session?.user?.role === "ADMIN";
   const isDeadlinePassed = new Date() > new Date(event.rsvpDeadline);
-  const isToday = new Date(event.date).toDateString() === new Date().toDateString();
+
+  // 체크인 가능 시간: 운동 시작 2시간 전부터
+  const now = new Date();
+  const eventDate = new Date(event.date);
+  const twoHoursBefore = new Date(eventDate.getTime() - 2 * 60 * 60 * 1000);
+  const canCheckIn = now >= twoHoursBefore;
 
   const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -277,8 +305,8 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
-        {/* 체크인 (운동 당일) */}
-        {isToday && (
+        {/* 체크인 (운동 2시간 전부터) */}
+        {canCheckIn && (
           <div className="bg-white rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">체크인</h3>
             {event.myCheckIn ? (
@@ -287,6 +315,13 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                 <div className="text-sm text-gray-500 mt-1">
                   도착: {new Date(event.myCheckIn).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                 </div>
+                <button
+                  onClick={handleCancelCheckIn}
+                  disabled={submitting}
+                  className="mt-3 text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+                >
+                  체크인 취소
+                </button>
               </div>
             ) : (rsvpStatus === "ATTEND" || rsvpStatus === "LATE") ? (
               <button
