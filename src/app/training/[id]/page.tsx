@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/training-event";
+import PomVoting from "@/components/PomVoting";
 
 export default function TrainingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -124,11 +125,11 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   const isAdmin = session?.user?.role === "ADMIN";
   const isDeadlinePassed = new Date() > new Date(event.rsvpDeadline);
 
-  // 체크인 가능 시간: 운동 시작 2시간 전부터
+  // 체크인 가능 시간: 운동 시작 2시간 전 ~ 운동 시작 시간까지
   const now = new Date();
   const eventDate = new Date(event.date);
   const twoHoursBefore = new Date(eventDate.getTime() - 2 * 60 * 60 * 1000);
-  const canCheckIn = now >= twoHoursBefore;
+  const canCheckIn = now >= twoHoursBefore && now <= eventDate;
 
   const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -396,7 +397,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* 체크인 (운동 2시간 전부터) */}
         {canCheckIn && (
-          <div className="bg-white rounded-xl p-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">체크인</h3>
             {event.myCheckIn ? (
               <div className="text-center py-3">
@@ -465,6 +466,37 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                       ))}
                     </div>
                   ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* POM 투표 (체크인한 사람들 대상) */}
+        {event.checkIns.length > 0 && (
+          <PomVoting
+            eventId={event.id}
+            eventDate={event.date}
+            checkIns={event.checkIns}
+          />
+        )}
+
+        {/* 장비 정보 */}
+        {event.equipmentAssignments && event.equipmentAssignments.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">장비</h3>
+            <div className="space-y-2">
+              {event.equipmentAssignments.map((assignment) => (
+                <div key={assignment.id} className="flex items-start gap-2 text-sm">
+                  <span className="text-gray-900 font-medium">{assignment.equipment.name}:</span>
+                  <div className="flex-1">
+                    <span className="text-gray-700">
+                      {assignment.user?.name || "미배정"}
+                    </span>
+                    {assignment.memo && (
+                      <span className="text-gray-500 ml-1">"{assignment.memo}"</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

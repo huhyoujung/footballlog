@@ -44,6 +44,13 @@ export async function GET(
           },
           orderBy: { orderIndex: "asc" },
         },
+        equipmentAssignments: {
+          include: {
+            equipment: { select: { id: true, name: true, description: true } },
+            user: { select: userSelect },
+          },
+          orderBy: { equipment: { orderIndex: "asc" } },
+        },
       },
     });
 

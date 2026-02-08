@@ -55,6 +55,18 @@ interface SessionEntry {
   }[];
 }
 
+interface EquipmentWithAssignment {
+  id: string;
+  name: string;
+  description: string | null;
+  assignment: {
+    id: string;
+    userId: string | null;
+    memo: string | null;
+    user: User | null;
+  } | null;
+}
+
 interface EventDetail {
   id: string;
   title: string;
@@ -66,7 +78,7 @@ interface EventDetail {
   sessions: SessionEntry[];
 }
 
-type Tab = "attendance" | "latefee" | "session";
+type Tab = "attendance" | "latefee" | "session" | "equipment";
 
 // 팀의 포지션 요약 문자열 생성 (예: "GK1 DF2 MF2 FW1")
 function getTeamPositionSummary(
@@ -134,6 +146,11 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   // 출석률 모달 상태
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
 
+  // 장비 상태
+  const [equipments, setEquipments] = useState<EquipmentWithAssignment[]>([]);
+  const [equipmentAssignments, setEquipmentAssignments] = useState<Record<string, { userId: string | null; memo: string }>>({});
+  const [savingEquipment, setSavingEquipment] = useState(false);
+
   useEffect(() => {
     params.then((p) => setEventId(p.id));
   }, [params]);
@@ -141,6 +158,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     if (eventId) fetchEvent();
   }, [eventId]);
+
+  useEffect(() => {
+    if (eventId && activeTab === "equipment") {
+      fetchEquipments();
+    }
+  }, [eventId, activeTab]);
 
   const fetchEvent = async () => {
     try {
@@ -153,6 +176,56 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       // ignore
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEquipments = async () => {
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/equipment`);
+      if (res.ok) {
+        const data = await res.json();
+        setEquipments(data);
+
+        // 현재 배정 상태를 state에 설정
+        const assignments: Record<string, { userId: string | null; memo: string }> = {};
+        data.forEach((eq: EquipmentWithAssignment) => {
+          assignments[eq.id] = {
+            userId: eq.assignment?.userId || null,
+            memo: eq.assignment?.memo || "",
+          };
+        });
+        setEquipmentAssignments(assignments);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveEquipmentAssignments = async () => {
+    setSavingEquipment(true);
+    try {
+      const assignments = Object.entries(equipmentAssignments).map(([equipmentId, { userId, memo }]) => ({
+        equipmentId,
+        userId,
+        memo: memo.trim() || undefined,
+      }));
+
+      const res = await fetch(`/api/training-events/${eventId}/equipment`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignments }),
+      });
+
+      if (res.ok) {
+        alert("저장되었습니다");
+        fetchEquipments();
+      } else {
+        alert("저장에 실패했습니다");
+      }
+    } catch {
+      alert("저장에 실패했습니다");
+    } finally {
+      setSavingEquipment(false);
     }
   };
 
@@ -531,6 +604,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     { key: "attendance", label: "출석" },
     { key: "latefee", label: "지각비" },
     { key: "session", label: "세션" },
+    { key: "equipment", label: "장비" },
   ];
 
   return (
@@ -1219,6 +1293,97 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                 <div className="text-3xl mb-2">⚽</div>
                 <p className="text-sm text-gray-400">세션을 추가하여 팀을 분배하세요</p>
               </div>
+            )}
+          </>
+        )}
+
+        {/* 장비 탭 */}
+        {activeTab === "equipment" && (
+          <>
+            {equipments.length === 0 ? (
+              <div className="bg-white rounded-xl p-6 text-center">
+                <p className="text-sm text-gray-500 mb-2">등록된 장비가 없습니다</p>
+                <p className="text-xs text-gray-400">
+                  팀 설정에서 장비를 먼저 추가해주세요
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {equipments.map((eq) => {
+                    const assignment = equipmentAssignments[eq.id] || { userId: null, memo: "" };
+                    return (
+                      <div key={eq.id} className="bg-white rounded-xl p-4">
+                        <div className="mb-3">
+                          <h4 className="text-sm font-semibold text-gray-900">{eq.name}</h4>
+                          {eq.description && (
+                            <p className="text-xs text-gray-500 mt-0.5">{eq.description}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              담당자
+                            </label>
+                            <select
+                              value={assignment.userId || ""}
+                              onChange={(e) =>
+                                setEquipmentAssignments((prev) => ({
+                                  ...prev,
+                                  [eq.id]: { ...prev[eq.id], userId: e.target.value || null },
+                                }))
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                            >
+                              <option value="">없음 (미배정)</option>
+                              {attendees.map((r) => (
+                                <option key={r.userId} value={r.userId}>
+                                  {r.user.name || "이름 없음"}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              메모 (선택)
+                            </label>
+                            <input
+                              type="text"
+                              value={assignment.memo}
+                              onChange={(e) =>
+                                setEquipmentAssignments((prev) => ({
+                                  ...prev,
+                                  [eq.id]: { ...prev[eq.id], memo: e.target.value },
+                                }))
+                              }
+                              placeholder="예: 공 1개만, 펌프 포함"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => fetchEquipments()}
+                    className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={saveEquipmentAssignments}
+                    disabled={savingEquipment}
+                    className="flex-1 py-2.5 bg-team-500 text-white rounded-lg font-medium hover:bg-team-600 disabled:opacity-50"
+                  >
+                    {savingEquipment ? "저장 중..." : "저장"}
+                  </button>
+                </div>
+              </>
             )}
           </>
         )}

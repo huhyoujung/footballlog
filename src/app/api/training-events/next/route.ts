@@ -17,10 +17,16 @@ export async function GET() {
         date: { gte: new Date() },
       },
       include: {
+        venue: { select: { name: true } },
         _count: { select: { rsvps: true } },
         rsvps: {
           where: { userId: session.user.id },
           select: { status: true },
+          take: 1,
+        },
+        checkIns: {
+          where: { userId: session.user.id },
+          select: { checkedInAt: true },
           take: 1,
         },
       },
@@ -31,11 +37,14 @@ export async function GET() {
       events: events.map((event) => ({
         id: event.id,
         title: event.title,
+        isRegular: event.isRegular,
         date: event.date,
         location: event.location,
+        venue: event.venue,
         rsvpDeadline: event.rsvpDeadline,
         _count: event._count,
         myRsvp: event.rsvps[0]?.status || null,
+        myCheckIn: event.checkIns[0]?.checkedInAt.toISOString() || null,
       })),
     });
   } catch (error) {

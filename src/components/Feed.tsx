@@ -6,11 +6,14 @@ import Link from "next/link";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
+import TrainingCheckInCard from "./TrainingCheckInCard";
 import Toast from "./Toast";
 import LoadingSpinner from "./LoadingSpinner";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
+import { useTeam } from "@/contexts/TeamContext";
 import { timeAgo } from "@/lib/timeAgo";
+import { isCheckInPeriod } from "@/lib/timeUntil";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
 
@@ -23,9 +26,8 @@ interface Nudge {
 
 export default function Feed() {
   const { data: session } = useSession();
+  const { teamData, loading: teamLoading } = useTeam();
   const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [teamLogoUrl, setTeamLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
@@ -35,6 +37,8 @@ export default function Feed() {
   const { toast, showToast, hideToast } = useToast();
 
   const isAdmin = session?.user?.role === "ADMIN";
+  const teamMembers: TeamMember[] = teamData?.members || [];
+  const teamLogoUrl = teamData?.logoUrl || null;
 
   useEffect(() => {
     fetchData();
@@ -49,9 +53,8 @@ export default function Feed() {
 
   const fetchData = async () => {
     try {
-      const [logsRes, teamRes, nudgesRes, eventRes] = await Promise.all([
+      const [logsRes, nudgesRes, eventRes] = await Promise.all([
         fetch("/api/training-logs"),
-        fetch("/api/teams"),
         fetch("/api/nudges"),
         fetch("/api/training-events/next"),
       ]);
@@ -59,12 +62,6 @@ export default function Feed() {
       if (logsRes.ok) {
         const data = await logsRes.json();
         setLogs(data.logs);
-      }
-
-      if (teamRes.ok) {
-        const data = await teamRes.json();
-        setTeamMembers(data.members || []);
-        setTeamLogoUrl(data.logoUrl || null);
       }
 
       if (nudgesRes.ok) {
@@ -251,6 +248,16 @@ export default function Feed() {
     (event) => !event.myRsvp && new Date() < new Date(event.rsvpDeadline)
   );
 
+  // 체크인 대기 목록 (RSVP 참석/늦참 + 미체크인 + 시간 범위 내)
+  const checkInEvents = nextEvents.filter(
+    (event) =>
+      (event.myRsvp === "ATTEND" || event.myRsvp === "LATE") &&
+      !event.myCheckIn &&
+      isCheckInPeriod(event.date)
+  );
+
+  const isLoading = loading || teamLoading;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
@@ -276,10 +283,21 @@ export default function Feed() {
       </header>
 
       {/* 전광판 */}
-      {!loading && <TickerBanner messages={getTickerMessages()} />}
+      {!isLoading && <TickerBanner messages={getTickerMessages()} />}
+
+      {/* 체크인 유도 카드 (우선 표시) */}
+      {!isLoading && checkInEvents.length > 0 && (
+        <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
+          <div className={`flex gap-3 ${checkInEvents.length === 1 ? '' : 'w-max'}`}>
+            {checkInEvents.map((event) => (
+              <TrainingCheckInCard key={event.id} event={event} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 미투표 초대장들 */}
-      {!loading && pendingInvites.length > 0 && (
+      {!isLoading && pendingInvites.length > 0 && (
         <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${pendingInvites.length === 1 ? 'flex justify-center' : ''}`}>
           <div className={`flex gap-3 ${pendingInvites.length === 1 ? '' : 'w-max'}`}>
             {pendingInvites.map((event) => (
@@ -291,7 +309,7 @@ export default function Feed() {
 
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
-        {loading ? (
+        {isLoading ? (
           <LoadingSpinner />
         ) : logs.length === 0 ? (
           <div className="text-center py-20 px-6">
@@ -327,7 +345,7 @@ export default function Feed() {
       </main>
 
       {/* FAB - 추가 버튼 */}
-      {!loading && (
+      {!isLoading && (
         <div className="fixed bottom-6 right-6 z-50">
           {/* 메뉴 (운영진만) */}
           {isAdmin && showFabMenu && (

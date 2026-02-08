@@ -85,7 +85,10 @@ model User {
   checkIns               CheckIn[]
   lateFees               LateFee[]
   sessionTeamAssignments SessionTeamAssignment[]
-  taggedInLogs           TrainingLog[] @relation("TaggedInLogs")
+  equipmentAssignments   EquipmentAssignment[]
+  taggedInLogs           TrainingLog[]           @relation("TaggedInLogs")
+  pomVotesCast           PomVote[]               @relation("PomVoter")
+  pomVotesReceived       PomVote[]               @relation("PomNominee")
 }
 
 model Team {
@@ -104,6 +107,7 @@ model Team {
   nudges         Nudge[]
   trainingEvents TrainingEvent[]
   venues         Venue[]
+  equipments     Equipment[]
 }
 
 model Venue {
@@ -228,16 +232,18 @@ model TrainingEvent {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  venue        Venue?            @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  createdBy    User              @relation("TrainingEventCreator", fields: [createdById], references: [id])
-  vestBringer  User?             @relation("VestBringer", fields: [vestBringerId], references: [id])
-  vestReceiver User?             @relation("VestReceiver", fields: [vestReceiverId], references: [id])
-  rsvps        Rsvp[]
-  checkIns     CheckIn[]
-  lateFees     LateFee[]
-  sessions     TrainingSession[]
-  trainingLogs TrainingLog[]
+  team                 Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  venue                Venue?                @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  createdBy            User                  @relation("TrainingEventCreator", fields: [createdById], references: [id])
+  vestBringer          User?                 @relation("VestBringer", fields: [vestBringerId], references: [id])
+  vestReceiver         User?                 @relation("VestReceiver", fields: [vestReceiverId], references: [id])
+  rsvps                Rsvp[]
+  checkIns             CheckIn[]
+  lateFees             LateFee[]
+  sessions             TrainingSession[]
+  equipmentAssignments EquipmentAssignment[]
+  trainingLogs         TrainingLog[]
+  pomVotes             PomVote[]
 }
 
 model Rsvp {
@@ -308,4 +314,54 @@ model SessionTeamAssignment {
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingSessionId, userId])
+}
+
+// === 장비 관리 ===
+
+model Equipment {
+  id          String   @id @default(cuid())
+  teamId      String
+  name        String
+  description String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  team        Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  assignments EquipmentAssignment[]
+
+  @@unique([teamId, name])
+}
+
+model EquipmentAssignment {
+  id              String   @id @default(cuid())
+  trainingEventId String
+  equipmentId     String
+  userId          String?
+  memo            String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  equipment     Equipment     @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  user          User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([trainingEventId, equipmentId])
+}
+
+// === POM (Player of the Match) ===
+
+model PomVote {
+  id              String   @id @default(cuid())
+  trainingEventId String
+  voterId         String   // 투표한 사람
+  nomineeId       String   // 선택된 사람
+  reason          String   @db.Text // 어떤 플레이가 좋았는지
+  createdAt       DateTime @default(now())
+
+  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  voter         User          @relation("PomVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  nominee       User          @relation("PomNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingEventId, voterId]) // 한 이벤트당 1인 1표
 }

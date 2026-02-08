@@ -3,6 +3,7 @@ import "./globals.css";
 import SessionProvider from "@/components/SessionProvider";
 import PWAManager from "@/components/PWAManager";
 import TeamColorProvider from "@/components/TeamColorProvider";
+import { TeamProvider } from "@/contexts/TeamContext";
 
 export const metadata: Metadata = {
   title: "네모의 꿈",
@@ -34,9 +35,11 @@ export default function RootLayout({
         className="antialiased bg-gray-50 min-h-screen"
       >
         <SessionProvider>
-          <TeamColorProvider />
-          <PWAManager />
-          {children}
+          <TeamProvider>
+            <TeamColorProvider />
+            <PWAManager />
+            {children}
+          </TeamProvider>
         </SessionProvider>
       </body>
     </html>

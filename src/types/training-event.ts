@@ -7,8 +7,10 @@ export interface TrainingEventSummary {
   isRegular: boolean;
   date: string;
   location: string;
+  venue: { name: string } | null;
   rsvpDeadline: string;
   myRsvp: RsvpStatus | null;
+  myCheckIn: string | null; // checkedInAt ISO string
   _count: { rsvps: number };
 }
 
@@ -30,6 +32,7 @@ export interface TrainingEventDetail {
   rsvps: RsvpEntry[];
   checkIns: CheckInEntry[];
   sessions: SessionEntry[];
+  equipmentAssignments?: EquipmentAssignmentEntry[];
   myRsvp: RsvpStatus | null;
   myCheckIn: string | null; // checkedInAt ISO string
 }
@@ -71,4 +74,13 @@ export interface SessionEntry {
     teamLabel: string;
     user: { id: string; name: string | null; image: string | null };
   }[];
+}
+
+export interface EquipmentAssignmentEntry {
+  id: string;
+  equipmentId: string;
+  userId: string | null;
+  memo: string | null;
+  equipment: { id: string; name: string; description: string | null };
+  user: { id: string; name: string | null; image: string | null } | null;
 }

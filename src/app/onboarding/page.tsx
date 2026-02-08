@@ -82,10 +82,10 @@ export default function OnboardingPage() {
       }
 
       await update();
-      setMode("profile");
+      router.push("/");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
-    } finally {
       setLoading(false);
     }
   };
@@ -110,10 +110,10 @@ export default function OnboardingPage() {
       }
 
       await update();
-      setMode("profile");
+      router.push("/");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
-    } finally {
       setLoading(false);
     }
   };

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface Team {
   id: string;
@@ -24,7 +25,7 @@ interface Team {
 
 export default function MyPage() {
   const { data: session, update } = useSession();
-  const [team, setTeam] = useState<Team | null>(null);
+  const { teamData, loading: teamLoading } = useTeam();
   const [loading, setLoading] = useState(true);
   const [nudging, setNudging] = useState<string | null>(null);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
@@ -34,7 +35,6 @@ export default function MyPage() {
 
   useEffect(() => {
     if (session?.user?.teamId) {
-      fetchTeam();
       fetchProfile();
     } else {
       setLoading(false);
@@ -51,18 +51,6 @@ export default function MyPage() {
     } catch {
       // use session image as fallback
       setUserImage(session?.user?.image || null);
-    }
-  };
-
-  const fetchTeam = async () => {
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setTeam(data);
-      }
-    } catch (error) {
-      console.error("팀 정보 로드 실패:", error);
     } finally {
       setLoading(false);
     }
@@ -106,7 +94,9 @@ export default function MyPage() {
     signOut({ callbackUrl: "/login" });
   };
 
-  if (loading) {
+  const isLoading = loading || teamLoading;
+
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -128,15 +118,15 @@ export default function MyPage() {
       </header>
 
       <main className="flex-1 max-w-5xl mx-auto px-6 py-4 w-full space-y-4">
-        {team && (
+        {teamData && (
           <>
             {/* 팀원 목록 */}
             <div className="bg-white rounded-xl p-6">
               <p className="text-xs text-gray-400 mb-3">
-                우리 팀원 {team.members.length}명
+                우리 팀원 {teamData.members.length}명
               </p>
               <div className="space-y-2">
-                {team.members.map((member) => (
+                {teamData.members.map((member) => (
                   <div
                     key={member.id}
                     className="flex items-center gap-3 py-1.5"
@@ -245,13 +235,22 @@ export default function MyPage() {
                 <span className="text-gray-400">&rsaquo;</span>
               </Link>
               {isAdmin && (
-                <Link
-                  href="/my/team-settings"
-                  className="flex items-center justify-between p-4 hover:bg-gray-50"
-                >
-                  <span className="text-gray-900">팀 프로필 수정</span>
-                  <span className="text-gray-400">&rsaquo;</span>
-                </Link>
+                <>
+                  <Link
+                    href="/my/team-settings"
+                    className="flex items-center justify-between p-4 hover:bg-gray-50"
+                  >
+                    <span className="text-gray-900">팀 프로필 수정</span>
+                    <span className="text-gray-400">&rsaquo;</span>
+                  </Link>
+                  <Link
+                    href="/my/team-equipment"
+                    className="flex items-center justify-between p-4 hover:bg-gray-50"
+                  >
+                    <span className="text-gray-900">장비 관리</span>
+                    <span className="text-gray-400">&rsaquo;</span>
+                  </Link>
+                </>
               )}
             </div>
           </>

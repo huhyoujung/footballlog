@@ -433,7 +433,7 @@ function WritePageContent() {
               setFormData({ ...formData, keyPoints: value })
             }
             teamMembers={teamMembers}
-            placeholder="오늘 훈련에서 좋았던 점, 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요. @팀원이름 으로 태그할 수 있습니다."
+            placeholder="오늘 훈련에서 좋았던 점, 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요."
             rows={5}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
@@ -450,7 +450,7 @@ function WritePageContent() {
               setFormData({ ...formData, improvement: value })
             }
             teamMembers={teamMembers}
-            placeholder="다음 훈련에서 개선하고 싶은 점, 더 연습이 필요한 부분을 적어주세요. @팀원이름 으로 태그할 수 있습니다."
+            placeholder="다음 훈련에서 개선하고 싶은 점, 더 연습이 필요한 부분을 적어주세요."
             rows={4}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
@@ -458,7 +458,7 @@ function WritePageContent() {
 
         {/* 이미지 첨부 - 신규 작성 시에만 */}
         {!isEditMode && (
-          <div className="px-4 py-5">
+          <div className="px-4 py-5 flex flex-col items-center">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               사진 (선택)
             </label>
@@ -469,7 +469,7 @@ function WritePageContent() {
               style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
             >
               {imagePreview ? (
-                <div className="relative w-full aspect-[4/3]">
+                <div className="relative w-full aspect-[3/4]">
                   <img
                     src={imagePreview}
                     alt="미리보기"
@@ -508,7 +508,7 @@ function WritePageContent() {
 
         {/* 수정 모드에서 기존 이미지 표시 */}
         {isEditMode && imagePreview && (
-          <div className="px-4 py-5">
+          <div className="px-4 py-5 flex flex-col items-center">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               사진 (선택)
             </label>
@@ -519,7 +519,7 @@ function WritePageContent() {
               <img
                 src={imagePreview}
                 alt="기존 사진"
-                className="w-full aspect-[4/3] object-cover rounded-sm"
+                className="w-full aspect-[3/4] object-cover rounded-sm"
               />
             </div>
             <p className="text-xs text-gray-400 mt-2">사진은 수정할 수 없습니다</p>
