@@ -185,9 +185,9 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-4">
+      <main className="max-w-lg mx-auto p-4 space-y-3">
         {/* 운동 정보 */}
-        <div className="bg-white rounded-xl p-5 space-y-2.5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-900">
               <span>⚽</span>
@@ -214,7 +214,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
             </div>
           )}
           {event.notes && (
-            <div className="flex items-start gap-2 text-sm text-gray-600 bg-team-50 -mx-5 px-5 py-3 mt-3">
+            <div className="flex items-start gap-2 text-sm text-gray-600 border-t border-gray-100 -mx-5 px-5 py-3 mt-3">
               <span className="mt-0.5">💡</span>
               <div className="flex-1 whitespace-pre-wrap">{event.notes}</div>
             </div>
@@ -236,7 +236,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* RSVP - 응답하지 않은 경우에만 표시 */}
         {!isDeadlinePassed && !event.myRsvp && (
-          <div className="bg-white rounded-xl p-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">나의 참석 여부</h3>
             <div className="flex gap-2 mb-3">
               {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
@@ -283,17 +283,17 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* 참석 현황 */}
-        <div className="bg-white rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">
             참석 현황 ({event.rsvps.length}명 응답)
           </h3>
 
           {/* 내 응답 표시 및 수정 */}
           {event.myRsvp && !isDeadlinePassed && (
-            <div className="mb-4 p-3 bg-team-50 rounded-lg border border-team-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="mb-4 p-3 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">내 응답:</span>
+                  <span className="text-xs text-gray-500">내 응답</span>
                   <span className={`text-sm font-semibold ${
                     event.myRsvp === "ATTEND" ? "text-green-600" :
                     event.myRsvp === "ABSENT" ? "text-red-600" : "text-yellow-600"
@@ -303,14 +303,14 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                 </div>
                 <button
                   onClick={() => setShowEditRsvp(!showEditRsvp)}
-                  className="text-xs text-team-600 hover:text-team-700 font-medium"
+                  className="text-xs text-team-600 hover:text-team-700 font-medium px-2 py-1"
                 >
                   {showEditRsvp ? "취소" : "수정"}
                 </button>
               </div>
 
               {showEditRsvp && (
-                <div className="space-y-2 pt-2 border-t border-team-200">
+                <div className="space-y-2 pt-3 mt-3 border-t border-gray-100">
                   <div className="flex gap-2">
                     {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
                       const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
@@ -430,11 +430,11 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* 세션 정보 (모두 볼 수 있음) */}
         {event.sessions.length > 0 && (
-          <div className="bg-white rounded-xl p-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">세션</h3>
             <div className="space-y-3">
               {event.sessions.map((s, idx) => (
-                <div key={s.id} className="border border-gray-100 rounded-lg p-3">
+                <div key={s.id} className="border border-gray-200 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
                       {idx + 1}
