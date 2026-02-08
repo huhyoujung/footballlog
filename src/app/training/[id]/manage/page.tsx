@@ -466,20 +466,22 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // 세션 순서 변경 (데이터 refetch 없이)
-  const handleReorderSession = async (sessionId: string, direction: "up" | "down") => {
+  // 세션 순서 변경 (전체 순서를 한 번에 전송)
+  const handleReorderSessions = async (newOrder: string[]) => {
     try {
-      const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/reorder`, {
+      const res = await fetch(`/api/training-events/${eventId}/sessions/reorder-all`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction }),
+        body: JSON.stringify({ sessionIds: newOrder }),
       });
       if (!res.ok) {
         throw new Error("순서 변경 실패");
       }
-    } catch {
+      await fetchEvent();
+    } catch (error) {
+      console.error("순서 변경 실패:", error);
       alert("순서 변경에 실패했습니다");
-      throw new Error(); // 에러를 throw해서 루프 중단
+      await fetchEvent(); // 실패해도 fetch해서 원래 상태로 복구
     }
   };
 
@@ -580,22 +582,18 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const handleSessionDragEnd = async () => {
     if (draggedSessionId && dragOverSessionIndex !== null && event) {
       const fromIndex = event.sessions.findIndex((s) => s.id === draggedSessionId);
-      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
-        // 위/아래 방향 결정
-        const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
-        const moves = Math.abs(dragOverSessionIndex - fromIndex);
 
-        try {
-          // 여러 번 이동 (중간에 fetchEvent 안 함)
-          for (let i = 0; i < moves; i++) {
-            await handleReorderSession(draggedSessionId, direction);
-          }
-          // 모든 이동이 완료된 후 한 번만 fetch
-          await fetchEvent();
-        } catch {
-          // 에러 발생 시에도 fetch해서 올바른 상태로 복구
-          await fetchEvent();
-        }
+      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
+        // 배열 순서 직접 조정
+        const newSessions = [...event.sessions];
+        const [movedSession] = newSessions.splice(fromIndex, 1);
+        newSessions.splice(dragOverSessionIndex, 0, movedSession);
+
+        // 새로운 순서의 ID 배열 생성
+        const newOrder = newSessions.map((s) => s.id);
+
+        // 서버에 한 번에 전송
+        await handleReorderSessions(newOrder);
       }
     }
     setDraggedSessionId(null);
@@ -626,21 +624,18 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const handleSessionTouchEnd = async () => {
     if (draggedSessionId && dragOverSessionIndex !== null && event) {
       const fromIndex = event.sessions.findIndex((s) => s.id === draggedSessionId);
-      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
-        const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
-        const moves = Math.abs(dragOverSessionIndex - fromIndex);
 
-        try {
-          // 여러 번 이동 (중간에 fetchEvent 안 함)
-          for (let i = 0; i < moves; i++) {
-            await handleReorderSession(draggedSessionId, direction);
-          }
-          // 모든 이동이 완료된 후 한 번만 fetch
-          await fetchEvent();
-        } catch {
-          // 에러 발생 시에도 fetch해서 올바른 상태로 복구
-          await fetchEvent();
-        }
+      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
+        // 배열 순서 직접 조정
+        const newSessions = [...event.sessions];
+        const [movedSession] = newSessions.splice(fromIndex, 1);
+        newSessions.splice(dragOverSessionIndex, 0, movedSession);
+
+        // 새로운 순서의 ID 배열 생성
+        const newOrder = newSessions.map((s) => s.id);
+
+        // 서버에 한 번에 전송
+        await handleReorderSessions(newOrder);
       }
     }
     setDraggedSessionId(null);
