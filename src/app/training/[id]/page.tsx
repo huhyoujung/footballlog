@@ -446,7 +446,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                   {s.memo && <p className="text-xs text-gray-500 mt-1">{s.memo}</p>}
                   {!s.requiresTeams ? (
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                      <span>💡</span>
+                      <span>👥</span>
                       <span>전체 함께 진행</span>
                     </div>
                   ) : s.teamAssignments.length > 0 ? (

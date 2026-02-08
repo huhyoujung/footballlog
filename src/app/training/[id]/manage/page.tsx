@@ -121,6 +121,14 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
   const [randomTeamCount, setRandomTeamCount] = useState(2);
 
+  // 스와이프 상태
+  const [swipedSession, setSwipedSession] = useState<string | null>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchCurrent, setTouchCurrent] = useState<number | null>(null);
+
+  // 삭제 모달 상태
+  const [deleteModalSession, setDeleteModalSession] = useState<string | null>(null);
+
   // 출석률 모달 상태
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
 
@@ -238,9 +246,39 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
   // 세션 삭제
   const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm("이 세션을 삭제하시겠습니까?")) return;
+    setDeleteModalSession(null);
+    setSwipedSession(null);
     const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, { method: "DELETE" });
     if (res.ok) fetchEvent();
+  };
+
+  // 터치 핸들러
+  const handleTouchStart = (e: React.TouchEvent, sessionId: string) => {
+    if (editingSession === sessionId || editingSessionInfo === sessionId) return;
+    setTouchStart(e.touches[0].clientX);
+    setTouchCurrent(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    setTouchCurrent(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (sessionId: string) => {
+    if (touchStart === null || touchCurrent === null) return;
+
+    const diff = touchStart - touchCurrent;
+
+    if (diff > 80) {
+      // 왼쪽으로 스와이프 -> 버튼 표시
+      setSwipedSession(sessionId);
+    } else if (diff < -80 || Math.abs(diff) < 10) {
+      // 오른쪽으로 스와이프 또는 탭 -> 버튼 숨김
+      setSwipedSession(null);
+    }
+
+    setTouchStart(null);
+    setTouchCurrent(null);
   };
 
   // 팀 배정 편집 시작
@@ -611,9 +649,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </div>
 
             {event.sessions.map((sess, idx) => (
-              <div key={sess.id} className="bg-white rounded-xl overflow-hidden">
+              <div key={sess.id} className="bg-white rounded-xl overflow-hidden relative">
                 {/* 세션 헤더 */}
-                <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+                <div className="relative">
+                  <div
+                    className={`px-5 pt-4 pb-3 border-b border-gray-100 bg-white transition-transform duration-200 ease-out ${
+                      swipedSession === sess.id ? "-translate-x-32" : ""
+                    }`}
+                    onTouchStart={(e) => handleTouchStart(e, sess.id)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(sess.id)}
+                  >
                   {editingSessionInfo === sess.id ? (
                     /* 편집 모드 */
                     <div className="space-y-2">
@@ -665,7 +711,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           </h3>
                         </div>
                         <div className="flex gap-1">
-                          {/* 순서 변경 버튼 */}
+                          {/* 순서 변경 버튼만 유지 */}
                           <button
                             onClick={() => handleReorderSession(sess.id, "up")}
                             disabled={idx === 0}
@@ -684,41 +730,47 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                               <polyline points="6 9 12 15 18 9" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => {
-                              setEditingSessionInfo(sess.id);
-                              setEditTitle(sess.title || "");
-                              setEditMemo(sess.memo || "");
-                            }}
-                            className="text-xs text-gray-400 hover:text-team-500 p-1 transition-colors"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSession(sess.id)}
-                            className="text-xs text-gray-400 hover:text-red-500 p-1 transition-colors"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
-                          </button>
                         </div>
                       </div>
                       {sess.memo && <p className="text-xs text-gray-500 mt-1.5 ml-8">{sess.memo}</p>}
                     </>
                   )}
+                  </div>
+
+                  {/* 스와이프 시 나타나는 버튼 */}
+                  <div className="absolute right-0 top-0 bottom-0 flex items-center">
+                    <button
+                      onClick={() => {
+                        setEditingSessionInfo(sess.id);
+                        setEditTitle(sess.title || "");
+                        setEditMemo(sess.memo || "");
+                        setSwipedSession(null);
+                      }}
+                      className="h-full w-16 bg-team-500 text-white flex items-center justify-center hover:bg-team-600 transition-colors"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setDeleteModalSession(sess.id)}
+                      className="h-full w-16 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-5">
                   {!sess.requiresTeams ? (
                     /* 팀 분배 불필요 */
                     <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
-                      <span>💡</span>
+                      <span>👥</span>
                       <span>전체 함께 진행</span>
                     </div>
                   ) : editingSession === sess.id ? (
@@ -769,40 +821,19 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                         onDrop={(e) => handleDrop(e, sess.id, "unassigned")}
                       >
                         <div className="text-xs font-medium text-gray-400 mb-2">미배정</div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {attendees
                             .filter((r) => !(teamAssignments[sess.id] || []).some((a) => a.userId === r.userId))
                             .map((r) => (
-                              <div
+                              <span
                                 key={r.userId}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned")}
-                                className="inline-flex flex-col items-center cursor-grab active:cursor-grabbing select-none"
-                                style={{ width: "60px" }}
+                                className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors"
                               >
-                                {/* 선수 아이콘 */}
-                                <svg width="48" height="56" viewBox="0 0 24 28" fill="none" className="text-gray-600">
-                                  {/* 머리 */}
-                                  <circle cx="12" cy="4" r="3" fill="currentColor" />
-                                  {/* 몸통 */}
-                                  <path d="M12 8 L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                  {/* 팔 */}
-                                  <path d="M6 11 L12 10 L18 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                  {/* 다리 */}
-                                  <path d="M12 16 L9 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                  <path d="M12 16 L15 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                </svg>
-                                {/* 이름 */}
-                                <span className="text-[9px] font-medium text-gray-700 mt-0.5 text-center leading-tight truncate max-w-full px-0.5">
-                                  {r.user.name || "이름 없음"}
-                                </span>
-                                {/* 포지션 */}
-                                {r.user.position && (
-                                  <span className="text-[7px] font-semibold text-gray-400 uppercase">
-                                    {getPositionGroup(r.user.position)}
-                                  </span>
-                                )}
-                              </div>
+                                {r.user.name || "이름 없음"}
+                                {r.user.position && <span className="ml-1 text-[10px] text-gray-400">{getPositionGroup(r.user.position)}</span>}
+                              </span>
                             ))}
                         </div>
                       </div>
@@ -837,36 +868,15 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                               {teamMembers.map((a) => {
                                 const user = attendees.find((r) => r.userId === a.userId)?.user;
                                 return (
-                                  <div
+                                  <span
                                     key={a.userId}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, a.userId, user?.name || "이름 없음", label)}
-                                    className="inline-flex flex-col items-center cursor-grab active:cursor-grabbing select-none"
-                                    style={{ width: "60px" }}
+                                    className="px-2.5 py-1.5 bg-team-50 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-100 transition-colors"
                                   >
-                                    {/* 선수 아이콘 */}
-                                    <svg width="48" height="56" viewBox="0 0 24 28" fill="none" className="text-team-600">
-                                      {/* 머리 */}
-                                      <circle cx="12" cy="4" r="3" fill="currentColor" />
-                                      {/* 몸통 */}
-                                      <path d="M12 8 L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                      {/* 팔 */}
-                                      <path d="M6 11 L12 10 L18 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                      {/* 다리 */}
-                                      <path d="M12 16 L9 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                      <path d="M12 16 L15 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                    {/* 이름 */}
-                                    <span className="text-[9px] font-medium text-team-700 mt-0.5 text-center leading-tight truncate max-w-full px-0.5">
-                                      {user?.name || "이름 없음"}
-                                    </span>
-                                    {/* 포지션 */}
-                                    {user?.position && (
-                                      <span className="text-[7px] font-semibold text-team-400 uppercase">
-                                        {getPositionGroup(user.position)}
-                                      </span>
-                                    )}
-                                  </div>
+                                    {user?.name || "이름 없음"}
+                                    {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
+                                  </span>
                                 );
                               })}
                               {teamMembers.length === 0 && (
@@ -1036,6 +1046,32 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         isOpen={showAttendanceModal}
         onClose={() => setShowAttendanceModal(false)}
       />
+
+      {/* 세션 삭제 확인 모달 */}
+      {deleteModalSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">세션 삭제</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              이 세션을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModalSession(null)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleDeleteSession(deleteModalSession)}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

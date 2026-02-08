@@ -19,6 +19,7 @@ interface EventData {
   location: string;
   shoes: string[];
   uniform: string | null;
+  notes: string | null;
   vestBringerId: string | null;
   vestReceiverId: string | null;
   rsvpDeadline: string;
@@ -40,6 +41,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
   const [location, setLocation] = useState("");
   const [shoes, setShoes] = useState<string[]>([]);
   const [uniform, setUniform] = useState("");
+  const [notes, setNotes] = useState("");
   const [vestBringerId, setVestBringerId] = useState("");
   const [vestReceiverId, setVestReceiverId] = useState("");
   const [rsvpDeadlineDate, setRsvpDeadlineDate] = useState("");
@@ -69,6 +71,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
         setLocation(data.location || "");
         setShoes(data.shoes || []);
         setUniform(data.uniform || "");
+        setNotes(data.notes || "");
         setVestBringerId(data.vestBringerId || "");
         setVestReceiverId(data.vestReceiverId || "");
 
@@ -127,6 +130,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
           location,
           shoes,
           uniform: uniform || null,
+          notes: notes || null,
           vestBringerId: vestBringerId || null,
           vestReceiverId: vestReceiverId || null,
           rsvpDeadline: rsvpDeadline.toISOString(),
@@ -263,6 +267,20 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             onChange={(e) => setUniform(e.target.value)}
             placeholder="예: 홈 유니폼 (흰색)"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* 유의점/메모 */}
+        <div className="bg-white rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            유의점 <span className="text-gray-400 font-normal">(선택)</span>
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="예: 오늘은 패스 연습 집중, 짧은 패스 위주로"
+            rows={3}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
         </div>
 
