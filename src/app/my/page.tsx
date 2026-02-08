@@ -227,49 +227,39 @@ export default function MyPage() {
           </div>
         )}
 
-        {/* 내 정보 */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-400 px-2">내 정보</p>
-          <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
+        {/* 메뉴 */}
+        <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
+          <Link
+            href="/my/training-events"
+            className="flex items-center justify-between p-4 hover:bg-gray-50"
+          >
+            <span className="text-gray-900">팀 운동</span>
+            <span className="text-gray-400">&rsaquo;</span>
+          </Link>
+          <Link
+            href="/my/settings"
+            className="flex items-center justify-between p-4 hover:bg-gray-50"
+          >
+            <span className="text-gray-900">내 프로필 수정</span>
+            <span className="text-gray-400">&rsaquo;</span>
+          </Link>
+          <Link
+            href="/my/logs"
+            className="flex items-center justify-between p-4 hover:bg-gray-50"
+          >
+            <span className="text-gray-900">내 운동 일지</span>
+            <span className="text-gray-400">&rsaquo;</span>
+          </Link>
+          {isAdmin && (
             <Link
-              href="/my/settings"
+              href="/my/team-settings"
               className="flex items-center justify-between p-4 hover:bg-gray-50"
             >
-              <span className="text-gray-900">내 프로필 수정</span>
+              <span className="text-gray-900">팀 프로필 수정</span>
               <span className="text-gray-400">&rsaquo;</span>
             </Link>
-            <Link
-              href="/my/logs"
-              className="flex items-center justify-between p-4 hover:bg-gray-50"
-            >
-              <span className="text-gray-900">내 운동 일지</span>
-              <span className="text-gray-400">&rsaquo;</span>
-            </Link>
-            <Link
-              href="/my/training-events"
-              className="flex items-center justify-between p-4 hover:bg-gray-50"
-            >
-              <span className="text-gray-900">팀 운동</span>
-              <span className="text-gray-400">&rsaquo;</span>
-            </Link>
-          </div>
+          )}
         </div>
-
-        {/* 팀 관리 (운영진만) */}
-        {isAdmin && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-gray-400 px-2">팀 관리</p>
-            <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
-              <Link
-                href="/my/team-settings"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">팀 프로필 수정</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* 문의하기 */}
