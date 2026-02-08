@@ -481,7 +481,7 @@ function WritePageContent() {
         {!isEditMode && (
           <div className="px-4 py-5 flex flex-col items-center">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              사진 (선택)
+              사진
             </label>
             <button
               type="button"
@@ -531,7 +531,7 @@ function WritePageContent() {
         {isEditMode && imagePreview && (
           <div className="px-4 py-5 flex flex-col items-center">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              사진 (선택)
+              사진
             </label>
             <div
               className="w-32 bg-white rounded-sm p-2 pb-4"
