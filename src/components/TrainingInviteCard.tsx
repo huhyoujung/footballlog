@@ -29,13 +29,12 @@ export default function TrainingInviteCard({ event }: Props) {
       className="block flex-shrink-0 w-[280px]"
     >
       <div className="bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-4 shadow-lg">
-        <div className="flex items-center justify-end mb-3">
-          <span className="px-2.5 py-1 bg-white/20 text-white text-xs font-medium rounded-full">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-lg font-bold text-white flex-1">{event.title}</h3>
+          <span className="px-2.5 py-1 bg-white/20 text-white text-xs font-medium rounded-full flex-shrink-0">
             {event._count.rsvps}명 응답
           </span>
         </div>
-
-        <h3 className="text-lg font-bold text-white mb-3">{event.title}</h3>
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 text-white/90">

@@ -280,8 +280,8 @@ export default function Feed() {
 
       {/* 미투표 초대장들 */}
       {!loading && pendingInvites.length > 0 && (
-        <div className="overflow-x-auto scrollbar-hide px-4 py-3">
-          <div className="flex gap-3">
+        <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${pendingInvites.length === 1 ? 'flex justify-center' : ''}`}>
+          <div className={`flex gap-3 ${pendingInvites.length === 1 ? '' : 'w-max'}`}>
             {pendingInvites.map((event) => (
               <TrainingInviteCard key={event.id} event={event} />
             ))}
