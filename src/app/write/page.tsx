@@ -287,7 +287,7 @@ function WritePageContent() {
             onChange={(e) =>
               setFormData({ ...formData, keyPoints: e.target.value })
             }
-            placeholder={"오늘 훈련에서 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요"}
+            placeholder={"오늘 훈련에서 좋았던 점, 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요"}
             rows={5}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
