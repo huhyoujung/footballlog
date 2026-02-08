@@ -58,7 +58,7 @@ export default function TeamMemberStrip({ members, activeUserIds }: Props) {
                   <span className="text-[10px] text-gray-400">
                     {member.position}
                     {member.position && member.number !== null && " "}
-                    {member.number !== null && `#${member.number}`}
+                    {member.number !== null && member.number}
                   </span>
                 )}
               </div>

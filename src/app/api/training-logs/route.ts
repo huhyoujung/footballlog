@@ -48,6 +48,13 @@ export async function GET(req: Request) {
               number: true,
             },
           },
+          trainingEvent: {
+            select: {
+              id: true,
+              title: true,
+              date: true,
+            },
+          },
           _count: {
             select: {
               comments: true,

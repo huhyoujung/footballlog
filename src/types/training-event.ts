@@ -20,6 +20,9 @@ export interface TrainingEventDetail {
   createdById: string;
   title: string;
   isRegular: boolean;
+  enablePomVoting: boolean;
+  pomVotingDeadline: string | null;
+  pomVotesPerPerson: number;
   date: string;
   location: string;
   shoes: string[];
@@ -33,6 +36,7 @@ export interface TrainingEventDetail {
   checkIns: CheckInEntry[];
   sessions: SessionEntry[];
   equipmentAssignments?: EquipmentAssignmentEntry[];
+  trainingLogs?: any[];
   myRsvp: RsvpStatus | null;
   myCheckIn: string | null; // checkedInAt ISO string
 }

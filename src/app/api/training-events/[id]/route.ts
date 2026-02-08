@@ -51,6 +51,16 @@ export async function GET(
           },
           orderBy: { equipment: { orderIndex: "asc" } },
         },
+        trainingLogs: {
+          include: {
+            user: { select: userSelect },
+            likes: { select: { userId: true } },
+            comments: {
+              select: { id: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

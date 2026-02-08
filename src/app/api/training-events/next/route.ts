@@ -4,18 +4,41 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // 앞으로 예정된 모든 이벤트 (피드 배너용)
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || !session.user.teamId) {
       return NextResponse.json({ events: [] });
     }
 
-    const events = await prisma.trainingEvent.findMany({
-      where: {
+    // ?includeToday=true 면 과거 운동만 (오늘 포함, 최신순), 아니면 미래 운동 (오래된 순)
+    const { searchParams } = new URL(req.url);
+    const includeToday = searchParams.get("includeToday") === "true";
+
+    const now = new Date();
+    let whereCondition: any;
+    let orderBy: any;
+
+    if (includeToday) {
+      // 일지 작성용: 오늘 0시 ~ 현재 시간 (과거 운동만)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      whereCondition = {
         teamId: session.user.teamId,
-        date: { gte: new Date() },
-      },
+        date: { gte: todayStart, lte: now },
+      };
+      orderBy = { date: "desc" }; // 최신순
+    } else {
+      // 피드 배너용: 현재 시간 이후 (미래 운동)
+      whereCondition = {
+        teamId: session.user.teamId,
+        date: { gte: now },
+      };
+      orderBy = { date: "asc" }; // 오래된 순
+    }
+
+    const events = await prisma.trainingEvent.findMany({
+      where: whereCondition,
       include: {
         venue: { select: { name: true } },
         _count: { select: { rsvps: true } },
@@ -30,7 +53,7 @@ export async function GET() {
           take: 1,
         },
       },
-      orderBy: { date: "asc" },
+      orderBy,
     });
 
     return NextResponse.json({

@@ -1,10 +1,11 @@
 "use client";
+
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 
 interface TeamInfo {
@@ -13,15 +14,6 @@ interface TeamInfo {
   inviteCode: string;
   logoUrl?: string | null;
   primaryColor?: string;
-  vestOrder?: string[];
-  members?: {
-    id: string;
-    name: string | null;
-    image: string | null;
-    role: string;
-    position: string | null;
-    number: number | null;
-  }[];
 }
 
 const PRESET_COLORS = [
@@ -49,10 +41,6 @@ export default function TeamSettingsPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [changingRole, setChangingRole] = useState<string | null>(null);
-  const [vestOrder, setVestOrder] = useState<string[]>([]);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (session?.user?.role !== "ADMIN") {
@@ -71,7 +59,6 @@ export default function TeamSettingsPage() {
         setTeamName(data.name || "");
         setLogoUrl(data.logoUrl || null);
         setPrimaryColor(data.primaryColor || "#967B5D");
-        setVestOrder(data.vestOrder || []);
       } else {
         const errorData = await res.json();
         setError(errorData.error || "팀 정보를 불러오는데 실패했습니다");
@@ -194,92 +181,6 @@ export default function TeamSettingsPage() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    setChangingRole(userId);
-    try {
-      const res = await fetch("/api/teams/role", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
-
-      if (res.ok) {
-        setTeam((prev) =>
-          prev
-            ? {
-                ...prev,
-                members: prev.members?.map((m) =>
-                  m.id === userId ? { ...m, role: newRole } : m
-                ) || [],
-              }
-            : null
-        );
-      }
-    } catch (error) {
-      console.error("역할 변경 실패:", error);
-    } finally {
-      setChangingRole(null);
-    }
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-
-    const newOrder = [...vestOrder];
-    const draggedItem = newOrder[draggedIndex];
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(index, 0, draggedItem);
-    setVestOrder(newOrder);
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
-
-  const addToVestOrder = (userId: string) => {
-    if (!vestOrder.includes(userId)) {
-      setVestOrder([...vestOrder, userId]);
-    }
-  };
-
-  const removeFromVestOrder = (userId: string) => {
-    setVestOrder(vestOrder.filter((id) => id !== userId));
-  };
-
-  const saveVestOrder = async () => {
-    try {
-      const res = await fetch("/api/teams/vest-order", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vestOrder }),
-      });
-
-      if (res.ok) {
-        setSuccess("조끼 순서가 저장되었습니다");
-        setTimeout(() => setSuccess(""), 2000);
-      } else {
-        const data = await res.json();
-        setError(data.error || "저장에 실패했습니다");
-      }
-    } catch (err) {
-      setError("저장 실패");
-    }
-  };
-
-  const filteredMembers = team?.members?.filter(
-    (m) =>
-      m.id !== session?.user?.id &&
-      (m.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.number?.toString().includes(searchTerm))
-  ) || [];
-
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -289,12 +190,8 @@ export default function TeamSettingsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/my" className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
-          <h1 className="text-lg font-semibold text-gray-900">팀 프로필 수정</h1>
+          <BackButton href="/my/team-admin" />
+          <h1 className="text-lg font-semibold text-gray-900">팀 프로필</h1>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -411,190 +308,6 @@ export default function TeamSettingsPage() {
           >
             초대 코드 변경
           </button>
-        </div>
-
-        {/* 운영진 관리 */}
-        <div className="bg-white rounded-xl p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            운영진 관리
-          </label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="팀원 검색 (이름, 포지션, 등번호)"
-            className="w-full px-4 py-2.5 mb-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-          />
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {filteredMembers.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">
-                {searchTerm ? "검색 결과가 없습니다" : "팀원이 없습니다"}
-              </p>
-            ) : (
-              filteredMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50"
-                >
-                  <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                    {member.image ? (
-                      <Image
-                        src={member.image}
-                        alt={member.name || ""}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-team-50" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-gray-900 font-medium">
-                        {member.name || "익명"}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {member.position || ""} {member.number ? `#${member.number}` : ""}
-                      </span>
-                    </div>
-                    {member.role === "ADMIN" && (
-                      <span className="inline-block mt-0.5 px-2 py-0.5 bg-team-50 text-team-500 text-[10px] font-medium rounded-full">
-                        운영진
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleRoleChange(
-                        member.id,
-                        member.role === "ADMIN" ? "MEMBER" : "ADMIN"
-                      )
-                    }
-                    disabled={changingRole === member.id}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex-shrink-0 ${
-                      member.role === "ADMIN"
-                        ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        : "bg-team-500 text-white hover:bg-team-600"
-                    } disabled:opacity-50`}
-                  >
-                    {changingRole === member.id
-                      ? "..."
-                      : member.role === "ADMIN"
-                        ? "해제"
-                        : "운영진 지정"}
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 조끼 당번 순서 */}
-        <div className="bg-white rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-medium text-gray-700">
-              조끼 당번 순서
-            </label>
-            <button
-              onClick={saveVestOrder}
-              className="text-xs px-3 py-1.5 bg-team-500 text-white rounded-lg hover:bg-team-600 transition-colors"
-            >
-              순서 저장
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mb-3">
-            드래그하여 순서를 조정하세요. 정기운동 생성 시 이 순서대로 자동 추천됩니다.
-          </p>
-
-          {/* 조끼 순서 리스트 */}
-          {vestOrder.length > 0 ? (
-            <div className="space-y-2 mb-4">
-              {vestOrder.map((userId, index) => {
-                const member = team?.members?.find((m) => m.id === userId);
-                if (!member) return null;
-                return (
-                  <div
-                    key={userId}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white cursor-move hover:bg-gray-50 transition-colors ${
-                      draggedIndex === index ? "opacity-50" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="8" y1="6" x2="16" y2="6" />
-                        <line x1="8" y1="12" x2="16" y2="12" />
-                        <line x1="8" y1="18" x2="16" y2="18" />
-                      </svg>
-                      <span className="text-sm font-medium">{index + 1}</span>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                      {member.image ? (
-                        <Image
-                          src={member.image}
-                          alt={member.name || ""}
-                          width={32}
-                          height={32}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-team-50" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm text-gray-900 font-medium">
-                        {member.name || "익명"}
-                      </span>
-                      <span className="text-xs text-gray-400 ml-1.5">
-                        {member.position || ""} {member.number ? `#${member.number}` : ""}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => removeFromVestOrder(userId)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-lg mb-4">
-              조끼 당번 순서가 설정되지 않았습니다
-            </p>
-          )}
-
-          {/* 팀원 추가 버튼 */}
-          <div className="border-t border-gray-100 pt-3">
-            <p className="text-xs text-gray-500 mb-2">팀원 추가</p>
-            <div className="flex flex-wrap gap-2">
-              {team?.members
-                ?.filter((m) => !vestOrder.includes(m.id))
-                .map((member) => (
-                  <button
-                    key={member.id}
-                    onClick={() => addToVestOrder(member.id)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 hover:bg-team-50 text-gray-700 hover:text-team-700 text-xs rounded-lg transition-colors"
-                  >
-                    <span className="font-medium">{member.name || "익명"}</span>
-                    <span className="text-gray-400">
-                      {member.position || ""} {member.number ? `#${member.number}` : ""}
-                    </span>
-                  </button>
-                ))}
-              {team?.members?.filter((m) => !vestOrder.includes(m.id)).length === 0 && (
-                <p className="text-xs text-gray-400">모든 팀원이 추가되었습니다</p>
-              )}
-            </div>
-          </div>
         </div>
 
         {error && (

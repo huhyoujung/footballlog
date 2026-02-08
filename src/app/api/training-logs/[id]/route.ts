@@ -29,6 +29,13 @@ export async function GET(
             number: true,
           },
         },
+        trainingEvent: {
+          select: {
+            id: true,
+            title: true,
+            date: true,
+          },
+        },
         comments: {
           include: {
             user: {

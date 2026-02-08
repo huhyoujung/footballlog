@@ -6,6 +6,13 @@ export interface TrainingLog {
   keyPoints: string;
   improvement: string;
   imageUrl: string | null;
+  title?: string | null;
+  trainingEventId?: string | null;
+  trainingEvent?: {
+    id: string;
+    title: string | null;
+    date: string;
+  } | null;
   createdAt: string;
   user: {
     id: string;

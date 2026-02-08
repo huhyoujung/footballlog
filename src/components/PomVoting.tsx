@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import confetti from "canvas-confetti";
 import { getPomVotingStatus, isPomVotingClosed } from "@/lib/pom";
 
 interface User {
@@ -26,10 +27,11 @@ interface PomResult {
 interface Props {
   eventId: string;
   eventDate: string;
+  pomVotingDeadline: string | null;
   checkIns: CheckInEntry[];
 }
 
-export default function PomVoting({ eventId, eventDate, checkIns }: Props) {
+export default function PomVoting({ eventId, eventDate, pomVotingDeadline, checkIns }: Props) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<PomResult[]>([]);
@@ -39,12 +41,30 @@ export default function PomVoting({ eventId, eventDate, checkIns }: Props) {
   const [reason, setReason] = useState("");
   const [showResults, setShowResults] = useState(false);
 
-  const votingStatus = getPomVotingStatus(eventDate);
-  const isClosed = isPomVotingClosed(eventDate);
+  const votingStatus = getPomVotingStatus(eventDate, pomVotingDeadline);
+  const isClosed = isPomVotingClosed(eventDate, pomVotingDeadline);
 
   useEffect(() => {
     fetchPomData();
   }, []);
+
+  // 결과 표시 시 confetti 실행 (첫 회만)
+  useEffect(() => {
+    if (showResults && results.length > 0 && isClosed) {
+      const confettiKey = `pom-confetti-${eventId}`;
+      const hasShownConfetti = localStorage.getItem(confettiKey);
+
+      if (!hasShownConfetti) {
+        // Confetti 애니메이션
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+        localStorage.setItem(confettiKey, "true");
+      }
+    }
+  }, [showResults, results.length, isClosed, eventId]);
 
   const fetchPomData = async () => {
     try {
@@ -148,7 +168,7 @@ export default function PomVoting({ eventId, eventDate, checkIns }: Props) {
                 <p className="text-lg font-semibold text-gray-900">{winner.user.name || "익명"}</p>
                 {(winner.user.position || winner.user.number) && (
                   <p className="text-sm text-gray-500">
-                    {winner.user.position || ""} {winner.user.number ? `#${winner.user.number}` : ""}
+                    {winner.user.position || ""} {winner.user.number ? `${winner.user.number}` : ""}
                   </p>
                 )}
                 <p className="text-sm font-medium text-team-600 mt-1">{winner.count}표 획득</p>
@@ -203,13 +223,36 @@ export default function PomVoting({ eventId, eventDate, checkIns }: Props) {
       </div>
 
       {myVote ? (
-        <div className="bg-team-50 rounded-lg p-4 space-y-2">
-          <p className="text-xs font-semibold text-team-700">투표 완료</p>
-          <p className="text-sm text-gray-900">
-            <span className="font-medium">{myVote.nomineeName}</span>에게 투표했습니다
-          </p>
-          <p className="text-sm text-gray-700 italic">"{myVote.reason}"</p>
-          <p className="text-xs text-gray-500 mt-2">투표는 변경할 수 있습니다</p>
+        <div className="bg-team-50 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-team-700">✅ 투표 완료</p>
+          </div>
+          {!isClosed ? (
+            // 마감 전: 본인 투표 내용 숨김
+            <>
+              <p className="text-sm text-gray-700">
+                투표가 완료되었습니다. 마감 후 결과를 확인할 수 있습니다.
+              </p>
+              <button
+                onClick={() => {
+                  // 다시 투표하기 - 기존 값으로 폼 채우기
+                  setSelectedNomineeId(myVote.nomineeId);
+                  setReason(myVote.reason);
+                }}
+                className="w-full py-2 bg-white border border-team-300 text-team-600 rounded-lg text-sm font-medium hover:bg-team-50 transition-colors"
+              >
+                다시 투표하기
+              </button>
+            </>
+          ) : (
+            // 마감 후: 본인 투표 내용 공개
+            <>
+              <p className="text-sm text-gray-900">
+                <span className="font-medium">{myVote.nomineeName}</span>에게 투표했습니다
+              </p>
+              <p className="text-sm text-gray-700 italic">"{myVote.reason}"</p>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -226,7 +269,7 @@ export default function PomVoting({ eventId, eventDate, checkIns }: Props) {
             <option key={checkIn.userId} value={checkIn.userId}>
               {checkIn.user.name || "익명"}
               {checkIn.user.position || checkIn.user.number
-                ? ` (${checkIn.user.position || ""} ${checkIn.user.number ? `#${checkIn.user.number}` : ""})`
+                ? ` (${checkIn.user.position || ""} ${checkIn.user.number ? `${checkIn.user.number}` : ""})`
                 : ""}
             </option>
           ))}

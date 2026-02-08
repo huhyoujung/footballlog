@@ -20,6 +20,17 @@ export async function GET() {
     const equipments = await prisma.equipment.findMany({
       where: { teamId: session.user.teamId },
       orderBy: { orderIndex: "asc" },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            position: true,
+            number: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(equipments);

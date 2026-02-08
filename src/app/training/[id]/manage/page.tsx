@@ -1,5 +1,6 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -59,6 +60,7 @@ interface EquipmentWithAssignment {
   id: string;
   name: string;
   description: string | null;
+  owner: User | null;
   assignment: {
     id: string;
     userId: string | null;
@@ -111,6 +113,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [lateFeeUserId, setLateFeeUserId] = useState("");
   const [lateFeeAmount, setLateFeeAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [lateFeeAmounts, setLateFeeAmounts] = useState<Record<string, number>>({});
 
   // 세션 상태
   const [showSessionForm, setShowSessionForm] = useState(false);
@@ -135,6 +138,11 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [touchDragUser, setTouchDragUser] = useState<{ userId: string; userName: string; fromTeam: string; sessionId: string } | null>(null);
   const [touchDragUnassigned, setTouchDragUnassigned] = useState<{ sessionId: string } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ sessionId: string; teamLabel: string } | null>(null);
+  const [touchDragPosition, setTouchDragPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // 세션 드래그 상태
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
+  const [dragOverSessionIndex, setDragOverSessionIndex] = useState<number | null>(null);
 
   // 랜덤 배정 상태
   const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
@@ -158,6 +166,33 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     if (eventId) fetchEvent();
   }, [eventId]);
+
+  useEffect(() => {
+    if (event && activeTab === "latefee") {
+      // 지각비 금액 초기화: 기존 지각비 + 지각/미도착 인원
+      const amounts: Record<string, number> = {};
+
+      // 기존 지각비 불러오기
+      event.lateFees.forEach((fee) => {
+        amounts[fee.userId] = fee.amount;
+      });
+
+      // 지각자 및 미도착자 0원으로 초기화 (기존 값 없으면)
+      const lateCheckIns = event.checkIns.filter((c) => c.isLate);
+      const noShows = event.rsvps
+        .filter((r) => r.status === "ATTEND" || r.status === "LATE")
+        .filter((r) => !event.checkIns.some((c) => c.userId === r.userId));
+
+      [...lateCheckIns, ...noShows].forEach((item) => {
+        const userId = item.userId;
+        if (!(userId in amounts)) {
+          amounts[userId] = 0;
+        }
+      });
+
+      setLateFeeAmounts(amounts);
+    }
+  }, [event, activeTab]);
 
   useEffect(() => {
     if (eventId && activeTab === "equipment") {
@@ -204,11 +239,15 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const saveEquipmentAssignments = async () => {
     setSavingEquipment(true);
     try {
-      const assignments = Object.entries(equipmentAssignments).map(([equipmentId, { userId, memo }]) => ({
-        equipmentId,
-        userId,
-        memo: memo.trim() || undefined,
-      }));
+      // 각 장비의 owner를 userId로 사용 (장비 관리자가 담당)
+      const assignments = Object.entries(equipmentAssignments).map(([equipmentId, { memo }]) => {
+        const equipment = equipments.find((eq) => eq.id === equipmentId);
+        return {
+          equipmentId,
+          userId: equipment?.owner?.id || null,
+          memo: memo.trim() || undefined,
+        };
+      });
 
       const res = await fetch(`/api/training-events/${eventId}/equipment`, {
         method: "PUT",
@@ -267,6 +306,52 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     if (!confirm("지각비를 삭제하시겠습니까?")) return;
     const res = await fetch(`/api/training-events/${eventId}/late-fees/${feeId}`, { method: "DELETE" });
     if (res.ok) fetchEvent();
+  };
+
+  // 지각비 일괄 저장
+  const handleSaveLateFees = async () => {
+    setSubmitting(true);
+    try {
+      // 금액이 0보다 큰 항목만 전송
+      const feesToSave = Object.entries(lateFeeAmounts)
+        .filter(([_, amount]) => amount > 0)
+        .map(([userId, amount]) => ({ userId, amount }));
+
+      // 기존 지각비 중 금액이 0으로 변경된 것은 삭제
+      const deletePromises = event!.lateFees
+        .filter((fee) => lateFeeAmounts[fee.userId] === 0)
+        .map((fee) => fetch(`/api/training-events/${eventId}/late-fees/${fee.id}`, { method: "DELETE" }));
+
+      // 새로 추가하거나 업데이트할 항목
+      const upsertPromises = feesToSave.map(async ({ userId, amount }) => {
+        const existingFee = event!.lateFees.find((f) => f.userId === userId);
+        if (existingFee && existingFee.amount !== amount) {
+          // 업데이트: 삭제 후 재생성
+          await fetch(`/api/training-events/${eventId}/late-fees/${existingFee.id}`, { method: "DELETE" });
+          return fetch(`/api/training-events/${eventId}/late-fees`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, amount }),
+          });
+        } else if (!existingFee) {
+          // 신규 생성
+          return fetch(`/api/training-events/${eventId}/late-fees`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, amount }),
+          });
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all([...deletePromises, ...upsertPromises]);
+      await fetchEvent();
+      alert("저장되었습니다");
+    } catch {
+      alert("저장에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // 세션 생성
@@ -505,6 +590,10 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     e.preventDefault();
 
     const touch = e.touches[0];
+
+    // 터치 위치 업데이트
+    setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
+
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     if (!element) return;
 
@@ -525,6 +614,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     if (!touchDragUser || !dragOverTarget) {
       setTouchDragUser(null);
       setDragOverTarget(null);
+      setTouchDragPosition(null);
       return;
     }
 
@@ -534,6 +624,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
     setTouchDragUser(null);
     setDragOverTarget(null);
+    setTouchDragPosition(null);
   };
 
   const handleUnassignedTouchStart = (sessionId: string) => {
@@ -578,6 +669,73 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     setDragOverTarget(null);
   };
 
+  // 세션 드래그 핸들러
+  const handleSessionDragStart = (e: React.DragEvent, sessionId: string) => {
+    e.stopPropagation();
+    setDraggedSessionId(sessionId);
+  };
+
+  const handleSessionDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverSessionIndex(index);
+  };
+
+  const handleSessionDragEnd = async () => {
+    if (draggedSessionId && dragOverSessionIndex !== null && event) {
+      const fromIndex = event.sessions.findIndex((s) => s.id === draggedSessionId);
+      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
+        // 위/아래 방향 결정
+        const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
+        const moves = Math.abs(dragOverSessionIndex - fromIndex);
+
+        // 여러 번 이동
+        for (let i = 0; i < moves; i++) {
+          await handleReorderSession(draggedSessionId, direction);
+        }
+      }
+    }
+    setDraggedSessionId(null);
+    setDragOverSessionIndex(null);
+  };
+
+  const handleSessionTouchStart = (sessionId: string) => {
+    setDraggedSessionId(sessionId);
+  };
+
+  const handleSessionTouchMove = (e: React.TouchEvent) => {
+    if (!draggedSessionId) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const sessionCard = element.closest('[data-session-card]');
+    if (sessionCard) {
+      const index = parseInt(sessionCard.getAttribute('data-session-index') || '-1');
+      if (index >= 0) {
+        setDragOverSessionIndex(index);
+      }
+    }
+  };
+
+  const handleSessionTouchEnd = async () => {
+    if (draggedSessionId && dragOverSessionIndex !== null && event) {
+      const fromIndex = event.sessions.findIndex((s) => s.id === draggedSessionId);
+      if (fromIndex !== -1 && fromIndex !== dragOverSessionIndex) {
+        const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
+        const moves = Math.abs(dragOverSessionIndex - fromIndex);
+
+        for (let i = 0; i < moves; i++) {
+          await handleReorderSession(draggedSessionId, direction);
+        }
+      }
+    }
+    setDraggedSessionId(null);
+    setDragOverSessionIndex(null);
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -612,11 +770,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={`/training/${eventId}`} className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href={`/training/${eventId}`} />
           <h1 className="text-lg font-semibold text-gray-900 truncate max-w-[200px]">{event?.title || "운동 관리"}</h1>
           <div className="flex-1" />
           <Link
@@ -693,104 +847,83 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         {/* 지각비 탭 */}
         {activeTab === "latefee" && (
           <>
-            <div className="bg-white rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">지각비 현황</h3>
-              {event.lateFees.length > 0 ? (
-                <div className="space-y-2">
-                  {event.lateFees.map((fee) => (
-                    <div key={fee.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-900">{fee.user.name || "이름 없음"}</span>
-                        <span className="text-sm font-medium text-gray-700">
-                          {fee.amount.toLocaleString()}원
-                        </span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          fee.status === "PAID" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
-                        }`}>
-                          {fee.status === "PAID" ? "납부" : "미납"}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        {fee.status === "PENDING" && (
-                          <button
-                            onClick={() => handleMarkPaid(fee.id)}
-                            className="text-xs text-green-600 hover:text-green-700 px-2 py-1"
-                          >
-                            완료
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDeleteLateFee(fee.id)}
-                          className="text-xs text-red-400 hover:text-red-500 px-2 py-1"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 text-center py-4">지각비 내역이 없습니다</p>
-              )}
+            {/* 총 금액 */}
+            <div className="bg-team-50 rounded-xl px-5 py-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-team-700">총 지각비</span>
+                <span className="text-xl font-bold text-team-600">
+                  {Object.values(lateFeeAmounts).reduce((sum, amount) => sum + amount, 0).toLocaleString()}원
+                </span>
+              </div>
             </div>
 
-            {/* 지각비 추가 */}
-            {!showLateFeeForm ? (
-              <button
-                onClick={() => setShowLateFeeForm(true)}
-                className="w-full py-3 bg-white rounded-xl text-sm font-medium text-team-600 hover:bg-team-50 transition-colors border border-team-100"
-              >
-                + 지각비 추가
-              </button>
-            ) : (
-              <div className="bg-white rounded-xl p-5 space-y-3">
-                <h4 className="text-sm font-semibold text-gray-900">지각비 부과</h4>
-                <select
-                  value={lateFeeUserId}
-                  onChange={(e) => setLateFeeUserId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+            {/* 지각비 리스트 */}
+            <div className="bg-white rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">지각 및 미도착 명단</h3>
+                <button
+                  onClick={handleSaveLateFees}
+                  disabled={submitting}
+                  className="text-xs font-medium text-white bg-team-500 px-4 py-2 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50"
                 >
-                  <option value="">멤버 선택</option>
-                  {event.checkIns
-                    .filter((c) => c.isLate)
-                    .filter((c) => !event.lateFees.some((f) => f.userId === c.userId))
-                    .map((c) => (
-                      <option key={c.userId} value={c.userId}>
-                        {c.user.name || "이름 없음"} (지각)
-                      </option>
-                    ))}
-                  {attendees
-                    .filter((r) => !checkedInIds.has(r.userId))
-                    .map((r) => (
-                      <option key={r.userId} value={r.userId}>
-                        {r.user.name || "이름 없음"} (미도착)
-                      </option>
-                    ))}
-                </select>
-                <input
-                  type="number"
-                  value={lateFeeAmount}
-                  onChange={(e) => setLateFeeAmount(e.target.value)}
-                  placeholder="금액 (원)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowLateFeeForm(false)}
-                    className="flex-1 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={handleAddLateFee}
-                    disabled={!lateFeeUserId || !lateFeeAmount || submitting}
-                    className="flex-1 py-2 text-sm text-white bg-team-500 rounded-lg disabled:opacity-50"
-                  >
-                    {submitting ? "처리 중..." : "부과하기"}
-                  </button>
-                </div>
+                  {submitting ? "저장 중..." : "저장"}
+                </button>
               </div>
-            )}
+
+              {Object.keys(lateFeeAmounts).length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(lateFeeAmounts).map(([userId, amount]) => {
+                    const checkIn = event.checkIns.find((c) => c.userId === userId);
+                    const rsvp = event.rsvps.find((r) => r.userId === userId);
+                    const user = checkIn?.user || rsvp?.user;
+                    const existingFee = event.lateFees.find((f) => f.userId === userId);
+                    const isLate = checkIn?.isLate;
+                    const isNoShow = !checkIn && rsvp;
+
+                    return (
+                      <div key={userId} className={`flex items-center gap-3 py-2 border-b border-gray-50 last:border-0 ${amount === 0 ? 'opacity-60' : ''}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${amount === 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                              {user?.name || "이름 없음"}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              isLate ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"
+                            }`}>
+                              {isLate ? "지각" : "미도착"}
+                            </span>
+                            {existingFee?.status === "PAID" && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600">
+                                납부완료
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setLateFeeAmounts((prev) => ({ ...prev, [userId]: parseInt(e.target.value) || 0 }))}
+                            className="w-24 px-2 py-1.5 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-team-300"
+                          />
+                          <span className="text-sm text-gray-500">원</span>
+                          {existingFee && existingFee.status === "PENDING" && amount > 0 && (
+                            <button
+                              onClick={() => handleMarkPaid(existingFee.id)}
+                              className="text-xs text-green-600 hover:text-green-700 px-2 py-1 border border-green-200 rounded"
+                            >
+                              완료
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-6">지각 또는 미도착 인원이 없습니다</p>
+              )}
+            </div>
           </>
         )}
 
@@ -812,7 +945,19 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             </div>
 
             {event.sessions.map((sess, idx) => (
-              <div key={sess.id} className="bg-white rounded-xl overflow-hidden">
+              <div
+                key={sess.id}
+                className={`bg-white rounded-xl overflow-hidden transition-opacity ${draggedSessionId === sess.id ? 'opacity-50' : ''} ${dragOverSessionIndex === idx ? 'ring-2 ring-team-300' : ''}`}
+                data-session-card="true"
+                data-session-index={idx}
+                draggable={editingSessionInfo !== sess.id && editingSession !== sess.id}
+                onDragStart={(e) => handleSessionDragStart(e, sess.id)}
+                onDragOver={(e) => handleSessionDragOver(e, idx)}
+                onDragEnd={handleSessionDragEnd}
+                onTouchStart={() => editingSessionInfo !== sess.id && editingSession !== sess.id && handleSessionTouchStart(sess.id)}
+                onTouchMove={handleSessionTouchMove}
+                onTouchEnd={handleSessionTouchEnd}
+              >
                 {/* 세션 헤더 */}
                 <div className="px-5 pt-4 pb-3 border-b border-gray-100">
                   {editingSessionInfo === sess.id ? (
@@ -880,6 +1025,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                     <>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
+                          {/* 드래그 핸들 */}
+                          <div className="cursor-move touch-none p-1 text-gray-300 hover:text-gray-500">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <circle cx="9" cy="5" r="1.5" />
+                              <circle cx="9" cy="12" r="1.5" />
+                              <circle cx="9" cy="19" r="1.5" />
+                              <circle cx="15" cy="5" r="1.5" />
+                              <circle cx="15" cy="12" r="1.5" />
+                              <circle cx="15" cy="19" r="1.5" />
+                            </svg>
+                          </div>
                           <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                             {idx + 1}
                           </span>
@@ -932,6 +1088,27 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
                       <span>👥</span>
                       <span>전체 함께 진행</span>
+                    </div>
+                  ) : editingSessionInfo === sess.id ? (
+                    /* 세션 정보 편집 중 - 팀 배정 버튼 표시 */
+                    <div className="space-y-2 py-4">
+                      <p className="text-xs text-gray-400 text-center mb-3">
+                        팀을 분배하려면 아래 버튼을 사용하세요
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setEditingSessionInfo(null); startEditingTeams(sess); }}
+                          className="flex-1 py-2.5 text-xs font-medium text-team-600 bg-white border border-team-200 rounded-lg hover:bg-team-50 transition-colors"
+                        >
+                          팀 배정
+                        </button>
+                        <button
+                          onClick={() => { setEditingSessionInfo(null); startRandomAssignment(sess); }}
+                          className="flex-1 py-2.5 text-xs font-semibold text-white bg-team-500 rounded-lg hover:bg-team-600 transition-colors"
+                        >
+                          🔀 랜덤 배정
+                        </button>
+                      </div>
                     </div>
                   ) : editingSession === sess.id ? (
                     <div className="space-y-3">
@@ -1204,22 +1381,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                       ) : (
                         <p className="text-xs text-gray-400 text-center py-2">팀이 아직 배정되지 않았어요</p>
                       )}
-
-                      {/* 편집 버튼 */}
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <button
-                          onClick={() => startEditingTeams(sess)}
-                          className="flex-1 py-2 text-xs font-medium text-team-600 bg-white border border-team-200 rounded-lg hover:bg-team-50 transition-colors"
-                        >
-                          팀 배정
-                        </button>
-                        <button
-                          onClick={() => startRandomAssignment(sess)}
-                          className="flex-1 py-2 text-xs font-semibold text-white bg-team-500 rounded-lg hover:bg-team-600 transition-colors"
-                        >
-                          🔀 랜덤 배정
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1322,29 +1483,21 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                         </div>
 
                         <div className="space-y-2">
+                          {/* 장비 관리자 표시 (읽기 전용) */}
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              담당자
+                              장비 관리자
                             </label>
-                            <select
-                              value={assignment.userId || ""}
-                              onChange={(e) =>
-                                setEquipmentAssignments((prev) => ({
-                                  ...prev,
-                                  [eq.id]: { ...prev[eq.id], userId: e.target.value || null },
-                                }))
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                            >
-                              <option value="">없음 (미배정)</option>
-                              {attendees.map((r) => (
-                                <option key={r.userId} value={r.userId}>
-                                  {r.user.name || "이름 없음"}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                              {eq.owner ? (
+                                <span>{eq.owner.name || "이름 없음"}</span>
+                              ) : (
+                                <span className="text-gray-400">미지정</span>
+                              )}
+                            </div>
                           </div>
 
+                          {/* 메모 */}
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               메모 (선택)
@@ -1358,7 +1511,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                   [eq.id]: { ...prev[eq.id], memo: e.target.value },
                                 }))
                               }
-                              placeholder="예: 공 1개만, 펌프 포함"
+                              placeholder="예: 공 2개, 펌프 포함"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent"
                             />
                           </div>
@@ -1418,6 +1571,22 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 터치 드래그 고스트 요소 */}
+      {touchDragUser && touchDragPosition && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            left: touchDragPosition.x,
+            top: touchDragPosition.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <span className="inline-block px-2.5 py-1.5 bg-team-500 text-white rounded-md text-xs font-medium shadow-lg opacity-80">
+            {touchDragUser.userName}
+          </span>
         </div>
       )}
     </div>

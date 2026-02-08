@@ -24,6 +24,21 @@ interface Nudge {
   createdAt: string;
 }
 
+interface RecentMvp {
+  user: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    position: string | null;
+    number: number | null;
+  };
+  voteCount: number;
+  eventDate: string;
+  eventTitle: string | null;
+  isToday: boolean;
+  isYesterday: boolean;
+}
+
 export default function Feed() {
   const { data: session } = useSession();
   const { teamData, loading: teamLoading } = useTeam();
@@ -32,6 +47,7 @@ export default function Feed() {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [nextEvents, setNextEvents] = useState<TrainingEventSummary[]>([]);
+  const [recentMvp, setRecentMvp] = useState<RecentMvp | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
@@ -53,10 +69,11 @@ export default function Feed() {
 
   const fetchData = async () => {
     try {
-      const [logsRes, nudgesRes, eventRes] = await Promise.all([
+      const [logsRes, nudgesRes, eventRes, mvpRes] = await Promise.all([
         fetch("/api/training-logs"),
         fetch("/api/nudges"),
         fetch("/api/training-events/next"),
+        fetch("/api/pom/recent-mvp"),
       ]);
 
       if (logsRes.ok) {
@@ -72,6 +89,11 @@ export default function Feed() {
       if (eventRes.ok) {
         const data = await eventRes.json();
         setNextEvents(data.events || []);
+      }
+
+      if (mvpRes.ok) {
+        const data = await mvpRes.json();
+        setRecentMvp(data.mvp || null);
       }
     } catch (error) {
       console.error("데이터 로드 실패:", error);
@@ -214,6 +236,16 @@ export default function Feed() {
       messages.push({
         key: `event-${event.id}`,
         text: `📢 ${event.title || "팀 운동"} · ${dateStr} ${timeStr} · ${event.location}`,
+      });
+    }
+
+    // MVP 메시지 (24시간 이내)
+    if (recentMvp) {
+      const mvpName = recentMvp.user.name || "팀원";
+      const whenText = recentMvp.isToday ? "오늘" : recentMvp.isYesterday ? "어제" : "최근";
+      messages.push({
+        key: "mvp",
+        text: `🏆 ${mvpName}님이 ${whenText} MVP였습니다!`,
       });
     }
 

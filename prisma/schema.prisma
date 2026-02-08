@@ -86,6 +86,7 @@ model User {
   lateFees               LateFee[]
   sessionTeamAssignments SessionTeamAssignment[]
   equipmentAssignments   EquipmentAssignment[]
+  ownedEquipments        Equipment[]             @relation("EquipmentOwner")
   taggedInLogs           TrainingLog[]           @relation("TaggedInLogs")
   pomVotesCast           PomVote[]               @relation("PomVoter")
   pomVotesReceived       PomVote[]               @relation("PomNominee")
@@ -215,22 +216,25 @@ enum LateFeeStatus {
 }
 
 model TrainingEvent {
-  id             String   @id @default(cuid())
-  teamId         String
-  createdById    String
-  title          String
-  isRegular      Boolean  @default(true)
-  date           DateTime
-  location       String
-  venueId        String?
-  shoes          String[] @default([])
-  uniform        String?  @db.Text
-  notes          String?  @db.Text
-  vestBringerId  String?
-  vestReceiverId String?
-  rsvpDeadline   DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  teamId              String
+  createdById         String
+  title               String
+  isRegular           Boolean   @default(true)
+  enablePomVoting     Boolean   @default(true)
+  pomVotingDeadline   DateTime?
+  pomVotesPerPerson   Int       @default(1)
+  date                DateTime
+  location            String
+  venueId             String?
+  shoes               String[]  @default([])
+  uniform             String?   @db.Text
+  notes               String?   @db.Text
+  vestBringerId       String?
+  vestReceiverId      String?
+  rsvpDeadline        DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   team                 Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
   venue                Venue?                @relation(fields: [venueId], references: [id], onDelete: SetNull)
@@ -323,11 +327,13 @@ model Equipment {
   teamId      String
   name        String
   description String?
+  ownerId     String?  // 장비 담당자 (팀 레벨 고정)
   orderIndex  Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   team        Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  owner       User?                 @relation("EquipmentOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   assignments EquipmentAssignment[]
 
   @@unique([teamId, name])

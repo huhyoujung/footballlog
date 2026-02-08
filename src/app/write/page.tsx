@@ -125,11 +125,11 @@ function WritePageContent() {
     fetchTeamMembers();
   }, []);
 
-  // 예정된 팀 운동 목록 로드
+  // 예정된 팀 운동 목록 로드 (오늘 0시 이후 포함)
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
       try {
-        const res = await fetch("/api/training-events/next");
+        const res = await fetch("/api/training-events/next?includeToday=true");
         if (res.ok) {
           const data = await res.json();
           setUpcomingEvents(data.events || []);
@@ -143,6 +143,7 @@ function WritePageContent() {
   }, []);
 
   const isFormComplete =
+    (formData.logType === "team" || formData.title.trim() !== "") &&
     formData.condition !== null &&
     formData.conditionReason.trim() !== "" &&
     formData.keyPoints.trim() !== "" &&
@@ -192,7 +193,7 @@ function WritePageContent() {
           throw new Error(data.error || "수정에 실패했습니다");
         }
 
-        router.push("/");
+        router.replace("/");
       } else {
         // 신규 작성: POST
         let imageUrl = null;
@@ -226,7 +227,7 @@ function WritePageContent() {
           throw new Error(data.error || "작성에 실패했습니다");
         }
 
-        router.push("/");
+        router.replace("/");
       }
     } catch (err) {
       console.error("일지 제출 오류:", err);
@@ -262,47 +263,45 @@ function WritePageContent() {
       </header>
 
       <main className="max-w-lg mx-auto divide-y divide-gray-100">
-        {/* 훈련 분류 */}
-        <div className="px-4 py-5 space-y-4">
-          <label className="block text-sm font-medium text-gray-700">
-            훈련 분류 (선택)
-          </label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="logType"
-                value="team"
-                checked={formData.logType === "team"}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    logType: "team",
-                    title: "",
-                    trainingEventId: upcomingEvents[0]?.id || null,
-                  });
-                }}
-                className="w-4 h-4 text-team-500 focus:ring-team-500"
-              />
-              <span className="text-sm text-gray-700">팀 운동</span>
+        {/* 운동 분류 - 토글 */}
+        <div className="px-4 py-5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">
+              운동 분류
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="logType"
-                value="personal"
-                checked={formData.logType === "personal"}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    logType: "personal",
-                    trainingEventId: null,
-                  });
+            <button
+              type="button"
+              onClick={() => {
+                const newType = formData.logType === "team" ? "personal" : "team";
+                const selectedEvent = newType === "team" ? upcomingEvents[0] : null;
+                setFormData({
+                  ...formData,
+                  logType: newType,
+                  title: newType === "team" ? "" : formData.title,
+                  trainingEventId: selectedEvent?.id || null,
+                  trainingDate: selectedEvent
+                    ? new Date(selectedEvent.date).toISOString().split("T")[0]
+                    : formData.trainingDate,
+                });
+              }}
+              className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-team-500 focus:ring-offset-2"
+              style={{
+                backgroundColor: formData.logType === "team" ? "#967B5D" : "#D1D5DB"
+              }}
+            >
+              <span
+                className="inline-block h-5 w-5 transform rounded-full bg-white transition-transform"
+                style={{
+                  transform: formData.logType === "team" ? "translateX(34px)" : "translateX(4px)"
                 }}
-                className="w-4 h-4 text-team-500 focus:ring-team-500"
               />
-              <span className="text-sm text-gray-700">개인 운동</span>
-            </label>
+              <span className="absolute left-1.5 text-[10px] font-medium text-white pointer-events-none" style={{ opacity: formData.logType === "personal" ? 1 : 0 }}>
+                개인
+              </span>
+              <span className="absolute right-1.5 text-[10px] font-medium text-white pointer-events-none" style={{ opacity: formData.logType === "team" ? 1 : 0 }}>
+                팀
+              </span>
+            </button>
           </div>
 
           {formData.logType === "team" && upcomingEvents.length > 0 ? (
@@ -312,9 +311,16 @@ function WritePageContent() {
               </label>
               <select
                 value={formData.trainingEventId || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, trainingEventId: e.target.value || null })
-                }
+                onChange={(e) => {
+                  const selectedEvent = upcomingEvents.find((ev) => ev.id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    trainingEventId: e.target.value || null,
+                    trainingDate: selectedEvent
+                      ? new Date(selectedEvent.date).toISOString().split("T")[0]
+                      : formData.trainingDate,
+                  });
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
               >
                 {upcomingEvents.map((event) => (
@@ -353,21 +359,23 @@ function WritePageContent() {
           )}
         </div>
 
-        {/* 운동 날짜 */}
-        <div className="px-4 py-5">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            운동 날짜
-          </label>
-          <input
-            type="date"
-            value={formData.trainingDate}
-            onChange={(e) =>
-              setFormData({ ...formData, trainingDate: e.target.value })
-            }
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-            required
-          />
-        </div>
+        {/* 운동 날짜 - 개인 운동일 때만 표시 */}
+        {formData.logType === "personal" && (
+          <div className="px-4 py-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              운동 날짜
+            </label>
+            <input
+              type="date"
+              value={formData.trainingDate}
+              onChange={(e) =>
+                setFormData({ ...formData, trainingDate: e.target.value })
+              }
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              required
+            />
+          </div>
+        )}
 
         {/* 컨디션 */}
         <button
@@ -487,7 +495,7 @@ function WritePageContent() {
                   </button>
                 </div>
               ) : (
-                <div className="w-full aspect-[4/3] bg-team-50 rounded-sm flex items-center justify-center">
+                <div className="w-full aspect-[3/4] bg-team-50 rounded-sm flex items-center justify-center">
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C3A587" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />

@@ -213,7 +213,7 @@ export default function MentionTextarea({
               </span>
               {(member.position || member.number) && (
                 <span className="text-xs text-gray-500">
-                  {member.position || ""} {member.number ? `#${member.number}` : ""}
+                  {member.position || ""} {member.number ? `${member.number}` : ""}
                 </span>
               )}
             </button>

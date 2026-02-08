@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/training-event";
 import PomVoting from "@/components/PomVoting";
+import ConditionBadge from "@/components/ConditionBadge";
 
 export default function TrainingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -19,13 +20,19 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   const [submitting, setSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showEditRsvp, setShowEditRsvp] = useState(false);
+  const [showAttendance, setShowAttendance] = useState(true);
+  const [showSessions, setShowSessions] = useState(true);
+  const [showPomVoting, setShowPomVoting] = useState(true);
 
   useEffect(() => {
     params.then((p) => setEventId(p.id));
   }, [params]);
 
   useEffect(() => {
-    if (eventId) fetchEvent();
+    if (eventId) {
+      window.scrollTo(0, 0); // 페이지 최상단으로 스크롤
+      fetchEvent();
+    }
   }, [eventId]);
 
   const fetchEvent = async () => {
@@ -170,9 +177,9 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                 </svg>
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px] z-20">
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] z-20">
                   <Link href={`/training/${eventId}/manage`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMenu(false)}>
-                    관리하기
+                    수정 및 관리하기
                   </Link>
                   <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-50">
                     삭제하기
@@ -285,10 +292,27 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
         {/* 참석 현황 */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">
-            참석 현황 ({event.rsvps.length}명 응답)
-          </h3>
+          <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setShowAttendance(!showAttendance)}>
+            <h3 className="text-sm font-semibold text-gray-900">
+              참석 현황 ({event.rsvps.length}명 응답)
+            </h3>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`text-gray-500 transition-transform ${showAttendance ? '' : '-rotate-90'}`}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
 
+          {showAttendance && (
+            <>
           {/* 내 응답 표시 및 수정 */}
           {event.myRsvp && !isDeadlinePassed && (
             <div className="mb-4 p-3 border border-gray-200 rounded-lg">
@@ -393,6 +417,8 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
               ))}
             </div>
           )}
+            </>
+          )}
         </div>
 
         {/* 체크인 (운동 2시간 전부터) */}
@@ -429,10 +455,58 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
+        {/* POM 투표 (체크인한 사람들 대상) - 체크인 이후 바로 표시 */}
+        {event.checkIns.length > 0 && (
+          <div className="space-y-3">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+            </div>
+            {showPomVoting && (
+              <PomVoting
+                eventId={event.id}
+                eventDate={event.date}
+                pomVotingDeadline={event.pomVotingDeadline}
+                checkIns={event.checkIns}
+              />
+            )}
+          </div>
+        )}
+
         {/* 세션 정보 (모두 볼 수 있음) */}
         {event.sessions.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">세션</h3>
+            <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setShowSessions(!showSessions)}>
+              <h3 className="text-sm font-semibold text-gray-900">세션</h3>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`text-gray-500 transition-transform ${showSessions ? '' : '-rotate-90'}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+            {showSessions && (
             <div className="space-y-3">
               {event.sessions.map((s, idx) => (
                 <div key={s.id} className="border border-gray-200 rounded-lg p-3">
@@ -469,35 +543,54 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 
-        {/* POM 투표 (체크인한 사람들 대상) */}
-        {event.checkIns.length > 0 && (
-          <PomVoting
-            eventId={event.id}
-            eventDate={event.date}
-            checkIns={event.checkIns}
-          />
-        )}
-
-        {/* 장비 정보 */}
-        {event.equipmentAssignments && event.equipmentAssignments.length > 0 && (
+        {/* 훈련 일지 */}
+        {event.trainingLogs && event.trainingLogs.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">장비</h3>
-            <div className="space-y-2">
-              {event.equipmentAssignments.map((assignment) => (
-                <div key={assignment.id} className="flex items-start gap-2 text-sm">
-                  <span className="text-gray-900 font-medium">{assignment.equipment.name}:</span>
-                  <div className="flex-1">
-                    <span className="text-gray-700">
-                      {assignment.user?.name || "미배정"}
-                    </span>
-                    {assignment.memo && (
-                      <span className="text-gray-500 ml-1">"{assignment.memo}"</span>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">팀원들의 훈련 일지 ({event.trainingLogs.length})</h3>
+            <div className="space-y-3">
+              {event.trainingLogs.map((log: any) => (
+                <Link
+                  key={log.id}
+                  href={`/log/${log.id}`}
+                  className="block border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* 사용자 정보 */}
+                    <div className="flex-shrink-0">
+                      {log.user.image ? (
+                        <img src={log.user.image} alt={log.user.name || ""} className="w-10 h-10 rounded-full" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-500 text-xs">👤</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 일지 내용 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-gray-900">{log.user.name || "익명"}</span>
+                        <ConditionBadge condition={log.condition} />
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">{log.conditionReason}</p>
+                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                        <span>❤️ {log.likes.length}</span>
+                        <span>💬 {log.comments.length}</span>
+                      </div>
+                    </div>
+
+                    {/* 사진 썸네일 */}
+                    {log.imageUrl && (
+                      <div className="flex-shrink-0">
+                        <img src={log.imageUrl} alt="일지 사진" className="w-16 h-16 rounded object-cover" />
+                      </div>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

@@ -40,6 +40,13 @@ interface TrainingLog {
   keyPoints: string;
   improvement: string;
   imageUrl: string | null;
+  title?: string | null;
+  trainingEventId?: string | null;
+  trainingEvent?: {
+    id: string;
+    title: string | null;
+    date: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -408,45 +415,54 @@ export default function LogDetailPage({
         )}
 
         {/* 작성자 정보 */}
-        <div className="bg-white p-4 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-            {log.user.image ? (
-              <Image
-                src={log.user.image}
-                alt={log.user.name || ""}
-                width={48}
-                height={48}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+        <div className="bg-white p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
+              {log.user.image ? (
+                <Image
+                  src={log.user.image}
+                  alt={log.user.name || ""}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="font-medium text-gray-900">
+                  {log.user.name || "익명"}
+                </p>
+                {(log.user.position || log.user.number != null) && (
+                  <span className="text-xs text-gray-400">
+                    {[log.user.position, log.user.number != null ? `${log.user.number}` : null].filter(Boolean).join(" ")}
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="font-medium text-gray-900">
-                {log.user.name || "익명"}
-              </p>
-              {(log.user.position || log.user.number != null) && (
-                <span className="text-xs text-gray-400">
-                  {[log.user.position, log.user.number != null ? `#${log.user.number}` : null].filter(Boolean).join(" ")}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm text-gray-500">
-                {formatDate(log.trainingDate)} 운동
-              </p>
-              {isEdited(log.createdAt, log.updatedAt) && (
-                <span className="text-xs text-gray-400">(수정됨)</span>
-              )}
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm text-gray-500">
+                  {formatDate(log.trainingDate)} 운동
+                </p>
+                {isEdited(log.createdAt, log.updatedAt) && (
+                  <span className="text-xs text-gray-400">(수정됨)</span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* 제목 표시 - 팀 운동이면 팀 운동 제목, 개인 운동이면 입력한 제목 */}
+          {(log.trainingEvent?.title || log.title) && (
+            <h2 className="mt-3 text-lg font-semibold text-gray-900">
+              {log.trainingEvent?.title || log.title}
+            </h2>
+          )}
         </div>
 
         {/* 컨디션 */}

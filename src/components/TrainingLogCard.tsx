@@ -68,7 +68,7 @@ export default function TrainingLogCard({ log, onLikeToggle }: Props) {
             </p>
             {(log.user.position || log.user.number != null) && (
               <span className="text-xs text-gray-400">
-                {[log.user.position, log.user.number != null ? `#${log.user.number}` : null].filter(Boolean).join(" ")}
+                {[log.user.position, log.user.number != null ? `${log.user.number}` : null].filter(Boolean).join(" ")}
               </span>
             )}
           </div>

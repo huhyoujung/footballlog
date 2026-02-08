@@ -2,7 +2,10 @@
  * POM (Player of the Match) 투표 시간 관리 유틸리티
  */
 
-export function getPomVotingStatus(eventDate: string): {
+export function getPomVotingStatus(
+  eventDate: string,
+  pomVotingDeadline: string | null
+): {
   isOpen: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -14,10 +17,15 @@ export function getPomVotingStatus(eventDate: string): {
   // 투표 시작: 운동 시작 2시간 후
   const votingStartTime = new Date(event.getTime() + 2 * 60 * 60 * 1000);
 
-  // 투표 마감: 다음날 23:59
-  const votingEndDate = new Date(event);
-  votingEndDate.setDate(votingEndDate.getDate() + 1);
-  votingEndDate.setHours(23, 59, 59, 999);
+  // 투표 마감: pomVotingDeadline이 있으면 사용, 없으면 다음날 23:59
+  let votingEndDate: Date;
+  if (pomVotingDeadline) {
+    votingEndDate = new Date(pomVotingDeadline);
+  } else {
+    votingEndDate = new Date(event);
+    votingEndDate.setDate(votingEndDate.getDate() + 1);
+    votingEndDate.setHours(23, 59, 59, 999);
+  }
 
   if (now < votingStartTime) {
     const hoursUntil = Math.floor((votingStartTime.getTime() - now.getTime()) / (60 * 60 * 1000));
@@ -59,13 +67,18 @@ export function getPomVotingStatus(eventDate: string): {
 /**
  * 투표 마감 여부 확인
  */
-export function isPomVotingClosed(eventDate: string): boolean {
+export function isPomVotingClosed(eventDate: string, pomVotingDeadline: string | null): boolean {
   const now = new Date();
   const event = new Date(eventDate);
 
-  const votingEndDate = new Date(event);
-  votingEndDate.setDate(votingEndDate.getDate() + 1);
-  votingEndDate.setHours(23, 59, 59, 999);
+  let votingEndDate: Date;
+  if (pomVotingDeadline) {
+    votingEndDate = new Date(pomVotingDeadline);
+  } else {
+    votingEndDate = new Date(event);
+    votingEndDate.setDate(votingEndDate.getDate() + 1);
+    votingEndDate.setHours(23, 59, 59, 999);
+  }
 
   return now > votingEndDate;
 }

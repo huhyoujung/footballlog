@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
 import { useTeam } from "@/contexts/TeamContext";
+import useSWR from "swr";
 
 interface Team {
   id: string;
@@ -23,40 +24,42 @@ interface Team {
   }[];
 }
 
+interface ProfileData {
+  image: string | null;
+}
+
+// SWR fetcher
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function MyPage() {
   const { data: session, update } = useSession();
   const { teamData, loading: teamLoading } = useTeam();
-  const [loading, setLoading] = useState(true);
   const [nudging, setNudging] = useState<string | null>(null);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
-  const [userImage, setUserImage] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<{
+    id: string;
+    name: string | null;
+  } | null>(null);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  useEffect(() => {
-    if (session?.user?.teamId) {
-      fetchProfile();
-    } else {
-      setLoading(false);
+  // SWR로 profile 데이터 페칭 (자동 캐싱)
+  const { data: profileData, isLoading: profileLoading } = useSWR<ProfileData>(
+    session?.user?.teamId ? "/api/profile" : null,
+    fetcher,
+    {
+      fallbackData: { image: session?.user?.image || null },
+      revalidateOnFocus: false, // profile은 자주 바뀌지 않으므로
+      dedupingInterval: 5000,
     }
-  }, [session]);
+  );
 
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch("/api/profile");
-      if (res.ok) {
-        const data = await res.json();
-        setUserImage(data.image);
-      }
-    } catch {
-      // use session image as fallback
-      setUserImage(session?.user?.image || null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const userImage = profileData?.image || session?.user?.image || null;
 
   const handleNudge = async (recipientId: string) => {
+    // 모달 닫기
+    setSelectedMember(null);
+
     // Optimistic UI: 즉시 완료 상태로 변경
     setNudgedToday((prev) => new Set(prev).add(recipientId));
 
@@ -94,7 +97,7 @@ export default function MyPage() {
     signOut({ callbackUrl: "/login" });
   };
 
-  const isLoading = loading || teamLoading;
+  const isLoading = profileLoading || teamLoading;
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -120,16 +123,62 @@ export default function MyPage() {
       <main className="flex-1 max-w-5xl mx-auto px-6 py-4 w-full space-y-4">
         {teamData && (
           <>
+            {/* 메뉴 */}
+            <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
+              <Link
+                href="/my/training-events"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">팀 운동</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              <Link
+                href="/my/settings"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">내 프로필 수정</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              <Link
+                href="/my/logs"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">내 운동 일지</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
+              {isAdmin && (
+                <Link
+                  href="/my/team-admin"
+                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                >
+                  <span className="text-gray-900">팀 정보 수정</span>
+                  <span className="text-gray-400">&rsaquo;</span>
+                </Link>
+              )}
+            </div>
+
             {/* 팀원 목록 */}
-            <div className="bg-white rounded-xl p-6">
-              <p className="text-xs text-gray-400 mb-3">
+            <div className="bg-white rounded-xl py-6">
+              <p className="text-xs text-gray-400 mb-3 px-6">
                 우리 팀원 {teamData.members.length}명
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2 px-6">
                 {teamData.members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 py-1.5"
+                    onClick={() => {
+                      if (member.id !== session?.user?.id) {
+                        setSelectedMember({
+                          id: member.id,
+                          name: member.name,
+                        });
+                      }
+                    }}
+                    className={`flex items-center gap-3 py-1.5 ${
+                      member.id !== session?.user?.id
+                        ? "cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors"
+                        : ""
+                    }`}
                   >
                     <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                       {member.image ? (
@@ -164,7 +213,7 @@ export default function MyPage() {
                       {/* 포지션/등번호 */}
                       {(member.position || member.number) && (
                         <span className="text-xs text-gray-500">
-                          {member.position || ""}{member.number ? ` #${member.number}` : ""}
+                          {member.position || ""}{member.number ? ` ${member.number}` : ""}
                         </span>
                       )}
 
@@ -182,76 +231,9 @@ export default function MyPage() {
                         )}
                       </div>
                     </div>
-                    {member.id !== session?.user?.id && (
-                      <button
-                        onClick={() => handleNudge(member.id)}
-                        disabled={
-                          nudging === member.id || nudgedToday.has(member.id)
-                        }
-                        className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${
-                          nudgedToday.has(member.id)
-                            ? "bg-gray-100 text-gray-400"
-                            : "bg-team-50 text-team-600 hover:bg-team-100"
-                        } disabled:opacity-50 transition-colors`}
-                      >
-                        {nudging === member.id ? (
-                          "..."
-                        ) : nudgedToday.has(member.id) ? (
-                          "완료"
-                        ) : (
-                          <>
-                            <span className="text-base">👉</span>
-                            닦달
-                          </>
-                        )}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* 메뉴 */}
-            <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
-              <Link
-                href="/my/training-events"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">팀 운동</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
-              <Link
-                href="/my/settings"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">내 프로필 수정</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
-              <Link
-                href="/my/logs"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">내 운동 일지</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
-              {isAdmin && (
-                <>
-                  <Link
-                    href="/my/team-settings"
-                    className="flex items-center justify-between p-4 hover:bg-gray-50"
-                  >
-                    <span className="text-gray-900">팀 프로필 수정</span>
-                    <span className="text-gray-400">&rsaquo;</span>
-                  </Link>
-                  <Link
-                    href="/my/team-equipment"
-                    className="flex items-center justify-between p-4 hover:bg-gray-50"
-                  >
-                    <span className="text-gray-900">장비 관리</span>
-                    <span className="text-gray-400">&rsaquo;</span>
-                  </Link>
-                </>
-              )}
             </div>
           </>
         )}
@@ -268,6 +250,58 @@ export default function MyPage() {
           문의하기
         </a>
       </footer>
+
+      {/* 팀원 액션 모달 */}
+      {selectedMember && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          onClick={() => setSelectedMember(null)}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-3 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {selectedMember.name || "팀원"}님에게
+              </h3>
+            </div>
+
+            {/* 닦달하기 버튼 */}
+            <button
+              onClick={() => handleNudge(selectedMember.id)}
+              disabled={nudgedToday.has(selectedMember.id)}
+              className={`w-full py-4 rounded-xl font-medium transition-colors ${
+                nudgedToday.has(selectedMember.id)
+                  ? "bg-gray-100 text-gray-400"
+                  : "bg-team-500 text-white hover:bg-team-600"
+              }`}
+            >
+              {nudgedToday.has(selectedMember.id) ? (
+                <>✅ 오늘 닦달 완료</>
+              ) : (
+                <>💪 닦달하기</>
+              )}
+            </button>
+
+            {/* 칭찬하기 버튼 (곧 지원) */}
+            <button
+              disabled
+              className="w-full py-4 rounded-xl font-medium bg-gray-100 text-gray-400"
+            >
+              👏 칭찬하기 (곧 지원됨)
+            </button>
+
+            {/* 취소 버튼 */}
+            <button
+              onClick={() => setSelectedMember(null)}
+              className="w-full py-3 text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
