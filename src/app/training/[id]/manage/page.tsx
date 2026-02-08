@@ -115,38 +115,32 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [submitting, setSubmitting] = useState(false);
   const [lateFeeAmounts, setLateFeeAmounts] = useState<Record<string, number>>({});
 
-  // 세션 상태
+  // 세션 생성 상태
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [sessionTitle, setSessionTitle] = useState("");
-  const [sessionMemo, setSessionMemo] = useState("");
   const [sessionRequiresTeams, setSessionRequiresTeams] = useState(false);
 
-  // 세션 수정 상태
-  const [editingSessionInfo, setEditingSessionInfo] = useState<string | null>(null);
+  // 세션 편집 상태 (생성과 통합 - 하나의 세션만 편집)
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editMemo, setEditMemo] = useState("");
   const [editRequiresTeams, setEditRequiresTeams] = useState(false);
+  const [editTeamCount, setEditTeamCount] = useState(2);
 
-  // 팀 배정 상태
-  const [editingSession, setEditingSession] = useState<string | null>(null);
+  // 팀 배정 상태 (편집 중인 세션의 배정 정보)
   const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
-  const [teamLabels, setTeamLabels] = useState<Record<string, string[]>>({});
   const [draggedUser, setDraggedUser] = useState<{ userId: string; userName: string; fromTeam: string } | null>(null);
-  const [unassignedPosition, setUnassignedPosition] = useState<Record<string, number>>({});
 
   // 터치 드래그 상태
   const [touchDragUser, setTouchDragUser] = useState<{ userId: string; userName: string; fromTeam: string; sessionId: string } | null>(null);
-  const [touchDragUnassigned, setTouchDragUnassigned] = useState<{ sessionId: string } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ sessionId: string; teamLabel: string } | null>(null);
   const [touchDragPosition, setTouchDragPosition] = useState<{ x: number; y: number } | null>(null);
 
-  // 세션 드래그 상태
+  // 세션 순서 드래그 상태
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [dragOverSessionIndex, setDragOverSessionIndex] = useState<number | null>(null);
 
-  // 랜덤 배정 상태
-  const [showRandomPanel, setShowRandomPanel] = useState<string | null>(null);
-  const [randomTeamCount, setRandomTeamCount] = useState(2);
+  // 자동배정 바텀시트
+  const [showAutoAssignSheet, setShowAutoAssignSheet] = useState(false);
 
   // 삭제 확인 상태
   const [deleteConfirmSession, setDeleteConfirmSession] = useState<string | null>(null);
