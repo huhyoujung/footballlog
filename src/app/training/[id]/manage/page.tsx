@@ -1260,9 +1260,11 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                     <div key={manager.id} className="bg-white rounded-xl p-4">
                       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <span>{manager.name || "익명"}</span>
-                        <span className="text-xs px-2 py-0.5 bg-team-50 text-team-600 rounded-full">
-                          관리자
-                        </span>
+                        {(manager.position || manager.number) && (
+                          <span className="text-xs text-gray-400 font-normal">
+                            {manager.position || ""} {manager.number ? `${manager.number}` : ""}
+                          </span>
+                        )}
                         <span className="text-xs text-gray-400 font-normal ml-auto">
                           ({assignedEquipments.length}개)
                         </span>

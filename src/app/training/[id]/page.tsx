@@ -170,23 +170,12 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">{event?.title || "팀 운동"}</h1>
           {isAdmin ? (
-            <div className="relative">
-              <button onClick={() => setShowMenu(!showMenu)} className="text-gray-500 hover:text-gray-700 p-1">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
-                </svg>
-              </button>
-              {showMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px] z-20">
-                  <Link href={`/training/${eventId}/manage`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMenu(false)}>
-                    수정 및 관리하기
-                  </Link>
-                  <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-50">
-                    삭제하기
-                  </button>
-                </div>
-              )}
-            </div>
+            <Link
+              href={`/training/${eventId}/manage`}
+              className="text-xs px-3 py-1.5 bg-team-500 text-white rounded-lg font-medium hover:bg-team-600 transition-colors"
+            >
+              관리하기
+            </Link>
           ) : (
             <div className="w-6" />
           )}
