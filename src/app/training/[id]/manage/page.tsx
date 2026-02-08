@@ -358,39 +358,14 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: sessionTitle || null,
-          memo: sessionMemo || null,
+          memo: null,
           requiresTeams: sessionRequiresTeams,
         }),
       });
       if (res.ok) {
         setShowSessionForm(false);
         setSessionTitle("");
-        setSessionMemo("");
         setSessionRequiresTeams(false);
-        fetchEvent();
-      }
-    } catch {
-      // ignore
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // 세션 수정
-  const handleUpdateSession = async (sessionId: string) => {
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editTitle || null,
-          memo: editMemo || null,
-          requiresTeams: editRequiresTeams,
-        }),
-      });
-      if (res.ok) {
-        setEditingSessionInfo(null);
         fetchEvent();
       }
     } catch {
@@ -539,37 +514,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     setDraggedUser(null);
   };
 
-  // 미배정 섹션 드래그 핸들러
-  const handleUnassignedDragStart = (e: React.DragEvent, sessionId: string) => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", JSON.stringify({ type: "unassigned-section", sessionId }));
-    e.stopPropagation();
-  };
-
-  const handleDropZoneDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    e.currentTarget.classList.add("border-team-500");
-  };
-
-  const handleDropZoneDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove("border-team-500");
-  };
-
-  const handleDropZoneDrop = (e: React.DragEvent, sessionId: string, position: number) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove("border-team-500");
-
-    try {
-      const data = JSON.parse(e.dataTransfer.getData("text/plain"));
-      if (data.type === "unassigned-section" && data.sessionId === sessionId) {
-        setUnassignedPosition((prev) => ({ ...prev, [sessionId]: position }));
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   // 터치 드래그 핸들러
   const handleUserTouchStart = (userId: string, userName: string, fromTeam: string, sessionId: string) => {
     setTouchDragUser({ userId, userName, fromTeam, sessionId });
@@ -616,48 +560,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     setTouchDragUser(null);
     setDragOverTarget(null);
     setTouchDragPosition(null);
-  };
-
-  const handleUnassignedTouchStart = (sessionId: string) => {
-    setTouchDragUnassigned({ sessionId });
-    setDragOverTarget(null);
-  };
-
-  const handleUnassignedTouchMove = (e: React.TouchEvent) => {
-    if (!touchDragUnassigned) return;
-    e.preventDefault();
-
-    const touch = e.touches[0];
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!element) return;
-
-    // 드롭존 찾기
-    const dropZone = element.closest('[data-unassigned-drop-zone]');
-    if (dropZone) {
-      const sessionId = dropZone.getAttribute('data-session-id');
-      const position = dropZone.getAttribute('data-position');
-      if (sessionId && position) {
-        setDragOverTarget({ sessionId, teamLabel: `position-${position}` });
-      }
-    } else {
-      setDragOverTarget(null);
-    }
-  };
-
-  const handleUnassignedTouchEnd = () => {
-    if (!touchDragUnassigned || !dragOverTarget) {
-      setTouchDragUnassigned(null);
-      setDragOverTarget(null);
-      return;
-    }
-
-    if (dragOverTarget.teamLabel.startsWith('position-')) {
-      const position = parseInt(dragOverTarget.teamLabel.replace('position-', ''));
-      setUnassignedPosition((prev) => ({ ...prev, [touchDragUnassigned.sessionId]: position }));
-    }
-
-    setTouchDragUnassigned(null);
-    setDragOverTarget(null);
   };
 
   // 세션 드래그 핸들러
@@ -1214,13 +1116,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                   placeholder="세션 제목 (예: 5v5 미니게임)"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-team-300 transition-colors"
                 />
-                <textarea
-                  value={sessionMemo}
-                  onChange={(e) => setSessionMemo(e.target.value)}
-                  placeholder="메모 (선택)"
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:border-team-300 transition-colors"
-                />
                 <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
                   <div>
                     <span className="text-sm font-medium text-gray-700">팀 분배 필요</span>
@@ -1238,7 +1133,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => { setShowSessionForm(false); setSessionTitle(""); setSessionMemo(""); setSessionRequiresTeams(false); }}
+                    onClick={() => { setShowSessionForm(false); setSessionTitle(""); setSessionRequiresTeams(false); }}
                     className="flex-1 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     취소
