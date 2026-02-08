@@ -6,6 +6,7 @@ import type { TrainingLog } from "@/types/training";
 
 interface Props {
   logs: TrainingLog[];
+  date: string; // 실제 날짜 (YYYY-MM-DD) - seed로 사용
   displayDate: string;
   onClick: () => void;
   isExpanding?: boolean;
@@ -23,8 +24,8 @@ function seededRandom(seed: string) {
   };
 }
 
-function generateStackConfigs(displayDate: string) {
-  const rand = seededRandom(displayDate);
+function generateStackConfigs(date: string) {
+  const rand = seededRandom(date);
 
   return [
     {
@@ -48,9 +49,9 @@ function generateStackConfigs(displayDate: string) {
   ];
 }
 
-export default function PolaroidStack({ logs, displayDate, onClick, isExpanding }: Props) {
+export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding }: Props) {
   const visibleLogs = logs.slice(0, 3);
-  const configs = useMemo(() => generateStackConfigs(displayDate), [displayDate]);
+  const configs = useMemo(() => generateStackConfigs(date), [date]);
 
   // 펼침 시 카드를 가로로 벌리는 위치 계산 (캐러셀 위치에 가깝게)
   const getExpandedOffset = (i: number, total: number) => {

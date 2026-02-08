@@ -6,6 +6,7 @@ import type { TrainingLog } from "@/types/training";
 
 interface Props {
   logs: TrainingLog[];
+  date: string; // 실제 날짜 (YYYY-MM-DD)
   displayDate: string;
   isExpanded: boolean;
   isExpanding?: boolean;
@@ -16,6 +17,7 @@ interface Props {
 
 export default function PolaroidDateGroup({
   logs,
+  date,
   displayDate,
   isExpanded,
   isExpanding,
@@ -35,6 +37,7 @@ export default function PolaroidDateGroup({
       ) : (
         <PolaroidStack
           logs={logs}
+          date={date}
           displayDate={displayDate}
           onClick={onExpand}
           isExpanding={isExpanding}

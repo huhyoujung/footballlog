@@ -38,6 +38,7 @@ export interface TeamMember {
 }
 
 export interface GroupedLogs {
-  displayDate: string;
+  date: string; // 실제 날짜 (YYYY-MM-DD)
+  displayDate: string; // 표시용 날짜 ("오늘", "어제", "1월 5일")
   logs: TrainingLog[];
 }

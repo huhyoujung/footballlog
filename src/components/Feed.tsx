@@ -197,6 +197,7 @@ export default function Feed() {
     return Object.entries(grouped)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([date, dateLogs]) => ({
+        date, // 실제 날짜 (YYYY-MM-DD) 추가
         displayDate:
           date === today
             ? "오늘"
@@ -366,6 +367,7 @@ export default function Feed() {
               <PolaroidDateGroup
                 key={group.displayDate}
                 logs={group.logs}
+                date={group.date}
                 displayDate={group.displayDate}
                 isExpanded={expandedDate === group.displayDate}
                 onExpand={() => handleExpand(group.displayDate)}
