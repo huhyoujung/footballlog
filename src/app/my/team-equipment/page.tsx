@@ -46,6 +46,9 @@ export default function TeamEquipmentPage() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // 선택된 관리자 ID 목록 (장비가 없어도 드롭존으로 표시)
+  const [designatedManagers, setDesignatedManagers] = useState<Set<string>>(new Set());
+
   // 드래그 상태
   const [draggedEquipment, setDraggedEquipment] = useState<Equipment | null>(null);
   const [dragOverOwner, setDragOverOwner] = useState<string | null>(null);
@@ -284,8 +287,34 @@ export default function TeamEquipmentPage() {
     }
   });
 
-  // 관리자 목록 (장비를 가진 사람들만)
-  const managers = teamData?.members.filter((m) => equipmentsByOwner[m.id]) || [];
+  // 관리자 목록 (장비를 가진 사람들 + 지정된 관리자)
+  const managers = teamData?.members.filter((m) =>
+    equipmentsByOwner[m.id] || designatedManagers.has(m.id)
+  ) || [];
+
+  // 모달 열 때 현재 관리자로 초기화
+  const openManagerModal = () => {
+    const currentManagers = new Set(Object.keys(equipmentsByOwner));
+    setDesignatedManagers(currentManagers);
+    setShowManagerModal(true);
+  };
+
+  // 관리자 토글
+  const toggleManager = (userId: string) => {
+    setDesignatedManagers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        // 장비가 있는 관리자는 제거 불가
+        if (equipmentsByOwner[userId]?.length > 0) {
+          return prev;
+        }
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -303,7 +332,7 @@ export default function TeamEquipmentPage() {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-team-700">🎯 장비 관리자</h3>
             <button
-              onClick={() => setShowManagerModal(true)}
+              onClick={openManagerModal}
               className="text-xs text-team-600 hover:text-team-700 font-medium"
             >
               선택
@@ -534,60 +563,106 @@ export default function TeamEquipmentPage() {
 
       {/* 관리자 선택 모달 */}
       {showManagerModal && teamData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              장비 관리자 선택
-            </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              관리자를 선택하면 장비를 배정할 수 있습니다
-            </p>
-            <div className="space-y-2">
-              {teamData.members.map((member) => {
-                const hasEquipment = equipmentsByOwner[member.id]?.length > 0;
-                return (
-                  <div
-                    key={member.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      hasEquipment ? "bg-team-50" : "bg-gray-50"
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                      {member.image ? (
-                        <Image
-                          src={member.image}
-                          alt={member.name || ""}
-                          width={40}
-                          height={40}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-team-50" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {member.name || "익명"}
-                      </p>
-                      {member.position && (
-                        <p className="text-xs text-gray-400">{member.position}</p>
-                      )}
-                      {hasEquipment && (
-                        <p className="text-xs text-team-600 mt-0.5">
-                          장비 {equipmentsByOwner[member.id].length}개
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowManagerModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-sm w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">
+                장비 관리자 선택
+              </h3>
+              <button
+                onClick={() => setShowManagerModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={() => setShowManagerModal(false)}
-              className="w-full mt-4 py-2.5 bg-team-500 text-white rounded-lg font-medium"
-            >
-              확인
-            </button>
+
+            {/* 설명 */}
+            <div className="px-6 pt-2 pb-4">
+              <p className="text-xs text-gray-500">
+                팀원을 선택하면 장비를 배정할 수 있는 드롭존이 표시됩니다
+              </p>
+            </div>
+
+            {/* 멤버 목록 - 스크롤 가능 */}
+            <div className="flex-1 overflow-y-auto px-6 pb-4">
+              <div className="space-y-2">
+                {teamData.members.map((member) => {
+                  const hasEquipment = equipmentsByOwner[member.id]?.length > 0;
+                  const isSelected = designatedManagers.has(member.id);
+                  const canDeselect = !hasEquipment;
+
+                  return (
+                    <button
+                      key={member.id}
+                      onClick={() => toggleManager(member.id)}
+                      disabled={!canDeselect && isSelected}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${
+                        isSelected
+                          ? "bg-team-50 border-2 border-team-500"
+                          : "bg-gray-50 border-2 border-transparent hover:border-gray-200"
+                      } ${!canDeselect && isSelected ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                        {member.image ? (
+                          <Image
+                            src={member.image}
+                            alt={member.name || ""}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-team-50" />
+                        )}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-medium text-gray-900">
+                          {member.name || "익명"}
+                        </p>
+                        {member.position && (
+                          <p className="text-xs text-gray-400">{member.position}</p>
+                        )}
+                        {hasEquipment && (
+                          <p className="text-xs text-team-600 mt-0.5">
+                            장비 {equipmentsByOwner[member.id].length}개
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {isSelected && (
+                          <div className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 하단 고정 확인 버튼 */}
+            <div className="p-6 pt-4 border-t border-gray-100 bg-white rounded-b-xl">
+              <button
+                onClick={() => setShowManagerModal(false)}
+                className="w-full py-3 bg-team-500 text-white rounded-lg font-medium hover:bg-team-600 transition-colors"
+              >
+                확인
+              </button>
+            </div>
           </div>
         </div>
       )}

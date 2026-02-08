@@ -290,6 +290,38 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
+        {/* POM 투표 (체크인한 사람들 대상) - 상단에 우선 표시 */}
+        {event.checkIns.length > 0 && (
+          <div className="space-y-3">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+            </div>
+            {showPomVoting && (
+              <PomVoting
+                eventId={event.id}
+                eventDate={event.date}
+                pomVotingDeadline={event.pomVotingDeadline}
+                checkIns={event.checkIns}
+              />
+            )}
+          </div>
+        )}
+
         {/* 참석 현황 */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setShowAttendance(!showAttendance)}>
@@ -451,38 +483,6 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
               <p className="text-sm text-gray-400 text-center py-3">
                 참석 응답 후 체크인할 수 있습니다
               </p>
-            )}
-          </div>
-        )}
-
-        {/* POM 투표 (체크인한 사람들 대상) - 체크인 이후 바로 표시 */}
-        {event.checkIns.length > 0 && (
-          <div className="space-y-3">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
-            {showPomVoting && (
-              <PomVoting
-                eventId={event.id}
-                eventDate={event.date}
-                pomVotingDeadline={event.pomVotingDeadline}
-                checkIns={event.checkIns}
-              />
             )}
           </div>
         )}

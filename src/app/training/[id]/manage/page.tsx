@@ -1044,25 +1044,6 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           </h3>
                         </div>
                         <div className="flex gap-1.5">
-                          {/* 순서 변경 버튼 */}
-                          <button
-                            onClick={() => handleReorderSession(sess.id, "up")}
-                            disabled={idx === 0}
-                            className="text-xs text-gray-400 hover:text-team-500 p-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="18 15 12 9 6 15" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleReorderSession(sess.id, "down")}
-                            disabled={idx === event.sessions.length - 1}
-                            className="text-xs text-gray-400 hover:text-team-500 p-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                          </button>
                           {/* 편집 버튼 */}
                           <button
                             onClick={() => {
