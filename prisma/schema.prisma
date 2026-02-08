@@ -126,6 +126,8 @@ model Venue {
 model TrainingLog {
   id              String   @id @default(cuid())
   userId          String
+  trainingEventId String?  // 팀 운동 연결 (nullable)
+  title           String?  // 개인 운동 제목 (nullable)
   trainingDate    DateTime
   condition       Int      // 0-10
   conditionReason String   @db.Text
@@ -136,10 +138,11 @@ model TrainingLog {
   updatedAt       DateTime @updatedAt
 
   // 관계
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments    Comment[]
-  likes       Like[]
-  taggedUsers User[]    @relation("TaggedInLogs")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingEvent TrainingEvent? @relation(fields: [trainingEventId], references: [id], onDelete: SetNull)
+  comments      Comment[]
+  likes         Like[]
+  taggedUsers   User[]         @relation("TaggedInLogs")
 }
 
 model Comment {
@@ -233,6 +236,7 @@ model TrainingEvent {
   checkIns     CheckIn[]
   lateFees     LateFee[]
   sessions     TrainingSession[]
+  trainingLogs TrainingLog[]
 }
 
 model Rsvp {

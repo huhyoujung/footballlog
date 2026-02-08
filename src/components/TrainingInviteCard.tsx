@@ -26,23 +26,16 @@ export default function TrainingInviteCard({ event }: Props) {
   return (
     <Link
       href={`/training/${event.id}`}
-      className="block px-4 my-3"
+      className="block flex-shrink-0 w-[280px]"
     >
-      <div className="max-w-lg mx-auto bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-5 shadow-lg">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 7 L15.5 10 L14 14.5 L10 14.5 L8.5 10 Z" fill="none" />
-            </svg>
-            <span className="text-white/80 text-xs font-semibold tracking-wider uppercase">팀 운동</span>
-          </div>
+      <div className="bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-4 shadow-lg">
+        <div className="flex items-center justify-end mb-3">
           <span className="px-2.5 py-1 bg-white/20 text-white text-xs font-medium rounded-full">
             {event._count.rsvps}명 응답
           </span>
         </div>
 
-        <h3 className="text-xl font-bold text-white mb-3">{event.title}</h3>
+        <h3 className="text-lg font-bold text-white mb-3">{event.title}</h3>
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 text-white/90">

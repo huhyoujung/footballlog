@@ -6,13 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ConditionPicker from "@/components/ConditionPicker";
 import MentionTextarea from "@/components/MentionTextarea";
+import BackButton from "@/components/BackButton";
 import { getConditionLevel, getConditionColor } from "@/lib/condition";
 
 export default function WritePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
         </div>
       }
@@ -44,13 +45,27 @@ function WritePageContent() {
       number: number | null;
     }>
   >([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<
+    Array<{
+      id: string;
+      title: string;
+      date: string;
+      location: string;
+    }>
+  >([]);
   const [formData, setFormData] = useState<{
+    logType: "team" | "personal";
+    trainingEventId: string | null;
+    title: string;
     trainingDate: string;
     condition: number | null;
     conditionReason: string;
     keyPoints: string;
     improvement: string;
   }>({
+    logType: "personal",
+    trainingEventId: null,
+    title: "",
     trainingDate: new Date().toISOString().split("T")[0],
     condition: null,
     conditionReason: "",
@@ -68,6 +83,9 @@ function WritePageContent() {
         if (res.ok) {
           const data = await res.json();
           setFormData({
+            logType: data.trainingEventId ? "team" : "personal",
+            trainingEventId: data.trainingEventId || null,
+            title: data.title || "",
             trainingDate: new Date(data.trainingDate).toISOString().split("T")[0],
             condition: data.condition,
             conditionReason: data.conditionReason,
@@ -105,6 +123,23 @@ function WritePageContent() {
     };
 
     fetchTeamMembers();
+  }, []);
+
+  // 예정된 팀 운동 목록 로드
+  useEffect(() => {
+    const fetchUpcomingEvents = async () => {
+      try {
+        const res = await fetch("/api/training-events/next");
+        if (res.ok) {
+          const data = await res.json();
+          setUpcomingEvents(data.events || []);
+        }
+      } catch {
+        // 팀 운동 목록 로드 실패 시 무시
+      }
+    };
+
+    fetchUpcomingEvents();
   }, []);
 
   const isFormComplete =
@@ -207,25 +242,18 @@ function WritePageContent() {
 
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-white pb-24">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            href={isEditMode ? `/log/${editId}` : "/"}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href={isEditMode ? `/log/${editId}` : "/"} />
           <h1 className="text-lg font-semibold text-gray-900">
             {isEditMode ? "운동 일지 수정" : "운동 일지 작성"}
           </h1>
@@ -233,9 +261,100 @@ function WritePageContent() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-6">
+      <main className="max-w-lg mx-auto divide-y divide-gray-100">
+        {/* 훈련 분류 */}
+        <div className="px-4 py-5 space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            훈련 분류 (선택)
+          </label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="logType"
+                value="team"
+                checked={formData.logType === "team"}
+                onChange={(e) => {
+                  setFormData({
+                    ...formData,
+                    logType: "team",
+                    title: "",
+                    trainingEventId: upcomingEvents[0]?.id || null,
+                  });
+                }}
+                className="w-4 h-4 text-team-500 focus:ring-team-500"
+              />
+              <span className="text-sm text-gray-700">팀 운동</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="logType"
+                value="personal"
+                checked={formData.logType === "personal"}
+                onChange={(e) => {
+                  setFormData({
+                    ...formData,
+                    logType: "personal",
+                    trainingEventId: null,
+                  });
+                }}
+                className="w-4 h-4 text-team-500 focus:ring-team-500"
+              />
+              <span className="text-sm text-gray-700">개인 운동</span>
+            </label>
+          </div>
+
+          {formData.logType === "team" && upcomingEvents.length > 0 ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                팀 운동 선택
+              </label>
+              <select
+                value={formData.trainingEventId || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, trainingEventId: e.target.value || null })
+                }
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              >
+                {upcomingEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {new Date(event.date).toLocaleDateString("ko-KR", {
+                      month: "short",
+                      day: "numeric",
+                      weekday: "short",
+                    })}{" "}
+                    {new Date(event.date).toLocaleTimeString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    - {event.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : formData.logType === "team" ? (
+            <p className="text-sm text-gray-500">예정된 팀 운동이 없습니다</p>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                제목
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                placeholder="예: 개인 체력 훈련"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              />
+            </div>
+          )}
+        </div>
+
         {/* 운동 날짜 */}
-        <div className="bg-white rounded-xl p-4">
+        <div className="px-4 py-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             운동 날짜
           </label>
@@ -254,7 +373,7 @@ function WritePageContent() {
         <button
           type="button"
           onClick={() => setShowConditionPicker(true)}
-          className="w-full bg-white rounded-xl p-4 text-left"
+          className="w-full px-4 py-5 text-left"
         >
           {condSelected ? (
             <div className="flex items-center gap-3">
@@ -287,7 +406,7 @@ function WritePageContent() {
 
         {/* 컨디션 이유 — 컨디션 선택 후에만 표시 */}
         {condSelected && (
-          <div className="bg-white rounded-xl p-4">
+          <div className="px-4 py-5">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               컨디션 이유
             </label>
@@ -304,7 +423,7 @@ function WritePageContent() {
         )}
 
         {/* 운동 핵심 포인트 */}
-        <div className="bg-white rounded-xl p-4">
+        <div className="px-4 py-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             핵심 포인트
           </label>
@@ -321,7 +440,7 @@ function WritePageContent() {
         </div>
 
         {/* 더 잘하기 위해서는 */}
-        <div className="bg-white rounded-xl p-4">
+        <div className="px-4 py-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             더 잘하기 위해서는?
           </label>
@@ -339,11 +458,14 @@ function WritePageContent() {
 
         {/* 이미지 첨부 - 신규 작성 시에만 */}
         {!isEditMode && (
-          <div className="flex flex-col items-center">
+          <div className="px-4 py-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              사진 (선택)
+            </label>
             <button
               type="button"
               onClick={() => !imagePreview && fileInputRef.current?.click()}
-              className="w-52 bg-white rounded-sm p-3 pb-6 cursor-pointer"
+              className="w-32 bg-white rounded-sm p-2 pb-4 cursor-pointer"
               style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
             >
               {imagePreview ? (
@@ -386,9 +508,12 @@ function WritePageContent() {
 
         {/* 수정 모드에서 기존 이미지 표시 */}
         {isEditMode && imagePreview && (
-          <div className="flex flex-col items-center">
+          <div className="px-4 py-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              사진 (선택)
+            </label>
             <div
-              className="w-52 bg-white rounded-sm p-3 pb-6"
+              className="w-32 bg-white rounded-sm p-2 pb-4"
               style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
             >
               <img

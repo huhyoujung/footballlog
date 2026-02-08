@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "팀에 소속되어 있지 않습니다" }, { status: 400 });
     }
 
-    const { trainingDate, condition, conditionReason, keyPoints, improvement, imageUrl } =
+    const { trainingEventId, title, trainingDate, condition, conditionReason, keyPoints, improvement, imageUrl } =
       await req.json();
 
     // 유효성 검사
@@ -160,6 +160,8 @@ export async function POST(req: Request) {
     const log = await prisma.trainingLog.create({
       data: {
         userId: session.user.id,
+        ...(trainingEventId && { trainingEventId }),
+        ...(title && { title }),
         trainingDate: new Date(trainingDate),
         condition,
         conditionReason: conditionReason.trim(),
