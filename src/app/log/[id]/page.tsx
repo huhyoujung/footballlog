@@ -667,6 +667,7 @@ export default function LogDetailPage({
               placeholder="댓글을 입력하세요... (@멘션 가능)"
               rows={1}
               className="w-full px-4 py-2 border border-gray-300 rounded-full text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+              dropdownPosition="top"
             />
           </div>
           <button
