@@ -270,7 +270,7 @@ export default function MyPage() {
           rel="noopener noreferrer"
           className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
-          💬 문의하기
+          문의하기
         </a>
       </footer>
     </div>

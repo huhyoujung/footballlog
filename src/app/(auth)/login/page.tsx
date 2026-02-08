@@ -73,7 +73,7 @@ export default function LoginPage() {
         rel="noopener noreferrer"
         className="text-xs text-white/60 hover:text-white/80 transition-colors text-center relative z-10"
       >
-        💬 문의하기
+        문의하기
       </a>
     </div>
   );
