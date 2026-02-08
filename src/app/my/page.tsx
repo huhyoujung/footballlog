@@ -9,6 +9,7 @@ import BackButton from "@/components/BackButton";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
+import { withEulReul } from "@/lib/korean";
 import useSWR from "swr";
 
 interface Team {
@@ -87,7 +88,7 @@ export default function MyPage() {
         alert(data.error || "닦달에 실패했습니다");
       } else {
         // 성공 시 토스트 표시
-        showToast(`${recipientName}님에게 닦달했습니다! 👉`);
+        showToast(`${withEulReul(recipientName)} 닦달했습니다! 👉`);
       }
     } catch {
       // 실패 시 롤백
@@ -140,13 +141,6 @@ export default function MyPage() {
                 <span className="text-gray-400">&rsaquo;</span>
               </Link>
               <Link
-                href="/my/settings"
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
-              >
-                <span className="text-gray-900">내 프로필 수정</span>
-                <span className="text-gray-400">&rsaquo;</span>
-              </Link>
-              <Link
                 href="/my/logs"
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
               >
@@ -158,18 +152,25 @@ export default function MyPage() {
                   href="/my/team-admin"
                   className="flex items-center justify-between p-4 hover:bg-gray-50"
                 >
-                  <span className="text-gray-900">팀 정보 수정</span>
+                  <span className="text-gray-900">팀 관리</span>
                   <span className="text-gray-400">&rsaquo;</span>
                 </Link>
               )}
+              <Link
+                href="/my/settings"
+                className="flex items-center justify-between p-4 hover:bg-gray-50"
+              >
+                <span className="text-gray-900">내 프로필 수정</span>
+                <span className="text-gray-400">&rsaquo;</span>
+              </Link>
             </div>
 
             {/* 팀원 목록 */}
             <div className="bg-white rounded-xl py-6">
-              <p className="text-xs text-gray-400 mb-3 px-6">
+              <p className="text-xs text-gray-400 mb-3 px-4">
                 우리 팀원 {teamData.members.length}명
               </p>
-              <div className="space-y-2 px-6">
+              <div className="space-y-2 px-4">
                 {teamData.members.map((member) => (
                   <div
                     key={member.id}
@@ -206,13 +207,10 @@ export default function MyPage() {
                         <span className="text-sm font-medium text-gray-900">
                           {member.name || "익명"}
                         </span>
-                        {/* 운영진 왕관 */}
+                        {/* 운영진 별 */}
                         {member.role === "ADMIN" && (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-team-600 flex-shrink-0">
-                            <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            <circle cx="12" cy="6" r="1.5" fill="currentColor" />
-                            <circle cx="9" cy="9" r="1" fill="currentColor" />
-                            <circle cx="15" cy="9" r="1" fill="currentColor" />
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-team-300 flex-shrink-0">
+                            <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" fill="currentColor" />
                           </svg>
                         )}
                       </div>
@@ -270,7 +268,7 @@ export default function MyPage() {
           >
             <div className="text-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {selectedMember.name || "팀원"}님에게
+                {withEulReul(selectedMember.name)}
               </h3>
             </div>
 

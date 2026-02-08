@@ -353,6 +353,11 @@ export default function TeamEquipmentPage() {
                       <span className="text-sm text-gray-900 font-medium">
                         {manager.name || "익명"}
                       </span>
+                      {manager.role === "ADMIN" && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-team-300 flex-shrink-0">
+                          <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" fill="currentColor" />
+                        </svg>
+                      )}
                       <span className="text-xs text-gray-400">
                         {manager.position || ""} {manager.number ? `#${manager.number}` : ""}
                       </span>

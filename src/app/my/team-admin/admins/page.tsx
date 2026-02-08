@@ -148,15 +148,15 @@ export default function AdminManagementPage() {
                       <span className="text-sm text-gray-900 font-medium">
                         {member.name || "익명"}
                       </span>
+                      {member.role === "ADMIN" && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-team-300 flex-shrink-0">
+                          <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" fill="currentColor" />
+                        </svg>
+                      )}
                       <span className="text-xs text-gray-400">
                         {member.position || ""} {member.number ? `${member.number}` : ""}
                       </span>
                     </div>
-                    {member.role === "ADMIN" && (
-                      <span className="inline-block mt-0.5 px-2 py-0.5 bg-team-50 text-team-500 text-[10px] font-medium rounded-full">
-                        운영진
-                      </span>
-                    )}
                   </div>
                   <button
                     onClick={() =>
