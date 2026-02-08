@@ -85,6 +85,7 @@ model User {
   checkIns               CheckIn[]
   lateFees               LateFee[]
   sessionTeamAssignments SessionTeamAssignment[]
+  taggedInLogs           TrainingLog[] @relation("TaggedInLogs")
 }
 
 model Team {
@@ -135,9 +136,10 @@ model TrainingLog {
   updatedAt       DateTime @updatedAt
 
   // 관계
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments Comment[]
-  likes    Like[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  likes       Like[]
+  taggedUsers User[]    @relation("TaggedInLogs")
 }
 
 model Comment {

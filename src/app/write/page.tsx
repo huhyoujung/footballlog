@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ConditionPicker from "@/components/ConditionPicker";
+import MentionTextarea from "@/components/MentionTextarea";
 import { getConditionLevel, getConditionColor } from "@/lib/condition";
 
 export default function WritePage() {
@@ -35,6 +36,14 @@ function WritePageContent() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [showConditionPicker, setShowConditionPicker] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<
+    Array<{
+      id: string;
+      name: string | null;
+      position: string | null;
+      number: number | null;
+    }>
+  >([]);
   const [formData, setFormData] = useState<{
     trainingDate: string;
     condition: number | null;
@@ -80,6 +89,23 @@ function WritePageContent() {
 
     fetchLog();
   }, [editId]);
+
+  // 팀원 목록 로드
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        const res = await fetch("/api/teams");
+        if (res.ok) {
+          const data = await res.json();
+          setTeamMembers(data.members || []);
+        }
+      } catch {
+        // 팀원 목록 로드 실패 시 무시 (멘션 기능만 사용 불가)
+      }
+    };
+
+    fetchTeamMembers();
+  }, []);
 
   const isFormComplete =
     formData.condition !== null &&
@@ -282,12 +308,13 @@ function WritePageContent() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             핵심 포인트
           </label>
-          <textarea
+          <MentionTextarea
             value={formData.keyPoints}
-            onChange={(e) =>
-              setFormData({ ...formData, keyPoints: e.target.value })
+            onChange={(value) =>
+              setFormData({ ...formData, keyPoints: value })
             }
-            placeholder={"오늘 훈련에서 좋았던 점, 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요"}
+            teamMembers={teamMembers}
+            placeholder="오늘 훈련에서 좋았던 점, 집중했던 부분, 코치님 피드백, 전술적으로 신경 쓴 점 등을 자유롭게 적어주세요. @팀원이름 으로 태그할 수 있습니다."
             rows={5}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
@@ -298,12 +325,13 @@ function WritePageContent() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             더 잘하기 위해서는?
           </label>
-          <textarea
+          <MentionTextarea
             value={formData.improvement}
-            onChange={(e) =>
-              setFormData({ ...formData, improvement: e.target.value })
+            onChange={(value) =>
+              setFormData({ ...formData, improvement: value })
             }
-            placeholder="다음 훈련에서 개선하고 싶은 점, 더 연습이 필요한 부분을 적어주세요"
+            teamMembers={teamMembers}
+            placeholder="다음 훈련에서 개선하고 싶은 점, 더 연습이 필요한 부분을 적어주세요. @팀원이름 으로 태그할 수 있습니다."
             rows={4}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
