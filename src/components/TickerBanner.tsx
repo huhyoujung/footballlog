@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface TickerMessage {
   key: string;
   text: string;
+  url?: string;
 }
 
 interface Props {
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export default function TickerBanner({ messages }: Props) {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isInitial, setIsInitial] = useState(true);
@@ -43,8 +46,19 @@ export default function TickerBanner({ messages }: Props) {
 
   const current = messages[currentIndex % messages.length];
 
+  const handleClick = () => {
+    if (current.url) {
+      router.push(current.url);
+    }
+  };
+
   return (
-    <div className="bg-team-50 border-b border-team-100 overflow-hidden h-10">
+    <div
+      className={`bg-team-50 border-b border-team-100 overflow-hidden h-10 ${
+        current.url ? "cursor-pointer hover:bg-team-100/50 transition-colors" : ""
+      }`}
+      onClick={handleClick}
+    >
       <div className="max-w-lg mx-auto px-5 h-full flex items-center">
         <p
           key={current.key}

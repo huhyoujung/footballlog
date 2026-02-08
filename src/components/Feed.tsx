@@ -226,7 +226,7 @@ export default function Feed() {
   };
 
   const getTickerMessages = () => {
-    const messages: { key: string; text: string }[] = [];
+    const messages: { key: string; text: string; url?: string }[] = [];
 
     // 팀 운동 (최우선)
     for (const event of nextEvents) {
@@ -236,6 +236,7 @@ export default function Feed() {
       messages.push({
         key: `event-${event.id}`,
         text: `📢 ${event.title || "팀 운동"} · ${dateStr} ${timeStr} · ${event.location}`,
+        url: `/training/${event.id}`,
       });
     }
 
