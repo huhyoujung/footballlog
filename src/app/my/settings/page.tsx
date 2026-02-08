@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePushSubscription } from "@/lib/usePushSubscription";
 
 const POSITIONS = [
   "GK",
@@ -47,6 +48,10 @@ export default function SettingsPage() {
   const [position, setPosition] = useState("");
   const [number, setNumber] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // 푸시 알림 상태
+  const { isSupported, isSubscribed, subscribe, unsubscribe } = usePushSubscription();
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -152,6 +157,32 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePushToggle = async () => {
+    setSubscribing(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (isSubscribed) {
+        await unsubscribe();
+        setSuccess("알림이 비활성화되었습니다");
+      } else {
+        const result = await subscribe();
+        if (result) {
+          setSuccess("알림이 활성화되었습니다");
+        } else {
+          setError("알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.");
+        }
+      }
+      setTimeout(() => setSuccess(""), 2000);
+    } catch (err) {
+      console.error("Push subscription error:", err);
+      setError("알림 설정에 실패했습니다");
+    } finally {
+      setSubscribing(false);
     }
   };
 
@@ -281,6 +312,36 @@ export default function SettingsPage() {
             {profile?.email}
           </p>
         </div>
+
+        {/* 푸시 알림 설정 */}
+        {isSupported && (
+          <div className="bg-white rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">
+                푸시 알림
+              </label>
+              <button
+                type="button"
+                onClick={handlePushToggle}
+                disabled={subscribing}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  isSubscribed ? "bg-team-500" : "bg-gray-300"
+                } disabled:opacity-50`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    isSubscribed ? "translate-x-5" : ""
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              {isSubscribed
+                ? "닦달, 댓글, 좋아요 등의 알림을 받고 있습니다"
+                : "알림을 켜면 중요한 소식을 놓치지 않아요"}
+            </p>
+          </div>
+        )}
 
         {error && (
           <p className="text-red-500 text-sm text-center">{error}</p>
