@@ -482,7 +482,7 @@ export default function LogDetailPage({
             </svg>
             운동 핵심 포인트
           </h2>
-          <p className="text-gray-800 whitespace-pre-wrap">{log.keyPoints}</p>
+          <p className="text-gray-800 whitespace-pre-wrap">{renderMentionedText(log.keyPoints)}</p>
         </div>
 
         {/* 개선점 */}
@@ -494,7 +494,7 @@ export default function LogDetailPage({
             </svg>
             더 잘하기 위해서는?
           </h2>
-          <p className="text-gray-800 whitespace-pre-wrap">{log.improvement}</p>
+          <p className="text-gray-800 whitespace-pre-wrap">{renderMentionedText(log.improvement)}</p>
         </div>
 
         {/* 좋아요/댓글 수 */}
@@ -664,9 +664,9 @@ export default function LogDetailPage({
                 setCommentMentions(mentions);
               }}
               teamMembers={teamMembers}
-              placeholder="댓글을 입력하세요... (@멘션 가능)"
-              rows={1}
-              className="w-full px-4 py-2 border border-gray-300 rounded-full text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+              placeholder="댓글을 입력하세요..."
+              rows={2}
+              className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
               dropdownPosition="top"
             />
           </div>
