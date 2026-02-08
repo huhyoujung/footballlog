@@ -20,7 +20,9 @@ export interface TrainingEventDetail {
   isRegular: boolean;
   date: string;
   location: string;
+  shoes: string[];
   uniform: string | null;
+  notes: string | null;
   vestBringer: { id: string; name: string | null } | null;
   vestReceiver: { id: string; name: string | null } | null;
   rsvpDeadline: string;
@@ -61,6 +63,7 @@ export interface SessionEntry {
   id: string;
   title: string | null;
   memo: string | null;
+  requiresTeams: boolean;
   orderIndex: number;
   teamAssignments: {
     id: string;

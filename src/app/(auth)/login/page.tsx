@@ -8,8 +8,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-team-500 to-team-700 px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex flex-col items-center justify-between bg-gradient-to-b from-green-600 to-green-800 px-4 py-8 relative overflow-hidden">
+      {/* 잔디 패턴 효과 */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `repeating-linear-gradient(
+            0deg,
+            rgba(255,255,255,0.1) 0px,
+            transparent 1px,
+            transparent 2px,
+            rgba(255,255,255,0.1) 3px
+          )`
+        }} />
+      </div>
+
+      {/* 상단 여백 */}
+      <div />
+
+      <div className="w-full max-w-sm relative z-10">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mx-auto mb-4">
             <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
@@ -20,15 +36,10 @@ export default function LoginPage() {
               <rect x="20" y="44" width="24" height="10" stroke="#967B5D" strokeWidth="1.5" fill="none" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">네모의 꿈</h1>
-          <p className="text-team-100">팀원들과 함께 성장하세요</p>
+          <p className="text-white text-lg font-medium">둥근 팀을 만들기</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h2 className="text-xl font-semibold text-gray-800 text-center mb-6">
-            로그인
-          </h2>
-
           <button
             onClick={handleGoogleSignIn}
             className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-sm"
@@ -53,16 +64,18 @@ export default function LoginPage() {
             </svg>
             Google로 계속하기
           </button>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            로그인하면 팀원들과 운동 일지를 공유할 수 있어요
-          </p>
         </div>
-
-        <p className="mt-6 text-center text-sm text-team-100">
-          네모의 꿈과 함께 더 나은 선수가 되세요
-        </p>
       </div>
+
+      {/* 문의하기 */}
+      <a
+        href="https://open.kakao.com/o/sqBLurfi"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-white/60 hover:text-white/80 transition-colors text-center relative z-10"
+      >
+        💬 사용하시는데 어려움이 있거나 건의사항이 있으시면 언제든 문의해주세요
+      </a>
     </div>
   );
 }

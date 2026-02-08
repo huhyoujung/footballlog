@@ -4,6 +4,18 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToTeam } from "@/lib/push";
 
+// 구장 신발 추천 업데이트 (최근 1회 데이터 기반)
+async function updateVenueRecommendation(venueId: string, currentShoes: string[]) {
+  // 구장 업데이트: 현재 신발을 그대로 추천 신발로 설정
+  await prisma.venue.update({
+    where: { id: venueId },
+    data: {
+      recommendedShoes: currentShoes.length > 0 ? currentShoes : [],
+      usageCount: { increment: 1 },
+    },
+  });
+}
+
 // 팀 운동 목록 조회
 export async function GET(req: Request) {
   try {
@@ -60,11 +72,40 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "운영진만 생성할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, isRegular, date, location, uniform, vestBringerId, vestReceiverId, rsvpDeadline } =
+    const { title, isRegular, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline } =
       await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
       return NextResponse.json({ error: "필수 항목을 입력해주세요" }, { status: 400 });
+    }
+
+    // 구장 찾기 또는 생성
+    let venueId: string | null = null;
+    if (location && location.trim()) {
+      let venue = await prisma.venue.findUnique({
+        where: {
+          teamId_name: {
+            teamId: session.user.teamId,
+            name: location.trim(),
+          },
+        },
+      });
+
+      if (!venue) {
+        // 새 구장 생성
+        venue = await prisma.venue.create({
+          data: {
+            teamId: session.user.teamId,
+            name: location.trim(),
+            recommendedShoes: Array.isArray(shoes) ? shoes : [],
+            usageCount: 1,
+          },
+        });
+      } else {
+        // 기존 구장: 사용 횟수 증가 + 신발 추천 업데이트
+        await updateVenueRecommendation(venue.id, Array.isArray(shoes) ? shoes : []);
+      }
+      venueId = venue.id;
     }
 
     const event = await prisma.trainingEvent.create({
@@ -75,7 +116,10 @@ export async function POST(req: Request) {
         isRegular: isRegular ?? true,
         date: new Date(date),
         location,
+        venueId,
+        shoes: Array.isArray(shoes) ? shoes : [],
         uniform: uniform || null,
+        notes: notes || null,
         vestBringerId: vestBringerId || null,
         vestReceiverId: vestReceiverId || null,
         rsvpDeadline: new Date(rsvpDeadline),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToUsers } from "@/lib/push";
 
 // 좋아요 토글
 export async function POST(
@@ -72,6 +73,19 @@ export async function POST(
       const likeCount = await prisma.like.count({
         where: { trainingLogId },
       });
+
+      // 푸시 알림: 일지 작성자에게 (본인 좋아요 제외)
+      if (log.userId !== session.user.id) {
+        try {
+          await sendPushToUsers([log.userId], {
+            title: "❤️ 좋아요",
+            body: `${session.user.name || "팀원"}님이 회원님의 일지에 좋아요를 눌렀어요`,
+            url: `/log/${trainingLogId}`,
+          });
+        } catch {
+          // 푸시 실패해도 좋아요는 성공
+        }
+      }
 
       return NextResponse.json({ liked: true, likeCount });
     }

@@ -200,10 +200,22 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
             <span>📍</span>
             <span>{event.location}</span>
           </div>
+          {event.shoes.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>👟</span>
+              <span>{event.shoes.join(", ")} 권장</span>
+            </div>
+          )}
           {event.uniform && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>👕</span>
               <span>{event.uniform}</span>
+            </div>
+          )}
+          {event.notes && (
+            <div className="flex items-start gap-2 text-sm text-gray-600 bg-team-50 -mx-5 px-5 py-3 mt-3">
+              <span className="mt-0.5">💡</span>
+              <div className="flex-1 whitespace-pre-wrap">{event.notes}</div>
             </div>
           )}
           {(event.vestBringer || event.vestReceiver) && (
@@ -350,7 +362,12 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                     세션 {idx + 1}{s.title ? `: ${s.title}` : ""}
                   </div>
                   {s.memo && <p className="text-xs text-gray-500 mt-1">{s.memo}</p>}
-                  {s.teamAssignments.length > 0 && (
+                  {!s.requiresTeams ? (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                      <span>💡</span>
+                      <span>전체 함께 진행</span>
+                    </div>
+                  ) : s.teamAssignments.length > 0 ? (
                     <div className="mt-2 space-y-1">
                       {Object.entries(
                         s.teamAssignments.reduce<Record<string, string[]>>((acc, a) => {
@@ -365,7 +382,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
                         </div>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))}
             </div>

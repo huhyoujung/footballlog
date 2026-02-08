@@ -14,6 +14,12 @@ export async function GET() {
       return NextResponse.json({ error: "운영진만 조회할 수 있습니다" }, { status: 403 });
     }
 
+    // 팀 정보 (조끼 순서 포함)
+    const team = await prisma.team.findUnique({
+      where: { id: session.user.teamId },
+      select: { vestOrder: true },
+    });
+
     // 팀원 명단 (이름순)
     const members = await prisma.user.findMany({
       where: { teamId: session.user.teamId },
@@ -38,20 +44,42 @@ export async function GET() {
     let bringerId: string | null = null;
     let receiverId: string | null = null;
 
-    if (lastEvent?.vestReceiverId) {
-      // 이전에 받은 사람 = 이번에 가져올 사람
-      bringerId = lastEvent.vestReceiverId;
+    // 조끼 순서가 설정되어 있으면 우선 사용
+    if (team?.vestOrder && team.vestOrder.length > 0) {
+      const vestOrder = team.vestOrder;
 
-      // 다음 로테이션 (가져올 사람 다음 사람이 받을 사람)
-      const bringerIdx = members.findIndex((m) => m.id === bringerId);
-      if (bringerIdx !== -1) {
-        const nextIdx = (bringerIdx + 1) % members.length;
-        receiverId = members[nextIdx].id;
+      if (lastEvent?.vestReceiverId) {
+        // 이전에 받은 사람 = 이번에 가져올 사람
+        bringerId = lastEvent.vestReceiverId;
+
+        // 다음 로테이션 (조끼 순서 배열 기반)
+        const bringerIdx = vestOrder.findIndex((id) => id === bringerId);
+        if (bringerIdx !== -1) {
+          const nextIdx = (bringerIdx + 1) % vestOrder.length;
+          receiverId = vestOrder[nextIdx];
+        } else {
+          // 조끼 순서에 없으면 첫 번째 사람
+          receiverId = vestOrder[0];
+        }
+      } else {
+        // 첫 이벤트: 조끼 순서의 첫/두 번째 사람
+        bringerId = vestOrder[0] || null;
+        receiverId = vestOrder.length > 1 ? vestOrder[1] : null;
       }
     } else {
-      // 첫 이벤트: 첫 번째/두 번째 사람
-      bringerId = members[0]?.id || null;
-      receiverId = members.length > 1 ? members[1].id : null;
+      // 조끼 순서가 없으면 이름순 기반 로테이션 (기존 로직)
+      if (lastEvent?.vestReceiverId) {
+        bringerId = lastEvent.vestReceiverId;
+        const bringerIdx = members.findIndex((m) => m.id === bringerId);
+        if (bringerIdx !== -1) {
+          const nextIdx = (bringerIdx + 1) % members.length;
+          receiverId = members[nextIdx].id;
+        }
+      } else {
+        // 첫 이벤트: 첫 번째/두 번째 사람
+        bringerId = members[0]?.id || null;
+        receiverId = members.length > 1 ? members[1].id : null;
+      }
     }
 
     return NextResponse.json({

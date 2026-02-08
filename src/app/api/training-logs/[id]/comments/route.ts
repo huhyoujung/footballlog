@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToUsers } from "@/lib/push";
 
 // 댓글 작성
 export async function POST(
@@ -64,6 +65,19 @@ export async function POST(
         },
       },
     });
+
+    // 푸시 알림: 일지 작성자에게 (본인 댓글 제외)
+    if (log.userId !== session.user.id) {
+      try {
+        await sendPushToUsers([log.userId], {
+          title: "새 댓글",
+          body: `${session.user.name || "팀원"}님이 회원님의 일지에 댓글을 남겼어요`,
+          url: `/log/${trainingLogId}`,
+        });
+      } catch {
+        // 푸시 실패해도 댓글 작성은 성공
+      }
+    }
 
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {

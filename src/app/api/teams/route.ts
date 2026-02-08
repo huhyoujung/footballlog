@@ -126,6 +126,7 @@ export async function GET() {
             inviteCode: true,
             logoUrl: true,
             primaryColor: true,
+            vestOrder: true,
             createdAt: true,
             createdBy: true,
             members: {
@@ -147,7 +148,44 @@ export async function GET() {
       return NextResponse.json({ error: "팀에 소속되어 있지 않습니다" }, { status: 404 });
     }
 
-    return NextResponse.json(user.team);
+    // 출석률 계산을 위한 데이터 조회
+    const now = new Date();
+    const totalEvents = await prisma.trainingEvent.count({
+      where: {
+        teamId: user.team.id,
+        date: { lt: now }, // 과거 운동만
+      },
+    });
+
+    // 각 멤버별 출석률 계산
+    const membersWithAttendance = await Promise.all(
+      user.team.members.map(async (member) => {
+        const checkInsCount = await prisma.checkIn.count({
+          where: {
+            userId: member.id,
+            trainingEvent: {
+              teamId: user.team!.id,
+              date: { lt: now },
+            },
+          },
+        });
+
+        const attendanceRate = totalEvents > 0 ? Math.round((checkInsCount / totalEvents) * 100) : 0;
+
+        return {
+          ...member,
+          attendanceRate,
+        };
+      })
+    );
+
+    // 출석률 순으로 정렬 (높은 순)
+    membersWithAttendance.sort((a, b) => b.attendanceRate - a.attendanceRate);
+
+    return NextResponse.json({
+      ...user.team,
+      members: membersWithAttendance,
+    });
   } catch (error) {
     console.error("팀 조회 오류:", error);
     return NextResponse.json(

@@ -45,6 +45,7 @@ interface SessionEntry {
   id: string;
   title: string | null;
   memo: string | null;
+  requiresTeams: boolean;
   orderIndex: number;
   teamAssignments: {
     id: string;
@@ -103,6 +104,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [sessionTitle, setSessionTitle] = useState("");
   const [sessionMemo, setSessionMemo] = useState("");
+  const [sessionRequiresTeams, setSessionRequiresTeams] = useState(false);
 
   // 팀 배정 상태
   const [editingSession, setEditingSession] = useState<string | null>(null);
@@ -186,12 +188,17 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/training-events/${eventId}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sessionTitle || null, memo: sessionMemo || null }),
+        body: JSON.stringify({
+          title: sessionTitle || null,
+          memo: sessionMemo || null,
+          requiresTeams: sessionRequiresTeams,
+        }),
       });
       if (res.ok) {
         setShowSessionForm(false);
         setSessionTitle("");
         setSessionMemo("");
+        setSessionRequiresTeams(false);
         fetchEvent();
       }
     } catch {
@@ -578,8 +585,13 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                 </div>
 
                 <div className="p-5">
-                  {/* 팀 배정 편집 모드 */}
-                  {editingSession === sess.id ? (
+                  {!sess.requiresTeams ? (
+                    /* 팀 분배 불필요 */
+                    <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
+                      <span>💡</span>
+                      <span>전체 함께 진행</span>
+                    </div>
+                  ) : editingSession === sess.id ? (
                     <div className="space-y-3">
                       {/* 랜덤 배정 패널 */}
                       {showRandomPanel === sess.id && (
@@ -812,9 +824,24 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                   rows={2}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:border-team-300 transition-colors"
                 />
+                <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">팀 분배 필요</span>
+                    <p className="text-xs text-gray-400 mt-0.5">게임, 대결 훈련 등</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSessionRequiresTeams(!sessionRequiresTeams)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${sessionRequiresTeams ? "bg-team-500" : "bg-gray-300"}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${sessionRequiresTeams ? "translate-x-5" : ""}`}
+                    />
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => { setShowSessionForm(false); setSessionTitle(""); setSessionMemo(""); }}
+                    onClick={() => { setShowSessionForm(false); setSessionTitle(""); setSessionMemo(""); setSessionRequiresTeams(false); }}
                     className="flex-1 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     취소

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SessionProvider from "@/components/SessionProvider";
+import PWAManager from "@/components/PWAManager";
 
 export const metadata: Metadata = {
   title: "네모의 꿈",
@@ -31,7 +32,10 @@ export default function RootLayout({
       <body
         className="antialiased bg-gray-50 min-h-screen"
       >
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <PWAManager />
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -11,16 +11,56 @@ const POSITIONS = [
   "LW", "RW", "ST", "CF",
 ];
 
+interface TeamSearchResult {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  _count: { members: number };
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { update } = useSession();
-  const [mode, setMode] = useState<"select" | "create" | "join" | "profile">("select");
-  const [teamName, setTeamName] = useState("");
+  const [mode, setMode] = useState<"select" | "find" | "create" | "profile">("select");
+
+  // 팀 찾기
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<TeamSearchResult[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<TeamSearchResult | null>(null);
   const [inviteCode, setInviteCode] = useState("");
+
+  // 팀 생성
+  const [teamName, setTeamName] = useState("");
+
+  // 프로필
   const [position, setPosition] = useState("");
   const [number, setNumber] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // 팀 검색
+  useEffect(() => {
+    const searchTeams = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/teams/search?q=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.teams || []);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const timer = setTimeout(searchTeams, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +92,7 @@ export default function OnboardingPage() {
 
   const handleJoinTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteCode.trim()) return;
+    if (!inviteCode.trim() || !selectedTeam) return;
 
     setLoading(true);
     setError("");
@@ -100,175 +140,243 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-team-500 to-team-700 px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-4xl">⚽</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">네모의 꿈</h1>
-          <p className="text-team-100">
-            {mode === "profile" ? "프로필을 설정하세요" : "팀에 참여하세요"}
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md">
+        {/* 모드 선택 */}
+        {mode === "select" && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">팀 찾기</h1>
+            <p className="text-sm text-gray-500 text-center mb-6">
+              한 계정은 하나의 팀에만 소속될 수 있습니다
+            </p>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          {mode === "select" && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-800 text-center mb-6">
-                시작하기
-              </h2>
+            <div className="space-y-3">
               <button
-                onClick={() => setMode("join")}
-                className="w-full py-3 px-4 bg-team-500 text-white font-medium rounded-lg hover:bg-team-600 transition-colors"
+                onClick={() => setMode("find")}
+                className="w-full py-4 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors"
               >
-                초대 코드로 가입하기
+                기존 팀 찾아서 가입하기
               </button>
               <button
                 onClick={() => setMode("create")}
-                className="text-sm text-gray-400 hover:text-gray-600 transition-colors mt-2"
+                className="w-full py-4 bg-white border-2 border-team-500 text-team-500 rounded-xl font-semibold hover:bg-team-50 transition-colors"
               >
-                또는 새 팀 만들기
+                새로운 팀 만들기
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {mode === "create" && (
+        {/* 팀 찾기 */}
+        {mode === "find" && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <button
+              onClick={() => {
+                setMode("select");
+                setSelectedTeam(null);
+                setInviteCode("");
+                setSearchQuery("");
+                setError("");
+              }}
+              className="mb-4 text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              뒤로
+            </button>
+
+            <h2 className="text-xl font-bold text-gray-900 mb-4">팀 검색</h2>
+
+            {!selectedTeam ? (
+              <>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="팀 이름을 검색하세요"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                />
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {searchResults.length === 0 && searchQuery.trim() && (
+                    <p className="text-center text-gray-400 py-8">
+                      검색 결과가 없습니다
+                    </p>
+                  )}
+                  {searchResults.map((team) => (
+                    <button
+                      key={team.id}
+                      onClick={() => setSelectedTeam(team)}
+                      className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      {team.logoUrl ? (
+                        <img src={team.logoUrl} alt={team.name} className="w-12 h-12 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
+                          <span className="text-team-600 font-semibold">{team.name[0]}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 text-left">
+                        <h3 className="font-semibold text-gray-900">{team.name}</h3>
+                        <p className="text-sm text-gray-500">{team._count.members}명의 팀원</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <form onSubmit={handleJoinTeam} className="space-y-4">
+                <div className="flex items-center gap-3 p-4 bg-team-50 rounded-lg">
+                  {selectedTeam.logoUrl ? (
+                    <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
+                      <span className="text-team-600 font-semibold">{selectedTeam.name[0]}</span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">{selectedTeam.name}</h3>
+                    <p className="text-sm text-gray-500">{selectedTeam._count.members}명의 팀원</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    초대 코드
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="팀 운영진에게 받은 초대 코드를 입력하세요"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTeam(null);
+                      setInviteCode("");
+                      setError("");
+                    }}
+                    className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || !inviteCode.trim()}
+                    className="flex-1 py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? "가입 중..." : "가입하기"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* 팀 생성 */}
+        {mode === "create" && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <button
+              onClick={() => {
+                setMode("select");
+                setTeamName("");
+                setError("");
+              }}
+              className="mb-4 text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              뒤로
+            </button>
+
+            <h2 className="text-xl font-bold text-gray-900 mb-4">새로운 팀 만들기</h2>
+
             <form onSubmit={handleCreateTeam} className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setMode("select")}
-                className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
-              >
-                ← 뒤로
-              </button>
-              <h2 className="text-xl font-semibold text-gray-800">
-                새 팀 만들기
-              </h2>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   팀 이름
                 </label>
                 <input
                   type="text"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  placeholder="예: FC 청춘"
+                  placeholder="예: 네모의 꿈 FC"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                  disabled={loading}
+                  required
                 />
               </div>
+
               {error && <p className="text-red-500 text-sm">{error}</p>}
+
               <button
                 type="submit"
                 disabled={loading || !teamName.trim()}
-                className="w-full py-3 px-4 bg-team-500 text-white font-medium rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
               >
                 {loading ? "생성 중..." : "팀 만들기"}
               </button>
             </form>
-          )}
+          </div>
+        )}
 
-          {mode === "join" && (
-            <form onSubmit={handleJoinTeam} className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setMode("select")}
-                className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
-              >
-                ← 뒤로
-              </button>
-              <h2 className="text-xl font-semibold text-gray-800">
-                팀에 가입하기
-              </h2>
+        {/* 프로필 설정 */}
+        {mode === "profile" && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">프로필 설정</h2>
+            <p className="text-sm text-gray-500 mb-6">나중에 수정할 수 있습니다</p>
+
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  초대 코드
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  포지션 (선택)
                 </label>
-                <input
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="초대 코드를 입력하세요"
+                <select
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                  disabled={loading}
-                />
+                >
+                  <option value="">선택 안함</option>
+                  {POSITIONS.map((pos) => (
+                    <option key={pos} value={pos}>{pos}</option>
+                  ))}
+                </select>
               </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading || !inviteCode.trim()}
-                className="w-full py-3 px-4 bg-team-500 text-white font-medium rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "가입 중..." : "팀 가입하기"}
-              </button>
-            </form>
-          )}
-
-          {mode === "profile" && (
-            <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-gray-800">
-                내 포지션 & 등번호
-              </h2>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  포지션
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {POSITIONS.map((pos) => (
-                    <button
-                      key={pos}
-                      type="button"
-                      onClick={() => setPosition(position === pos ? "" : pos)}
-                      className={`py-2 text-sm font-medium rounded-lg transition-colors ${
-                        position === pos
-                          ? "bg-team-500 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {pos}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  등번호
+                  등번호 (선택)
                 </label>
                 <input
                   type="number"
                   value={number}
                   onChange={(e) => setNumber(e.target.value)}
                   placeholder="예: 10"
-                  min={0}
-                  max={99}
+                  min="0"
+                  max="99"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
                 />
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    router.push("/");
-                    router.refresh();
-                  }}
-                  className="flex-1 py-3 px-4 text-gray-500 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  건너뛰기
-                </button>
-                <button
-                  onClick={handleProfileSubmit}
-                  disabled={loading}
-                  className="flex-1 py-3 px-4 bg-team-500 text-white font-medium rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50"
-                >
-                  {loading ? "저장 중..." : "완료"}
-                </button>
-              </div>
+              <button
+                onClick={handleProfileSubmit}
+                disabled={loading}
+                className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+              >
+                {loading ? "저장 중..." : "시작하기"}
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

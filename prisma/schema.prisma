@@ -93,6 +93,7 @@ model Team {
   inviteCode   String   @unique @default(cuid())
   logoUrl      String?
   primaryColor String   @default("#967B5D")
+  vestOrder    String[] @default([])  // 조끼 당번 순서 (사용자 ID 배열)
   createdAt    DateTime @default(now())
   createdBy    String   @unique
 
@@ -101,6 +102,24 @@ model Team {
   members        User[]
   nudges         Nudge[]
   trainingEvents TrainingEvent[]
+  venues         Venue[]
+}
+
+model Venue {
+  id              String   @id @default(cuid())
+  teamId          String
+  name            String
+  address         String?
+  surface         String?
+  recommendedShoes String[] @default([])
+  usageCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  team            Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  trainingEvents  TrainingEvent[]
+
+  @@unique([teamId, name])
 }
 
 model TrainingLog {
@@ -193,7 +212,10 @@ model TrainingEvent {
   isRegular      Boolean  @default(true)
   date           DateTime
   location       String
+  venueId        String?
+  shoes          String[] @default([])
   uniform        String?  @db.Text
+  notes          String?  @db.Text
   vestBringerId  String?
   vestReceiverId String?
   rsvpDeadline   DateTime
@@ -201,6 +223,7 @@ model TrainingEvent {
   updatedAt      DateTime @updatedAt
 
   team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  venue        Venue?            @relation(fields: [venueId], references: [id], onDelete: SetNull)
   createdBy    User              @relation("TrainingEventCreator", fields: [createdById], references: [id])
   vestBringer  User?             @relation("VestBringer", fields: [vestBringerId], references: [id])
   vestReceiver User?             @relation("VestReceiver", fields: [vestReceiverId], references: [id])
@@ -258,6 +281,7 @@ model TrainingSession {
   trainingEventId String
   title           String?
   memo            String?  @db.Text
+  requiresTeams   Boolean  @default(false)
   orderIndex      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
