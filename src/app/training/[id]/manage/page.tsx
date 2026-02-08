@@ -466,7 +466,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // 세션 순서 변경
+  // 세션 순서 변경 (데이터 refetch 없이)
   const handleReorderSession = async (sessionId: string, direction: "up" | "down") => {
     try {
       const res = await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/reorder`, {
@@ -474,9 +474,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ direction }),
       });
-      if (res.ok) fetchEvent();
+      if (!res.ok) {
+        throw new Error("순서 변경 실패");
+      }
     } catch {
       alert("순서 변경에 실패했습니다");
+      throw new Error(); // 에러를 throw해서 루프 중단
     }
   };
 
@@ -582,9 +585,16 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
         const moves = Math.abs(dragOverSessionIndex - fromIndex);
 
-        // 여러 번 이동
-        for (let i = 0; i < moves; i++) {
-          await handleReorderSession(draggedSessionId, direction);
+        try {
+          // 여러 번 이동 (중간에 fetchEvent 안 함)
+          for (let i = 0; i < moves; i++) {
+            await handleReorderSession(draggedSessionId, direction);
+          }
+          // 모든 이동이 완료된 후 한 번만 fetch
+          await fetchEvent();
+        } catch {
+          // 에러 발생 시에도 fetch해서 올바른 상태로 복구
+          await fetchEvent();
         }
       }
     }
@@ -620,8 +630,16 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         const direction = fromIndex < dragOverSessionIndex ? "down" : "up";
         const moves = Math.abs(dragOverSessionIndex - fromIndex);
 
-        for (let i = 0; i < moves; i++) {
-          await handleReorderSession(draggedSessionId, direction);
+        try {
+          // 여러 번 이동 (중간에 fetchEvent 안 함)
+          for (let i = 0; i < moves; i++) {
+            await handleReorderSession(draggedSessionId, direction);
+          }
+          // 모든 이동이 완료된 후 한 번만 fetch
+          await fetchEvent();
+        } catch {
+          // 에러 발생 시에도 fetch해서 올바른 상태로 복구
+          await fetchEvent();
         }
       }
     }
