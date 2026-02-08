@@ -209,17 +209,13 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, check
 
   // 투표 진행 중
   return (
-    <div className="bg-white rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">🏆 오늘의 MVP 투표</h3>
-        <span className="text-xs text-gray-500">{votingStatus.message}</span>
-      </div>
+    <div className="space-y-4">
+      {/* 투표 마감 정보 */}
+      <p className="text-xs text-gray-500">{votingStatus.message}</p>
 
       {myVote ? (
-        <div className="bg-team-50 rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-team-700">✅ 투표 완료</p>
-          </div>
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-team-700">✅ 투표 완료</p>
           {!isClosed ? (
             // 마감 전: 본인 투표 내용 숨김
             <>
@@ -293,20 +289,20 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, check
             {submitting ? "투표 중..." : "투표하기"}
           </button>
 
-          {/* 결과 보기 (투표 마감 전에도 가능) */}
-          {totalVotes > 0 && !showResults && (
+          {/* 결과 보기 (투표 마감 후에만 가능) */}
+          {isClosed && totalVotes > 0 && !showResults && (
             <button
               onClick={() => setShowResults(true)}
               className="w-full py-2 text-sm text-team-600 hover:text-team-700"
             >
-              중간 결과 보기 ({totalVotes}표)
+              결과 보기 ({totalVotes}표)
             </button>
           )}
         </>
       )}
 
-      {/* 중간 결과 모달 */}
-      {showResults && results.length > 0 && (
+      {/* 결과 모달 */}
+      {showResults && results.length > 0 && isClosed && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
           onClick={() => setShowResults(false)}
@@ -385,6 +381,6 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, check
           </div>
         </div>
       )}
-    </div>
+    </ div>
   );
 }
