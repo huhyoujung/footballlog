@@ -7,7 +7,7 @@ import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
 import Toast from "./Toast";
-import LoadingSpinner from "./LoadingSpinner";
+import FeedSkeleton from "./FeedSkeleton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
 import { timeAgo } from "@/lib/timeAgo";
@@ -244,10 +244,6 @@ export default function Feed() {
     return messages;
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
   const groupedLogs = groupLogsByDate();
 
   // 미투표 초대장 표시 여부 (마감 시간 전까지만)
@@ -278,14 +274,16 @@ export default function Feed() {
       </header>
 
       {/* 전광판 */}
-      <TickerBanner messages={getTickerMessages()} />
+      {!loading && <TickerBanner messages={getTickerMessages()} />}
 
       {/* 미투표 초대장 */}
-      {showInvite && <TrainingInviteCard event={nextEvent!} />}
+      {!loading && showInvite && <TrainingInviteCard event={nextEvent!} />}
 
       {/* 피드 */}
       <main className="max-w-lg mx-auto">
-        {logs.length === 0 ? (
+        {loading ? (
+          <FeedSkeleton />
+        ) : logs.length === 0 ? (
           <div className="text-center py-20 px-6">
             <div className="text-6xl mb-4">⚽</div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
