@@ -17,6 +17,7 @@ interface EventData {
   isRegular: boolean;
   date: string;
   location: string;
+  shoes: string[];
   uniform: string | null;
   vestBringerId: string | null;
   vestReceiverId: string | null;
@@ -37,6 +38,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
   const [date, setDate] = useState("");
   const [time, setTime] = useState("14:00");
   const [location, setLocation] = useState("");
+  const [shoes, setShoes] = useState<string[]>([]);
   const [uniform, setUniform] = useState("");
   const [vestBringerId, setVestBringerId] = useState("");
   const [vestReceiverId, setVestReceiverId] = useState("");
@@ -65,6 +67,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
         setTitle(data.title || "");
         setIsRegular(data.isRegular);
         setLocation(data.location || "");
+        setShoes(data.shoes || []);
         setUniform(data.uniform || "");
         setVestBringerId(data.vestBringerId || "");
         setVestReceiverId(data.vestReceiverId || "");
@@ -97,6 +100,12 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const toggleShoe = (shoe: string) => {
+    setShoes((prev) =>
+      prev.includes(shoe) ? prev.filter((s) => s !== shoe) : [...prev, shoe]
+    );
+  };
+
   const isFormComplete = title && date && time && location && rsvpDeadlineDate && rsvpDeadlineTime;
 
   const handleSubmit = async () => {
@@ -116,6 +125,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
           isRegular,
           date: dateTime.toISOString(),
           location,
+          shoes,
           uniform: uniform || null,
           vestBringerId: vestBringerId || null,
           vestReceiverId: vestReceiverId || null,
@@ -208,7 +218,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
           />
         </div>
 
-        {/* 장소 */}
+        {/* 장소 + 신발 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">장소</label>
           <input
@@ -218,6 +228,28 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             placeholder="운동 장소를 입력하세요"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
+
+          {/* 신발 선택 */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">신발 추천</label>
+            <div className="flex gap-2">
+              {["축구화", "풋살화"].map((shoe) => (
+                <button
+                  key={shoe}
+                  type="button"
+                  onClick={() => toggleShoe(shoe)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors border-2 ${
+                    shoes.includes(shoe)
+                      ? "bg-team-500 border-team-500 text-white"
+                      : "bg-white border-gray-200 text-gray-700 hover:border-team-300"
+                  }`}
+                >
+                  {shoes.includes(shoe) && "✓ "}
+                  {shoe}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 유니폼 */}
