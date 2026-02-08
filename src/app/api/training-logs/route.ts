@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToTeam } from "@/lib/push";
+import { parseMentions } from "@/lib/mention";
 
 // 운동 일지 목록 조회 (같은 팀만)
 export async function GET(req: Request) {
@@ -146,6 +147,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // 팀원 목록 조회 (멘션 파싱용)
+    const teamMembers = await prisma.user.findMany({
+      where: { teamId: session.user.teamId },
+      select: { id: true, name: true },
+    });
+
+    // @멘션 파싱
+    const combinedText = `${keyPoints} ${improvement}`;
+    const taggedUserIds = parseMentions(combinedText, teamMembers);
+
     const log = await prisma.trainingLog.create({
       data: {
         userId: session.user.id,
@@ -155,6 +166,11 @@ export async function POST(req: Request) {
         keyPoints: keyPoints.trim(),
         improvement: improvement.trim(),
         ...(imageUrl && { imageUrl }),
+        ...(taggedUserIds.length > 0 && {
+          taggedUsers: {
+            connect: taggedUserIds.map((id) => ({ id })),
+          },
+        }),
       },
       include: {
         user: {
@@ -173,6 +189,16 @@ export async function POST(req: Request) {
       body: `${session.user.name || "팀원"}님이 운동 일지를 올렸어요!`,
       url: `/log/${log.id}`,
     }).catch(() => {});
+
+    // 태그된 사람들에게 개별 알림 발송
+    if (taggedUserIds.length > 0) {
+      const { sendPushToUsers } = await import("@/lib/push");
+      sendPushToUsers(taggedUserIds, {
+        title: "📢 훈련 일지에 언급되셨어요",
+        body: `${session.user.name || "팀원"}님이 운동 일지에서 회원님을 언급했습니다`,
+        url: `/log/${log.id}`,
+      }).catch(() => {});
+    }
 
     return NextResponse.json(log, { status: 201 });
   } catch (error) {
