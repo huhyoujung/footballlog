@@ -192,7 +192,7 @@ function WritePageContent() {
           throw new Error(data.error || "수정에 실패했습니다");
         }
 
-        router.push(`/log/${editId}`);
+        router.push("/");
       } else {
         // 신규 작성: POST
         let imageUrl = null;
