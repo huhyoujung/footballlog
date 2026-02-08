@@ -72,9 +72,12 @@ export default function TeamSettingsPage() {
         setLogoUrl(data.logoUrl || null);
         setPrimaryColor(data.primaryColor || "#967B5D");
         setVestOrder(data.vestOrder || []);
+      } else {
+        const errorData = await res.json();
+        setError(errorData.error || "팀 정보를 불러오는데 실패했습니다");
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "팀 정보를 불러오는데 실패했습니다");
     } finally {
       setLoading(false);
     }
