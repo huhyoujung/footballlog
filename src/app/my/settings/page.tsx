@@ -1,11 +1,10 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import Link from "next/link";
 import useSWR from "swr";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
@@ -37,7 +36,6 @@ interface Profile {
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function SettingsPage() {
-  const router = useRouter();
   const { update } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -56,22 +54,26 @@ export default function SettingsPage() {
   const [subscribing, setSubscribing] = useState(false);
 
   // SWR로 profile 데이터 페칭
-  const { isLoading: loading } = useSWR<Profile>(
+  const { data: profileData, isLoading: loading } = useSWR<Profile>(
     "/api/profile",
     fetcher,
     {
       revalidateOnFocus: false,
       revalidateIfStale: false,
       dedupingInterval: 300000, // 5분 캐시
-      onSuccess: (data: Profile) => {
-        setProfile(data);
-        setName(data.name || "");
-        setPosition(data.position || "");
-        setNumber(data.number !== null ? String(data.number) : "");
-        setImagePreview(data.image);
-      },
     }
   );
+
+  // profile 데이터가 변경될 때마다 상태 업데이트
+  useEffect(() => {
+    if (profileData) {
+      setProfile(profileData);
+      setName(profileData.name || "");
+      setPosition(profileData.position || "");
+      setNumber(profileData.number !== null ? String(profileData.number) : "");
+      setImagePreview(profileData.image);
+    }
+  }, [profileData]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,9 +214,7 @@ export default function SettingsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/my" className="text-gray-500 hover:text-gray-700">
-            ← 뒤로
-          </Link>
+          <BackButton href="/my" />
           <h1 className="text-lg font-semibold text-gray-900">내 프로필 수정</h1>
           <button
             onClick={handleSave}

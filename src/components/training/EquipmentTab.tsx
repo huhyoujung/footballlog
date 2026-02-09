@@ -30,6 +30,7 @@ interface Props {
 export default function EquipmentTab({ eventId }: Props) {
   const [equipments, setEquipments] = useState<EquipmentWithAssignment[]>([]);
   const [equipmentAssignments, setEquipmentAssignments] = useState<Record<string, { userId: string | null; memo: string }>>({});
+  const [loading, setLoading] = useState(true);
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [touchDragEquipment, setTouchDragEquipment] = useState<{ equipmentId: string; name: string } | null>(null);
   const [touchDragEquipmentPosition, setTouchDragEquipmentPosition] = useState<{ x: number; y: number } | null>(null);
@@ -40,6 +41,7 @@ export default function EquipmentTab({ eventId }: Props) {
   }, [eventId]);
 
   const fetchEquipments = async () => {
+    setLoading(true);
     try {
       const [equipRes, teamRes] = await Promise.all([
         fetch(`/api/training-events/${eventId}/equipment`),
@@ -64,6 +66,8 @@ export default function EquipmentTab({ eventId }: Props) {
       }
     } catch {
       // ignore
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -172,6 +176,15 @@ export default function EquipmentTab({ eventId }: Props) {
     new Map(allRelatedUsers.map(user => [user.id, user])).values()
   );
 
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl p-6 text-center">
+        <div className="animate-spin inline-block w-6 h-6 border-2 border-team-500 border-t-transparent rounded-full"></div>
+        <p className="text-sm text-gray-500 mt-3">로딩 중...</p>
+      </div>
+    );
+  }
+
   if (equipments.length === 0) {
     return (
       <div className="bg-white rounded-xl p-6 text-center">
@@ -256,41 +269,24 @@ export default function EquipmentTab({ eventId }: Props) {
               data-equipment-drop-target
               data-user-id={manager.id}
             >
-              {assignedEquipments.map((eq) => {
-                const assignment = equipmentAssignments[eq.id];
-                return (
-                  <div key={eq.id} className="space-y-2">
-                    <div
-                      draggable
-                      onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
-                      onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
-                      onTouchMove={handleEquipmentTouchMove}
-                      onTouchEnd={handleEquipmentTouchEnd}
-                      className={`bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors touch-none ${
-                        touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <div className="font-medium text-sm text-gray-900">{eq.name}</div>
-                      {eq.description && (
-                        <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
-                      )}
-                    </div>
-                    {/* 메모 입력 */}
-                    <input
-                      type="text"
-                      value={assignment?.memo || ""}
-                      onChange={(e) =>
-                        setEquipmentAssignments((prev) => ({
-                          ...prev,
-                          [eq.id]: { ...prev[eq.id], memo: e.target.value },
-                        }))
-                      }
-                      placeholder="메모 (예: 공 2개, 펌프 포함)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                    />
-                  </div>
-                );
-              })}
+              {assignedEquipments.map((eq) => (
+                <div
+                  key={eq.id}
+                  draggable
+                  onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
+                  onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
+                  onTouchMove={handleEquipmentTouchMove}
+                  onTouchEnd={handleEquipmentTouchEnd}
+                  className={`bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors touch-none ${
+                    touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
+                  }`}
+                >
+                  <div className="font-medium text-sm text-gray-900">{eq.name}</div>
+                  {eq.description && (
+                    <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
+                  )}
+                </div>
+              ))}
               {assignedEquipments.length === 0 && (
                 <p className="text-xs text-gray-400 text-center py-6">
                   장비를 드래그하여 배정하세요

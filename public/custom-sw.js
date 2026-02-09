@@ -20,6 +20,14 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
+// 메시지 핸들러 (SKIP_WAITING 처리)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Received SKIP_WAITING message');
+    self.skipWaiting();
+  }
+});
+
 // Service Worker 활성화
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');

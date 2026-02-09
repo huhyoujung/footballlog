@@ -52,13 +52,34 @@ export function usePushSubscription() {
     if (!isSupported) return;
 
     try {
-      // Service worker가 준비될 때까지 최대 15초 대기
-      const registration = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker timeout')), 15000)
-        )
-      ]) as ServiceWorkerRegistration;
+      // Service Worker 등록 확인 및 활성화 대기
+      let registration = await navigator.serviceWorker.getRegistration();
+
+      if (!registration) {
+        // 등록이 없으면 새로 등록
+        registration = await navigator.serviceWorker.register('/custom-sw.js');
+      }
+
+      // 활성화된 워커를 찾을 때까지 폴링 (최대 10초, 500ms 간격)
+      const maxAttempts = 20;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        if (registration.active || navigator.serviceWorker.controller) {
+          break;
+        }
+
+        if (registration.installing) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        registration = await navigator.serviceWorker.getRegistration() || registration;
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
       const sub = await registration.pushManager.getSubscription();
       setIsSubscribed(!!sub);
@@ -95,12 +116,37 @@ export function usePushSubscription() {
         return { success: false, error: 'PERMISSION_DENIED' };
       }
 
-      const registration = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker timeout')), 15000)
-        )
-      ]) as ServiceWorkerRegistration;
+      // Service Worker 등록 확인 및 활성화 대기
+      let registration = await navigator.serviceWorker.getRegistration();
+
+      if (!registration) {
+        registration = await navigator.serviceWorker.register('/custom-sw.js');
+      }
+
+      // 활성화된 워커를 찾을 때까지 폴링 (최대 10초, 500ms 간격)
+      const maxAttempts = 20;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        if (registration.active || navigator.serviceWorker.controller) {
+          break;
+        }
+
+        if (registration.installing) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        registration = await navigator.serviceWorker.getRegistration() || registration;
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      if (!registration.active && !navigator.serviceWorker.controller) {
+        return { success: false, error: 'Service Worker 활성화 실패: 페이지를 새로고침해주세요' };
+      }
 
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
 
@@ -131,7 +177,12 @@ export function usePushSubscription() {
 
   async function unsubscribe() {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        setIsSubscribed(false);
+        return true;
+      }
+
       const sub = await registration.pushManager.getSubscription();
       if (sub) {
         await fetch("/api/push/subscribe", {

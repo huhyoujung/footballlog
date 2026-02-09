@@ -16,16 +16,7 @@ export default function PWAManager() {
     ) {
       const registerServiceWorker = async () => {
         try {
-          // 기존 등록 확인
-          const existingRegistration = await navigator.serviceWorker.getRegistration();
-
-          // 이미 등록된 SW가 있고 활성화되어 있으면 스킵
-          if (existingRegistration?.active) {
-            console.log("[PWA] Service Worker already registered and active");
-            return;
-          }
-
-          // 새로 등록
+          // 새로 등록 (강제 재등록으로 확실하게)
           const registration = await navigator.serviceWorker.register("/custom-sw.js", {
             scope: "/",
             updateViaCache: "none", // 캐시 무시
@@ -33,19 +24,33 @@ export default function PWAManager() {
 
           console.log("[PWA] Service Worker registered:", registration);
 
-          // 활성화될 때까지 대기
-          if (registration.installing) {
-            await new Promise<void>((resolve) => {
-              registration.installing!.addEventListener("statechange", function handler(e) {
-                const sw = e.target as ServiceWorker;
-                if (sw.state === "activated") {
-                  console.log("[PWA] Service Worker activated");
-                  resolve();
-                  sw.removeEventListener("statechange", handler);
-                }
-              });
+          // 활성화 대기 함수
+          const waitForActivation = (reg: ServiceWorkerRegistration) => {
+            return new Promise<void>((resolve) => {
+              if (reg.active) {
+                console.log("[PWA] Service Worker already active");
+                resolve();
+                return;
+              }
+
+              const sw = reg.installing || reg.waiting;
+              if (sw) {
+                sw.addEventListener("statechange", function handler(e) {
+                  const worker = e.target as ServiceWorker;
+                  if (worker.state === "activated") {
+                    console.log("[PWA] Service Worker activated");
+                    resolve();
+                    worker.removeEventListener("statechange", handler);
+                  }
+                });
+              } else {
+                resolve();
+              }
             });
-          }
+          };
+
+          // 활성화될 때까지 확실히 대기
+          await waitForActivation(registration);
 
           // 업데이트 확인
           registration.addEventListener("updatefound", () => {

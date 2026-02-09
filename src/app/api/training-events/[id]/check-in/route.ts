@@ -73,7 +73,7 @@ export async function POST(
     });
 
     if (!rsvp || (rsvp.status !== "ATTEND" && rsvp.status !== "LATE")) {
-      return NextResponse.json({ error: "참석 응답한 사람만 체크인할 수 있습니다" }, { status: 400 });
+      return NextResponse.json({ error: "RSVP한 사람만 체크인할 수 있습니다" }, { status: 400 });
     }
 
     // 중복 체크

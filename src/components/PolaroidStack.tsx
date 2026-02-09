@@ -95,7 +95,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
         })}
       </div>
       <div
-        className="mt-1 text-center stack-card"
+        className="-mt-2 text-center stack-card"
         style={{ opacity: isExpanding ? 0 : 1 }}
       >
         <p className="text-sm font-semibold text-team-500">{displayDate}</p>

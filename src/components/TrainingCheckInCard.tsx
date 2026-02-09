@@ -90,9 +90,83 @@ export default function TrainingCheckInCard({
     }
   };
 
+  // 체크인 완료 상태: 일반 카드
+  if (isCheckedIn) {
+    return (
+      <div className="mx-auto max-w-md px-6 py-4 animate-fade-in">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl shadow-lg p-6 border border-green-200">
+          {/* 체크 아이콘 + 타이틀 */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="text-green-600"
+            >
+              <path
+                d="M20 6L9 17L4 12"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <h3 className="text-xl font-bold text-green-700">CHECK-IN</h3>
+          </div>
+
+          {/* 운동 정보 */}
+          <div className="text-center mb-4 space-y-1">
+            <p className="text-lg font-semibold text-gray-900">
+              {event.title || "정기운동"}
+            </p>
+            <p className="text-sm text-gray-600">{dateStr}</p>
+            {event.venue && (
+              <p className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                <span>📍</span>
+                <span>{event.venue.name}</span>
+              </p>
+            )}
+          </div>
+
+          {/* 체크인 완료 상태 */}
+          <div className="text-center mb-4">
+            <div className="py-3 px-4 rounded-lg bg-white/70 mb-2">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">✅</span>
+                <div>
+                  <p className="text-lg font-bold text-green-600">
+                    체크인 완료!
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {checkInTime} 도착
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 취소 버튼 */}
+          <button
+            onClick={handleCancelCheckIn}
+            disabled={submitting}
+            className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+          >
+            체크인 취소
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 체크인 미완료 상태: 전체가 CTA 버튼
   return (
     <div className="mx-auto max-w-md px-6 py-4 animate-fade-in">
-      <div className="bg-gradient-to-br from-team-50 to-team-100 rounded-2xl shadow-lg p-6 border border-team-200 transition-all duration-300">
+      <button
+        onClick={handleCheckIn}
+        disabled={submitting}
+        className="w-full bg-gradient-to-br from-team-50 to-team-100 rounded-2xl shadow-lg p-6 border-2 border-team-300 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:border-team-400 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+      >
         {/* 체크 아이콘 + 타이틀 */}
         <div className="flex items-center justify-center gap-2 mb-4">
           <svg
@@ -127,73 +201,37 @@ export default function TrainingCheckInCard({
           )}
         </div>
 
-        {/* 체크인 완료 또는 남은 시간 */}
-        {isCheckedIn ? (
-          <div className="text-center mb-6">
-            <div className="py-3 px-4 rounded-lg bg-green-50 mb-2">
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">✅</span>
-                <div>
-                  <p className="text-lg font-bold text-green-600">
-                    체크인 완료!
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    {checkInTime} 도착
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={handleCancelCheckIn}
-              disabled={submitting}
-              className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+        {/* 남은 시간 또는 지각 경고 */}
+        <div
+          className={`text-center py-4 px-4 rounded-xl ${
+            isPast
+              ? "bg-orange-100 border-2 border-orange-300"
+              : "bg-white/70 border-2 border-team-200"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-3xl">{isPast ? "⚠️" : "⏰"}</span>
+            <p
+              className={`text-xl font-bold ${
+                isPast ? "text-orange-600" : "text-team-700"
+              }`}
             >
-              체크인 취소
-            </button>
+              {message}
+            </p>
           </div>
-        ) : (
-          <div
-            className={`text-center mb-6 py-3 px-4 rounded-lg ${
-              isPast ? "bg-orange-50" : "bg-team-50"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl">{isPast ? "⚠️" : "⏰"}</span>
-              <div>
-                <p
-                  className={`text-lg font-bold ${
-                    isPast ? "text-orange-600" : "text-team-700"
-                  }`}
-                >
-                  {message}
-                </p>
-                {isPast && (
-                  <p className="text-xs text-orange-600 mt-1">
-                    지금 체크인하세요
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+          <p className={`text-sm font-semibold ${isPast ? "text-orange-600" : "text-team-600"}`}>
+            {isPast ? "👆 지금 바로 체크인하세요!" : "👆 탭하여 체크인"}
+          </p>
+        </div>
 
-        {/* CTA 버튼 */}
-        {isCheckedIn ? (
-          <div className="w-full bg-green-500 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 opacity-75">
-            <span>✅</span>
-            <span>체크인 완료</span>
+        {/* 로딩 중 표시 */}
+        {submitting && (
+          <div className="mt-4 text-center">
+            <div className="inline-block animate-spin w-5 h-5 border-2 border-team-500 border-t-transparent rounded-full"></div>
+            <p className="text-xs text-team-600 mt-2">체크인 중...</p>
           </div>
-        ) : (
-          <button
-            onClick={handleCheckIn}
-            disabled={submitting}
-            className="w-full bg-team-500 hover:bg-team-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>📍</span>
-            <span>{submitting ? "체크인 중..." : "체크인 하기"}</span>
-          </button>
         )}
-      </div>
+      </button>
     </div>
   );
 }

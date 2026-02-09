@@ -30,7 +30,7 @@ interface Props {
 }
 
 export default function AttendanceTab({ rsvps, checkIns }: Props) {
-  // 참석 응답자 중 ATTEND/LATE
+  // RSVP 중 ATTEND/LATE
   const attendees = rsvps.filter((r) => r.status === "ATTEND" || r.status === "LATE");
 
   return (
@@ -68,7 +68,7 @@ export default function AttendanceTab({ rsvps, checkIns }: Props) {
           );
         })}
         {attendees.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-4">참석 응답한 멤버가 없습니다</p>
+          <p className="text-sm text-gray-400 text-center py-4">RSVP한 멤버가 없습니다</p>
         )}
       </div>
     </div>

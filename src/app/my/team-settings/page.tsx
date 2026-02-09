@@ -63,16 +63,17 @@ export default function TeamSettingsPage() {
       revalidateOnFocus: false,
       revalidateIfStale: false,
       dedupingInterval: 120000, // 2분 캐시
-      onSuccess: (data) => {
-        setTeamName(data.name || "");
-        setLogoUrl(data.logoUrl || null);
-        setPrimaryColor(data.primaryColor || "#967B5D");
-      },
-      onError: (err) => {
-        setError(err.message || "팀 정보를 불러오는데 실패했습니다");
-      },
     }
   );
+
+  // team 데이터가 변경될 때마다 상태 업데이트
+  useEffect(() => {
+    if (team) {
+      setTeamName(team.name || "");
+      setLogoUrl(team.logoUrl || null);
+      setPrimaryColor(team.primaryColor || "#967B5D");
+    }
+  }, [team]);
 
   const fetchTeam = () => refetchTeam();
 

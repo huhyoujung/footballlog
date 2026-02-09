@@ -83,7 +83,7 @@ export default function KebabMenu({
         </button>
 
         {showMenu && (
-          <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-[100]">
             <button
               onClick={() => {
                 setShowMenu(false);
@@ -91,7 +91,7 @@ export default function KebabMenu({
               }}
               className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              수정
+              기본 정보 수정
             </button>
             <button
               onClick={() => {
@@ -100,7 +100,7 @@ export default function KebabMenu({
               }}
               className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
             >
-              삭제
+              팀 운동 삭제
             </button>
           </div>
         )}
@@ -145,7 +145,7 @@ export default function KebabMenu({
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-700 mb-2">다음 데이터가 모두 삭제됩니다:</p>
               <ul className="space-y-1 text-xs text-gray-600">
-                <li>• 참석 응답 ({rsvpCount}건)</li>
+                <li>• RSVP ({rsvpCount}건)</li>
                 <li>• 체크인 기록 ({checkInCount}건)</li>
                 <li>• 지각비 내역 ({lateFeeCount}건)</li>
                 <li>• 세션 및 팀 배정 ({sessionCount}개 세션)</li>

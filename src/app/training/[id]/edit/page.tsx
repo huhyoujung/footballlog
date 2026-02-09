@@ -380,7 +380,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
 
         {/* 응답 마감 */}
         <div className="bg-white rounded-xl p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">참석 응답 마감</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">RSVP 마감</label>
           <input
             type="date"
             value={rsvpDeadlineDate}

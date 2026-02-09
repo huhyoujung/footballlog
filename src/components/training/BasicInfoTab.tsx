@@ -172,7 +172,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           <h3 className="text-sm font-semibold text-gray-900 mb-3">나의 참석 여부</h3>
           <div className="flex gap-2 mb-3">
             {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-              const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+              const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
               const colors = {
                 ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
                 ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
@@ -242,7 +242,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             </button>
           ) : (
             <p className="text-sm text-gray-400 text-center py-3">
-              참석 응답 후 체크인할 수 있습니다
+              RSVP 후 체크인할 수 있습니다
             </p>
           )}
         </div>
@@ -303,7 +303,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           <>
         {attendees.length > 0 && (
           <div className="mb-3">
-            <div className="text-xs font-medium text-green-600 mb-2">✅ 참석 ({attendees.length}명)</div>
+            <div className="text-xs font-medium text-green-600 mb-2">✅ 정참 ({attendees.length}명)</div>
             <div className="space-y-2">
               {attendees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
@@ -327,7 +327,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                       <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
                         <div className="flex gap-2">
                           {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-                            const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                            const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
                             const colors = {
                               ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
                               ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
@@ -409,7 +409,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                       <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
                         <div className="flex gap-2">
                           {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-                            const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                            const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
                             const colors = {
                               ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
                               ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
@@ -491,7 +491,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                       <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
                         <div className="flex gap-2">
                           {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-                            const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                            const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
                             const colors = {
                               ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
                               ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",

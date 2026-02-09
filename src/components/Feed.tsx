@@ -55,41 +55,25 @@ export default function Feed() {
   const teamMembers: TeamMember[] = teamData?.members || [];
   const teamLogoUrl = teamData?.logoUrl || null;
 
-  // SWR로 데이터 페칭 (자동 캐싱)
+  // SWR로 데이터 페칭 (전역 캐시 설정 사용 - 5분 캐시)
   const { data: logsData, mutate: mutateLogs } = useSWR<{ logs: TrainingLog[] }>(
     "/api/training-logs",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000, // 30초 캐시
-    }
+    fetcher
   );
 
   const { data: nudgesData } = useSWR<{ nudges: Nudge[] }>(
     "/api/nudges",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+    fetcher
   );
 
   const { data: eventsData, mutate: mutateEvents } = useSWR<{ events: TrainingEventSummary[] }>(
     "/api/training-events/next",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+    fetcher
   );
 
   const { data: mvpData } = useSWR<{ mvp: RecentMvp | null }>(
     "/api/pom/recent-mvp",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 30000,
-    }
+    fetcher
   );
 
   const logs = logsData?.logs || [];
@@ -320,8 +304,12 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* 전광판 */}
-      {!isLoading && <TickerBanner messages={getTickerMessages()} />}
+      {/* 전광판 (상단 고정) */}
+      {!isLoading && (
+        <div className="sticky top-[57px] z-10">
+          <TickerBanner messages={getTickerMessages()} />
+        </div>
+      )}
 
       {/* 체크인 유도 카드 (우선 표시) */}
       {!isLoading && checkInEvents.length > 0 && (
@@ -371,7 +359,7 @@ export default function Feed() {
             </Link>
           </div>
         ) : (
-          <div className={expandedDate ? "" : "flex flex-col items-center gap-10 px-4 py-8"}>
+          <div className={expandedDate ? "" : "flex flex-col items-center gap-3 px-4 py-8"}>
             {groupedLogs.map((group) => {
               const isThisExpanded = expandedDate === group.displayDate;
               // 다른 날짜가 펼쳐진 경우 현재 스택 숨기기

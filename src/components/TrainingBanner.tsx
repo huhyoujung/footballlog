@@ -19,7 +19,7 @@ export default function TrainingBanner({ event }: Props) {
   });
 
   const rsvpLabel = event.myRsvp
-    ? { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" }[event.myRsvp]
+    ? { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" }[event.myRsvp]
     : "미응답";
   const rsvpColor = event.myRsvp
     ? { ATTEND: "bg-green-100 text-green-700", ABSENT: "bg-red-100 text-red-700", LATE: "bg-yellow-100 text-yellow-700" }[event.myRsvp]

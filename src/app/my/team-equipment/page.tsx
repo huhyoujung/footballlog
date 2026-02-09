@@ -17,13 +17,6 @@ interface Equipment {
   description: string | null;
   orderIndex: number;
   ownerId: string | null;
-  owner: {
-    id: string;
-    name: string | null;
-    image: string | null;
-    position: string | null;
-    number: number | null;
-  } | null;
 }
 
 type Tab = "equipment" | "manager";
@@ -33,7 +26,6 @@ export default function TeamEquipmentPage() {
   const router = useRouter();
   const { teamData } = useTeam();
   const [activeTab, setActiveTab] = useState<Tab>("equipment");
-  const [managers, setManagers] = useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -41,6 +33,12 @@ export default function TeamEquipmentPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // 드래그 상태
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [touchDragItem, setTouchDragItem] = useState<{ index: number; name: string } | null>(null);
+  const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
 
   useEffect(() => {
     if (session?.user?.role !== "ADMIN") {
@@ -51,20 +49,13 @@ export default function TeamEquipmentPage() {
   // SWR로 장비 데이터 페칭
   const { data: equipments = [], isLoading, mutate: refetchEquipments } = useSWR<Equipment[]>(
     session?.user?.role === "ADMIN" ? "/api/teams/equipment" : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 120000, // 2분 캐시
-      onSuccess: (data) => {
-        // 장비 관리자 목록 추출
-        const managerIds = new Set<string>(data.filter((eq) => eq.ownerId).map((eq) => eq.ownerId!));
-        setManagers(managerIds);
-      },
-    }
+    fetcher
   );
 
   const fetchEquipments = () => refetchEquipments();
+
+  // 장비 관리자 목록 (ownerId가 있는 장비들의 ownerId 중복 제거)
+  const managers = new Set<string>(equipments.filter((eq) => eq.ownerId).map((eq) => eq.ownerId!));
 
   const handleAdd = async () => {
     if (!name.trim()) return;
@@ -149,6 +140,133 @@ export default function TeamEquipmentPage() {
     }
   };
 
+  // 드래그 앤 드롭 (데스크톱)
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDropTarget(index);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const reordered = [...equipments];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    // 서버에 순서 업데이트
+    await updateOrder(reordered.map((eq) => eq.id));
+
+    setDraggedIndex(null);
+    setDropTarget(null);
+  };
+
+  // 터치 드래그 (모바일)
+  const handleTouchStart = (index: number, name: string) => {
+    setTouchDragItem({ index, name });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchDragItem) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    setTouchPosition({ x: touch.clientX, y: touch.clientY });
+
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dropZone = element?.closest('[data-drop-index]');
+    if (dropZone) {
+      const index = parseInt(dropZone.getAttribute('data-drop-index') || '-1');
+      if (index >= 0) setDropTarget(index);
+    } else {
+      setDropTarget(null);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (touchDragItem !== null && dropTarget !== null && touchDragItem.index !== dropTarget) {
+      const reordered = [...equipments];
+      const [moved] = reordered.splice(touchDragItem.index, 1);
+      reordered.splice(dropTarget, 0, moved);
+
+      await updateOrder(reordered.map((eq) => eq.id));
+    }
+
+    setTouchDragItem(null);
+    setTouchPosition(null);
+    setDropTarget(null);
+  };
+
+  const updateOrder = async (equipmentIds: string[]) => {
+    try {
+      const res = await fetch("/api/teams/equipment/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ equipmentIds }),
+      });
+
+      if (res.ok) {
+        await fetchEquipments();
+      } else {
+        alert("순서 변경에 실패했습니다");
+      }
+    } catch {
+      alert("순서 변경에 실패했습니다");
+    }
+  };
+
+  // 관리자 추가/제거
+  const handleToggleManager = async (memberId: string) => {
+    const isManager = managers.has(memberId);
+
+    try {
+      if (isManager) {
+        // 관리자 제거: 해당 멤버가 owner인 모든 장비의 ownerId를 null로
+        const equipmentsToUpdate = equipments.filter((eq) => eq.ownerId === memberId);
+        await Promise.all(
+          equipmentsToUpdate.map((eq) =>
+            fetch(`/api/teams/equipment/${eq.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: eq.name,
+                description: eq.description,
+                ownerId: null,
+              }),
+            })
+          )
+        );
+      } else {
+        // 관리자 추가: 첫 번째 장비의 ownerId를 해당 멤버로 (임시)
+        // 실제 배정은 정기운동 장비 탭에서 함
+        if (equipments.length > 0) {
+          const firstEquipment = equipments[0];
+          await fetch(`/api/teams/equipment/${firstEquipment.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: firstEquipment.name,
+              description: firstEquipment.description,
+              ownerId: memberId,
+            }),
+          });
+        }
+      }
+
+      await fetchEquipments();
+    } catch {
+      alert("관리자 설정에 실패했습니다");
+    }
+  };
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -158,7 +276,7 @@ export default function TeamEquipmentPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <BackButton href="/my" />
+          <BackButton href="/my/team-admin" />
           <h1 className="text-lg font-semibold text-gray-900">장비 관리</h1>
           <div className="w-6" />
         </div>
@@ -196,29 +314,40 @@ export default function TeamEquipmentPage() {
           <>
             <div className="bg-white rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-1">팀 장비 목록</h3>
-              <p className="text-xs text-gray-400 mb-3">장비는 모든 페이지에서 동일하게 보입니다</p>
+              <p className="text-xs text-gray-400 mb-3">드래그해서 순서 변경 가능</p>
               <div className="space-y-2">
                 {equipments.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-8">
                     등록된 장비가 없습니다
                   </p>
                 ) : (
-                  equipments.map((eq) => (
+                  equipments.map((eq, index) => (
                     <div
                       key={eq.id}
-                      className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onTouchStart={() => handleTouchStart(index, eq.name)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      data-drop-index={index}
+                      className={`border border-gray-200 rounded-lg p-3 cursor-move touch-none transition-all ${
+                        dropTarget === index ? "border-team-500 bg-team-50" : "hover:bg-gray-50"
+                      } ${touchDragItem?.index === index ? "opacity-50" : ""}`}
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="text-sm font-medium text-gray-900">{eq.name}</h4>
-                          {eq.description && (
-                            <p className="text-xs text-gray-500 mt-0.5">{eq.description}</p>
-                          )}
-                          {eq.owner && (
-                            <p className="text-xs text-team-600 mt-1">
-                              담당: {eq.owner.name || "익명"}
-                            </p>
-                          )}
+                        <div className="flex items-center gap-3 flex-1">
+                          {/* 드래그 핸들 */}
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-gray-400 flex-shrink-0">
+                            <path d="M9 5h2v2H9V5zm0 6h2v2H9v-2zm0 6h2v2H9v-2zm6-12h2v2h-2V5zm0 6h2v2h-2v-2zm0 6h2v2h-2v-2z" fill="currentColor"/>
+                          </svg>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-900">{eq.name}</h4>
+                            {eq.description && (
+                              <p className="text-xs text-gray-500 mt-0.5">{eq.description}</p>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-2 ml-2">
                           <button
@@ -265,61 +394,84 @@ export default function TeamEquipmentPage() {
         {/* 관리자 탭 */}
         {activeTab === "manager" && (
           <div className="bg-white rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">장비 관리자</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">장비 관리자 설정</h3>
             <p className="text-xs text-gray-500 mb-3">
-              팀 운동에서 장비를 배정받을 수 있는 관리자 목록입니다
+              팀 운동에서 장비를 배정받을 수 있는 관리자입니다
             </p>
             <div className="space-y-2">
-              {managers.size === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-8">
-                  장비에 담당자를 지정하면 자동으로 관리자로 등록됩니다
-                </p>
-              ) : (
-                teamData?.members
-                  .filter((member) => managers.has(member.id))
-                  .map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-3 p-2 rounded-lg bg-gray-50"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                        {member.image ? (
-                          <Image
-                            src={member.image}
-                            alt={member.name || ""}
-                            width={32}
-                            height={32}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-team-50" />
+              {teamData?.members.map((member) => {
+                const isManager = managers.has(member.id);
+                return (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                      {member.image ? (
+                        <Image
+                          src={member.image}
+                          alt={member.name || ""}
+                          width={32}
+                          height={32}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-team-50" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm text-gray-900 font-medium">
+                          {member.name || "익명"}
+                        </span>
+                        {member.role === "ADMIN" && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-team-300 flex-shrink-0">
+                            <path d="M12 6L16 12L21 8L19 18H5L3 8L8 12L12 6Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm text-gray-900 font-medium">
-                            {member.name || "익명"}
-                          </span>
-                          {member.role === "ADMIN" && (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-team-300 flex-shrink-0">
-                              <path d="M12 6L16 12L21 8L19 18H5L3 8L8 12L12 6Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                          <span className="text-xs text-gray-400">
-                            {member.position || ""} {member.number ? `#${member.number}` : ""}
-                          </span>
-                        </div>
-                        <span className="text-xs text-team-600 mt-0.5 block">
-                          장비 {equipments.filter((eq) => eq.ownerId === member.id).length}개 담당
+                        <span className="text-xs text-gray-400">
+                          {member.position || ""} {member.number ? `#${member.number}` : ""}
                         </span>
                       </div>
+                      {isManager && (
+                        <span className="text-xs text-team-600 mt-0.5 block">
+                          장비 관리자
+                        </span>
+                      )}
                     </div>
-                  ))
-              )}
+                    <button
+                      onClick={() => handleToggleManager(member.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isManager
+                          ? "bg-red-100 text-red-600 hover:bg-red-200"
+                          : "bg-team-100 text-team-600 hover:bg-team-200"
+                      }`}
+                    >
+                      {isManager ? "제거" : "추가"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
       </main>
+
+      {/* 터치 드래그 고스트 */}
+      {touchDragItem && touchPosition && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            left: touchPosition.x,
+            top: touchPosition.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <span className="inline-block px-3 py-2 bg-team-600 text-white rounded-md text-xs font-medium shadow-lg opacity-80">
+            {touchDragItem.name}
+          </span>
+        </div>
+      )}
 
       {/* 추가 모달 */}
       {showAddModal && (
