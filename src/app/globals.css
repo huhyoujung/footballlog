@@ -33,14 +33,6 @@
   --color-team-500: var(--color-team-500);
   --color-team-600: var(--color-team-600);
   --color-team-700: var(--color-team-700);
-
-  /* Condition Spectrum - Red → Orange → Yellow → Green */
-  --color-cond-red: #DC2626;
-  --color-cond-orange: #F97316;
-  --color-cond-yellow: #EAB308;
-  --color-cond-green-light: #86EFAC;
-  --color-cond-green: #22C55E;
-  --color-cond-green-deep: #15803D;
 }
 
 /* 다크모드 비활성화 - 라이트 모드로만 동작 */
