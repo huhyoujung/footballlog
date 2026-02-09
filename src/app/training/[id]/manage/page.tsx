@@ -1270,29 +1270,15 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
                 {/* 장비 관리자별 배정 */}
                 {(() => {
-                  // 모든 팀원 목록 가져오기
-                  const allMembers = teamData?.members || [];
+                  // 모든 관련 사용자 수집 (owner + assigned users from equipments array)
+                  const allRelatedUsers = [
+                    ...equipments.filter(eq => eq.owner).map(eq => eq.owner!),
+                    ...equipments.filter(eq => eq.assignment?.user).map(eq => eq.assignment!.user!)
+                  ];
 
-                  // 1. 장비 owner들 (기본 담당자)
-                  const ownerIds = new Set(
-                    equipments
-                      .filter((eq) => eq.owner)
-                      .map((eq) => eq.owner!.id)
-                  );
-
-                  // 2. 장비가 실제로 배정된 사용자들
-                  const assignedUserIds = new Set(
-                    Object.values(equipmentAssignments)
-                      .map((a) => a.userId)
-                      .filter((id): id is string => id !== null)
-                  );
-
-                  // 3. 두 그룹 합치기 (owner이거나 배정받은 사용자)
-                  const relevantUserIds = new Set([...ownerIds, ...assignedUserIds]);
-
-                  // 4. 해당하는 팀원들
-                  const relevantMembers = allMembers.filter((member) =>
-                    relevantUserIds.has(member.id)
+                  // 중복 제거 (ID 기준)
+                  const relevantMembers = Array.from(
+                    new Map(allRelatedUsers.map(user => [user.id, user])).values()
                   );
 
                   return relevantMembers.map((manager) => {
