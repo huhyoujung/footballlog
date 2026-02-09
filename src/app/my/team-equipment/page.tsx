@@ -56,7 +56,7 @@ export default function TeamEquipmentPage() {
         const data = await res.json();
         setEquipments(data);
         // 장비 관리자 목록 추출
-        const managerIds = new Set(data.filter((eq: Equipment) => eq.ownerId).map((eq: Equipment) => eq.ownerId!));
+        const managerIds = new Set<string>(data.filter((eq: Equipment) => eq.ownerId).map((eq: Equipment) => eq.ownerId!));
         setManagers(managerIds);
       }
     } catch (error) {
