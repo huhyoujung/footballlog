@@ -1,19 +1,19 @@
 {
-  "name": "네모의 꿈",
-  "short_name": "네모의 꿈",
+  "name": "NUTTY FC의 락커룸",
+  "short_name": "NUTTY FC",
   "description": "축구 팀원들을 위한 훈련 일지 SNS",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#967B5D",
+  "theme_color": "#06B6D4",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "https://dssyfyurslaopejnioqx.supabase.co/storage/v1/object/public/training-images/cmla7uxmm0000e6dbpaq4dcaw/1770476172061.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "https://dssyfyurslaopejnioqx.supabase.co/storage/v1/object/public/training-images/cmla7uxmm0000e6dbpaq4dcaw/1770476172061.png",
       "sizes": "512x512",
       "type": "image/png"
     }
