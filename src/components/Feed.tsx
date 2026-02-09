@@ -342,7 +342,7 @@ export default function Feed() {
       )}
 
       {/* 피드 */}
-      <main className="max-w-lg mx-auto">
+      <main className={expandedDate ? "" : "max-w-lg mx-auto"}>
         {isLoading ? (
           <LoadingSpinner />
         ) : logs.length === 0 ? (
@@ -362,19 +362,25 @@ export default function Feed() {
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-10 px-4 py-8">
-            {groupedLogs.map((group) => (
-              <PolaroidDateGroup
-                key={group.displayDate}
-                logs={group.logs}
-                date={group.date}
-                displayDate={group.displayDate}
-                isExpanded={expandedDate === group.displayDate}
-                onExpand={() => handleExpand(group.displayDate)}
-                onCollapse={handleCollapse}
-                onLikeToggle={handleLikeToggle}
-              />
-            ))}
+          <div className={expandedDate ? "" : "flex flex-col items-center gap-10 px-4 py-8"}>
+            {groupedLogs.map((group) => {
+              const isThisExpanded = expandedDate === group.displayDate;
+              // 다른 날짜가 펼쳐진 경우 현재 스택 숨기기
+              if (expandedDate && !isThisExpanded) return null;
+
+              return (
+                <PolaroidDateGroup
+                  key={group.displayDate}
+                  logs={group.logs}
+                  date={group.date}
+                  displayDate={group.displayDate}
+                  isExpanded={isThisExpanded}
+                  onExpand={() => handleExpand(group.displayDate)}
+                  onCollapse={handleCollapse}
+                  onLikeToggle={handleLikeToggle}
+                />
+              );
+            })}
           </div>
         )}
       </main>

@@ -195,7 +195,8 @@ export default function TeamEquipmentPage() {
         {activeTab === "equipment" && (
           <>
             <div className="bg-white rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">팀 장비 목록</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">팀 장비 목록</h3>
+              <p className="text-xs text-gray-400 mb-3">장비는 모든 페이지에서 동일하게 보입니다</p>
               <div className="space-y-2">
                 {equipments.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-8">

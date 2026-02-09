@@ -72,6 +72,8 @@ input:-webkit-autofill:active {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  touch-action: pan-x; /* 모바일 가로 스크롤 활성화 */
+  -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
 }
 
 /* Polaroid card enter animation (stagger in carousel) */

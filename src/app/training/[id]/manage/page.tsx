@@ -1269,68 +1269,95 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                 </div>
 
                 {/* 장비 관리자별 배정 */}
-                {[...new Set(equipments.filter((eq) => eq.owner).map((eq) => eq.owner!))].map((manager) => {
-                  const assignedEquipments = equipments.filter(
-                    (eq) => equipmentAssignments[eq.id]?.userId === manager.id
+                {(() => {
+                  // 모든 팀원 목록 가져오기
+                  const allMembers = teamData?.members || [];
+
+                  // 1. 장비 owner들 (기본 담당자)
+                  const ownerIds = new Set(
+                    equipments
+                      .filter((eq) => eq.owner)
+                      .map((eq) => eq.owner!.id)
                   );
 
-                  return (
-                    <div key={manager.id} className="bg-white rounded-xl p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <span>{manager.name || "익명"}</span>
-                        {(manager.position || manager.number) && (
-                          <span className="text-xs text-gray-400 font-normal">
-                            {manager.position || ""} {manager.number ? `${manager.number}` : ""}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-400 font-normal ml-auto">
-                          ({assignedEquipments.length}개)
-                        </span>
-                      </h3>
-                      <div
-                        className="min-h-[80px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
-                        onDragOver={handleEquipmentDragOver}
-                        onDrop={(e) => handleEquipmentDrop(e, manager.id)}
-                      >
-                        {assignedEquipments.map((eq) => {
-                          const assignment = equipmentAssignments[eq.id];
-                          return (
-                            <div key={eq.id} className="space-y-2">
-                              <div
-                                draggable
-                                onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
-                                className="bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors"
-                              >
-                                <div className="font-medium text-sm text-gray-900">{eq.name}</div>
-                                {eq.description && (
-                                  <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
-                                )}
-                              </div>
-                              {/* 메모 입력 */}
-                              <input
-                                type="text"
-                                value={assignment?.memo || ""}
-                                onChange={(e) =>
-                                  setEquipmentAssignments((prev) => ({
-                                    ...prev,
-                                    [eq.id]: { ...prev[eq.id], memo: e.target.value },
-                                  }))
-                                }
-                                placeholder="메모 (예: 공 2개, 펌프 포함)"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                              />
-                            </div>
-                          );
-                        })}
-                        {assignedEquipments.length === 0 && (
-                          <p className="text-xs text-gray-400 text-center py-6">
-                            장비를 드래그하여 배정하세요
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  // 2. 장비가 실제로 배정된 사용자들
+                  const assignedUserIds = new Set(
+                    Object.values(equipmentAssignments)
+                      .map((a) => a.userId)
+                      .filter((id): id is string => id !== null)
                   );
-                })}
+
+                  // 3. 두 그룹 합치기 (owner이거나 배정받은 사용자)
+                  const relevantUserIds = new Set([...ownerIds, ...assignedUserIds]);
+
+                  // 4. 해당하는 팀원들
+                  const relevantMembers = allMembers.filter((member) =>
+                    relevantUserIds.has(member.id)
+                  );
+
+                  return relevantMembers.map((manager) => {
+                    const assignedEquipments = equipments.filter(
+                      (eq) => equipmentAssignments[eq.id]?.userId === manager.id
+                    );
+
+                    return (
+                      <div key={manager.id} className="bg-white rounded-xl p-4">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <span>{manager.name || "익명"}</span>
+                          {(manager.position || manager.number) && (
+                            <span className="text-xs text-gray-400 font-normal">
+                              {manager.position || ""} {manager.number ? `#${manager.number}` : ""}
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-400 font-normal ml-auto">
+                            ({assignedEquipments.length}개)
+                          </span>
+                        </h3>
+                        <div
+                          className="min-h-[80px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
+                          onDragOver={handleEquipmentDragOver}
+                          onDrop={(e) => handleEquipmentDrop(e, manager.id)}
+                        >
+                          {assignedEquipments.map((eq) => {
+                            const assignment = equipmentAssignments[eq.id];
+                            return (
+                              <div key={eq.id} className="space-y-2">
+                                <div
+                                  draggable
+                                  onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
+                                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="font-medium text-sm text-gray-900">{eq.name}</div>
+                                  {eq.description && (
+                                    <div className="text-xs text-gray-500 mt-1">{eq.description}</div>
+                                  )}
+                                </div>
+                                {/* 메모 입력 */}
+                                <input
+                                  type="text"
+                                  value={assignment?.memo || ""}
+                                  onChange={(e) =>
+                                    setEquipmentAssignments((prev) => ({
+                                      ...prev,
+                                      [eq.id]: { ...prev[eq.id], memo: e.target.value },
+                                    }))
+                                  }
+                                  placeholder="메모 (예: 공 2개, 펌프 포함)"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                                />
+                              </div>
+                            );
+                          })}
+                          {assignedEquipments.length === 0 && (
+                            <p className="text-xs text-gray-400 text-center py-6">
+                              장비를 드래그하여 배정하세요
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
 
                 <div className="flex gap-3">
                   <button
