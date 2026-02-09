@@ -100,7 +100,8 @@ export default function PWAManager() {
       const searchParams = new URLSearchParams(window.location.search);
       const startUrl = `${currentUrl.origin}/?${searchParams.toString()}`;
 
-      await injectManifest({
+      // 노드를 삭제하지 않고 재사용하므로 즉시 실행 가능
+      injectManifest({
         name: teamName,
         shortName: teamName,
         logoUrl: teamLogo,
@@ -114,7 +115,8 @@ export default function PWAManager() {
     };
 
     setupPWA();
-  }, [session?.user?.teamId, injectManifest, injectFavicon]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.teamId]);
 
   return null;
 }

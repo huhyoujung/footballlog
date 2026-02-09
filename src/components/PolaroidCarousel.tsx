@@ -18,16 +18,16 @@ export default function PolaroidCarousel({
   return (
     <div className="w-full py-8">
       {/* 헤더 */}
-      <div className="flex items-center gap-3 px-4 py-2.5 max-w-lg mx-auto">
+      <div className="flex items-center gap-2 px-4 py-2 max-w-2xl mx-auto">
         <button
           onClick={onCollapse}
-          className="text-gray-400 hover:text-gray-600 p-1"
+          className="text-gray-400 hover:text-gray-600 p-2 -ml-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
-        <span className="text-sm font-semibold text-team-500">
+        <span className="text-base font-semibold text-team-600">
           {displayDate}
         </span>
       </div>

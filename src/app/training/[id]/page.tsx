@@ -2,7 +2,6 @@
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
 import BasicInfoTab from "@/components/training/BasicInfoTab";
-import AttendanceTab from "@/components/training/AttendanceTab";
 import LateFeeTab from "@/components/training/LateFeeTab";
 import SessionTab from "@/components/training/SessionTab";
 import EquipmentTab from "@/components/training/EquipmentTab";
@@ -15,7 +14,7 @@ import type { TrainingEventDetail } from "@/types/training-event";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-type AdminTab = "info" | "attendance" | "latefee" | "session" | "equipment";
+type AdminTab = "info" | "latefee" | "session" | "equipment";
 
 export default function TrainingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { data: session } = useSession();
@@ -37,9 +36,10 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
     eventId ? `/api/training-events/${eventId}${session?.user?.role === "ADMIN" ? "?includeManagement=true" : ""}` : null,
     fetcher,
     {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 120000, // 2분 캐시
+      revalidateOnFocus: true, // 페이지 재진입 시 데이터 새로고침
+      revalidateIfStale: true,
+      dedupingInterval: 5000, // 5초 캐시로 단축
+      keepPreviousData: true, // 이전 데이터 유지하여 화면 깜빡임 방지
     }
   );
 
@@ -59,19 +59,18 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
   const tabs: { key: AdminTab; label: string }[] = [
     { key: "info", label: "기본 정보" },
-    { key: "attendance", label: "출석" },
-    { key: "latefee", label: "지각비" },
     { key: "session", label: "세션" },
+    { key: "latefee", label: "지각비" },
     { key: "equipment", label: "장비" },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
+    <div className="min-h-screen bg-white pb-8">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href="/" />
-          <h1 className="text-lg font-semibold text-gray-900">{event?.title || "팀 운동"}</h1>
+          <h1 className="text-base font-semibold text-gray-900">{event?.title || "팀 운동"}</h1>
           {isAdmin ? (
             <KebabMenu
               eventId={eventId}
@@ -90,8 +89,8 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
       {/* 탭 (관리자만 표시) */}
       {isAdmin && (
-        <div className="bg-white border-b border-gray-200 sticky top-[57px] z-10">
-          <div className="max-w-lg mx-auto flex">
+        <div className="bg-white border-b border-gray-200 sticky top-[46px] z-10">
+          <div className="max-w-2xl mx-auto flex">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -109,7 +108,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      <main className="max-w-lg mx-auto p-4 space-y-3">
+      <main className="max-w-2xl mx-auto p-4 space-y-3">
         {/* Regular users see only basic info */}
         {!isAdmin && (
           <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
@@ -120,25 +119,22 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
         )}
 
-        {isAdmin && activeTab === "attendance" && (
-          <AttendanceTab rsvps={event.rsvps} checkIns={event.checkIns} />
-        )}
-
-        {isAdmin && activeTab === "latefee" && (
-          <LateFeeTab
-            eventId={eventId}
-            rsvps={event.rsvps}
-            checkIns={event.checkIns}
-            lateFees={event.lateFees || []}
-            onRefresh={() => mutate()}
-          />
-        )}
-
         {isAdmin && activeTab === "session" && (
           <SessionTab
             eventId={eventId}
             sessions={event.sessions}
             rsvps={event.rsvps}
+            onRefresh={() => mutate()}
+          />
+        )}
+
+        {isAdmin && activeTab === "latefee" && (
+          <LateFeeTab
+            eventId={eventId}
+            eventDate={event.date}
+            rsvps={event.rsvps}
+            checkIns={event.checkIns}
+            lateFees={event.lateFees || []}
             onRefresh={() => mutate()}
           />
         )}

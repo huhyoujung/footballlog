@@ -20,20 +20,16 @@ interface TeamInfo {
 }
 
 // 접근성을 고려한 프리셋 컬러 (모바일 친화적)
-// HSL 기준: Lightness 35-65%, Saturation 30-80%
+// 비슷한 색상 제거하여 선택하기 쉽게
 const PRESET_COLORS = [
-  { name: "브라운", color: "#967B5D" },    // 기본 갈색 (L:52%, S:46%)
-  { name: "그린", color: "#059669" },      // 초록 (L:42%, S:95%)
-  { name: "블루", color: "#3B82F6" },      // 파랑 (L:60%, S:92%)
-  { name: "레드", color: "#DC2626" },      // 빨강 (L:49%, S:78%) - 조정됨
-  { name: "오렌지", color: "#EA580C" },    // 주황 (L:48%, S:92%) - 조정됨
-  { name: "퍼플", color: "#9333EA" },      // 보라 (L:56%, S:84%) - 조정됨
-  { name: "핑크", color: "#DB2777" },      // 핑크 (L:50%, S:77%) - 조정됨
-  { name: "시안", color: "#0891B2" },      // 청록 (L:36%, S:92%) - 조정됨
-  { name: "인디고", color: "#4F46E5" },    // 인디고 (L:59%, S:78%)
-  { name: "틸", color: "#0D9488" },        // 틸 (L:46%, S:85%)
-  { name: "라임", color: "#65A30D" },      // 라임 (L:35%, S:86%)
-  { name: "로즈", color: "#E11D48" },      // 로즈 (L:50%, S:80%)
+  { name: "브라운", color: "#967B5D" },    // 기본 갈색
+  { name: "그린", color: "#059669" },      // 초록
+  { name: "블루", color: "#3B82F6" },      // 파랑
+  { name: "레드", color: "#DC2626" },      // 빨강
+  { name: "오렌지", color: "#EA580C" },    // 주황
+  { name: "퍼플", color: "#9333EA" },      // 보라
+  { name: "틸", color: "#0D9488" },        // 청록
+  { name: "라임", color: "#65A30D" },      // 라임
 ];
 
 export default function TeamSettingsPage() {
@@ -146,9 +142,11 @@ export default function TeamSettingsPage() {
       await res.json();
       await refetchTeam();
       setSuccess("저장되었습니다");
+
+      // 팀 컬러 변경 시 CSS 변수 업데이트를 위해 새로고침
       setTimeout(() => {
-        router.push("/my");
-      }, 1000);
+        window.location.href = "/my";
+      }, 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
@@ -193,12 +191,12 @@ export default function TeamSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href="/my/team-admin" />
-          <h1 className="text-lg font-semibold text-gray-900">팀 프로필</h1>
+          <h1 className="text-base font-semibold text-gray-900">팀 프로필</h1>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -209,13 +207,10 @@ export default function TeamSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-4">
-        {/* 팀 로고 */}
+      <main className="max-w-2xl mx-auto p-4 space-y-4">
+        {/* 팀 로고 및 기본 정보 */}
         <div className="bg-white rounded-xl p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            팀 로고
-          </label>
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center mb-6">
             <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden mb-3 flex items-center justify-center">
               {logoUrl ? (
                 <Image
@@ -235,7 +230,8 @@ export default function TeamSettingsPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="text-team-500 text-sm font-medium"
+              className="text-sm font-medium transition-colors"
+              style={{ color: primaryColor }}
             >
               {uploading ? "업로드 중..." : "로고 변경"}
             </button>
@@ -247,6 +243,77 @@ export default function TeamSettingsPage() {
               className="hidden"
             />
           </div>
+
+          {/* 팀 이름 */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              팀 이름
+            </label>
+            <div className="text-center text-lg font-semibold text-gray-900 mb-4">
+              {teamName || "팀 이름 없음"}
+            </div>
+          </div>
+
+          {/* 초대 코드 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+              초대 코드
+            </label>
+            <div className="flex items-center justify-center gap-2">
+              <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900 font-mono tracking-wider text-sm">
+                {team?.inviteCode}
+              </div>
+              <button
+                onClick={handleCopyInviteCode}
+                className="px-3 py-2 text-gray-400 hover:opacity-80 transition-opacity"
+                style={{ color: copied ? primaryColor : undefined }}
+              >
+                {copied ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <div className="text-center mt-2">
+              <button
+                onClick={handleRegenerateCode}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                초대 코드 변경
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 팀 이름 수정 */}
+        <div className="bg-white rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            팀 이름 수정
+          </label>
+          <input
+            type="text"
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            placeholder="팀 이름을 입력하세요"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:border-transparent transition-all"
+            style={{
+              outlineColor: primaryColor,
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = primaryColor;
+              e.target.style.boxShadow = `0 0 0 3px ${primaryColor}20`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '';
+              e.target.style.boxShadow = '';
+            }}
+          />
         </div>
 
         {/* 팀 컬러 */}
@@ -280,53 +347,6 @@ export default function TeamSettingsPage() {
           <p className="mt-3 text-xs text-gray-500">
             💡 모바일 접근성을 고려한 컬러입니다
           </p>
-        </div>
-
-        {/* 팀 이름 */}
-        <div className="bg-white rounded-xl p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            팀 이름
-          </label>
-          <input
-            type="text"
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            placeholder="팀 이름을 입력하세요"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-          />
-        </div>
-
-        {/* 초대 코드 */}
-        <div className="bg-white rounded-xl p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            초대 코드
-          </label>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 px-4 py-3 bg-gray-50 rounded-lg text-gray-900 font-mono tracking-wider text-sm">
-              {team?.inviteCode}
-            </div>
-            <button
-              onClick={handleCopyInviteCode}
-              className="px-3 py-3 text-gray-400 hover:text-team-500 transition-colors"
-            >
-              {copied ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#967B5D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                </svg>
-              )}
-            </button>
-          </div>
-          <button
-            onClick={handleRegenerateCode}
-            className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            초대 코드 변경
-          </button>
         </div>
 
         {error && (

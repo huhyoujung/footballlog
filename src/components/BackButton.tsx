@@ -21,7 +21,8 @@ export default function BackButton({ href, onClick }: BackButtonProps) {
     }
   };
 
-  const className = "text-gray-500 hover:text-gray-700 p-4 -ml-4 inline-flex items-center justify-center min-w-[52px] min-h-[52px]";
+  // 더 큰 터치 영역 제공 (모바일 최적화)
+  const className = "text-gray-500 hover:text-gray-700 p-2 inline-flex items-center justify-center touch-manipulation";
 
   const content = (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

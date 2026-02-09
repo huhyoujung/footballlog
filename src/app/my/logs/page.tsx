@@ -31,17 +31,17 @@ export default function MyLogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href="/my" />
-          <h1 className="text-lg font-semibold text-gray-900">내 운동 일지</h1>
+          <h1 className="text-base font-semibold text-gray-900">내 운동 일지</h1>
           <div className="w-5" />
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto">
+      <main className="max-w-2xl mx-auto">
         {logs.length === 0 ? (
           <div className="text-center py-20 px-6">
             <div className="text-6xl mb-4">📝</div>

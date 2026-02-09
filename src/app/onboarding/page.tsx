@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import BackButton from "@/components/BackButton";
+import { usePushSubscription } from "@/lib/usePushSubscription";
 
 const POSITIONS = [
   "GK", "CB", "LB", "RB",
@@ -22,6 +23,7 @@ interface TeamSearchResult {
 export default function OnboardingPage() {
   const router = useRouter();
   const { update } = useSession();
+  const { isSupported, subscribe } = usePushSubscription();
   const [mode, setMode] = useState<"select" | "find" | "create" | "profile">("select");
 
   // 팀 찾기
@@ -39,6 +41,22 @@ export default function OnboardingPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // 온보딩 완료 후 푸시 알림 권한 요청 및 이동
+  const completeOnboarding = async () => {
+    // 푸시 알림 권한 요청 (비동기, 실패해도 계속 진행)
+    if (isSupported) {
+      try {
+        await subscribe();
+      } catch (error) {
+        console.log("Push notification prompt skipped or denied");
+      }
+    }
+
+    // 홈으로 이동
+    router.push("/");
+    router.refresh();
+  };
 
   // 팀 검색
   useEffect(() => {
@@ -83,8 +101,7 @@ export default function OnboardingPage() {
       }
 
       await update();
-      router.push("/");
-      router.refresh();
+      await completeOnboarding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
@@ -111,8 +128,7 @@ export default function OnboardingPage() {
       }
 
       await update();
-      router.push("/");
-      router.refresh();
+      await completeOnboarding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);

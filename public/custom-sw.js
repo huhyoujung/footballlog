@@ -5,7 +5,6 @@ const STATIC_CACHE = [
   '/',
   '/feed',
   '/write',
-  '/icons/icon-192x192.png',
 ];
 
 // Service Worker 설치
@@ -14,7 +13,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Caching static assets');
-      return cache.addAll(STATIC_CACHE.map(url => new Request(url, { cache: 'reload' })));
+      // 개발 모드에서 캐시 실패를 무시하고 계속 진행
+      return cache.addAll(STATIC_CACHE.map(url => new Request(url, { cache: 'reload' })))
+        .catch((error) => {
+          console.warn('[SW] Cache pre-population failed (this is OK in development):', error);
+          // 에러를 무시하고 설치 계속 진행
+        });
     })
   );
   self.skipWaiting();
@@ -48,6 +52,12 @@ self.addEventListener('activate', (event) => {
 
 // 네트워크 요청 처리 (Network First 전략)
 self.addEventListener('fetch', (event) => {
+  // POST, PUT, DELETE 등 GET이 아닌 요청은 캐시하지 않고 바로 처리
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {

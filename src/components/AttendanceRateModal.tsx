@@ -53,8 +53,8 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
         {/* 헤더 */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">팀원 출석률</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-2.5 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">팀원 출석률</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"

@@ -228,16 +228,16 @@ function WritePageContent() {
     <div className="min-h-screen bg-white pb-24">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href={isEditMode ? `/log/${editId}` : "/"} />
-          <h1 className="text-lg font-semibold text-gray-900">
+          <h1 className="text-base font-semibold text-gray-900">
             {isEditMode ? "운동 일지 수정" : "운동 일지 작성"}
           </h1>
           <div className="w-6" />
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto divide-y divide-gray-100">
+      <main className="max-w-2xl mx-auto divide-y divide-gray-100">
         {/* 운동 분류 - 토글 */}
         <div className="px-4 py-5">
           <div className="flex items-center justify-between">
@@ -527,7 +527,7 @@ function WritePageContent() {
       {/* 하단 제출 CTA */}
       {isFormComplete && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-10">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-2xl mx-auto">
             <button
               onClick={handleSubmit}
               disabled={loading}

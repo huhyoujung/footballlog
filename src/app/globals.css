@@ -5,16 +5,9 @@
   color-scheme: light only;
   --background: #f9fafb;
   --foreground: #171717;
-}
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-  --font-mono: "SF Mono", SFMono-Regular, Consolas, monospace;
-
-  /* Primary - Team Brand (Warm Brown) */
-  /* 개선된 팔레트: 밝은 색상은 채도를 낮춰 자연스러운 배경색 생성 */
+  /* Primary - Team Brand (기본값: Warm Brown) */
+  /* TeamColorProvider가 동적으로 덮어씀 */
   --color-team-50: #F7F5F3;
   --color-team-100: #EFEBE7;
   --color-team-200: #DED7CE;
@@ -23,6 +16,23 @@
   --color-team-500: #977C5E;
   --color-team-600: #7D684F;
   --color-team-700: #5E4E3B;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  --font-mono: "SF Mono", SFMono-Regular, Consolas, monospace;
+
+  /* Team colors - :root에서 정의되고 동적으로 업데이트됨 */
+  --color-team-50: var(--color-team-50);
+  --color-team-100: var(--color-team-100);
+  --color-team-200: var(--color-team-200);
+  --color-team-300: var(--color-team-300);
+  --color-team-400: var(--color-team-400);
+  --color-team-500: var(--color-team-500);
+  --color-team-600: var(--color-team-600);
+  --color-team-700: var(--color-team-700);
 
   /* Condition Spectrum - Red → Orange → Yellow → Green */
   --color-cond-red: #DC2626;

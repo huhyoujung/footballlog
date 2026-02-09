@@ -64,52 +64,54 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
 
   // SWR로 event 데이터 페칭
   const { data: event, isLoading } = useSWR<EventData>(
-    eventId ? `/api/training-events/${eventId}` : null,
+    eventId ? `/api/training-events/${eventId}?edit=true` : null,
     fetcher,
     {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 120000, // 2분 캐시
-      onSuccess: (data) => {
-        // 폼 데이터 설정
-        setTitle(data.title || "");
-        setIsRegular(data.isRegular);
-        setEnablePomVoting(data.enablePomVoting ?? true);
-        setPomVotesPerPerson(data.pomVotesPerPerson ?? 1);
-        setLocation(data.location || "");
-        setShoes(data.shoes || []);
-        setUniform(data.uniform || "");
-        setNotes(data.notes || "");
-        setVestBringerId(data.vestBringerId || "");
-        setVestReceiverId(data.vestReceiverId || "");
-
-        // 날짜/시간 파싱
-        const eventDate = new Date(data.date);
-        setDate(eventDate.toISOString().split("T")[0]);
-        setTime(eventDate.toTimeString().slice(0, 5));
-
-        const deadline = new Date(data.rsvpDeadline);
-        setRsvpDeadlineDate(deadline.toISOString().split("T")[0]);
-        setRsvpDeadlineTime(deadline.toTimeString().slice(0, 5));
-
-        // POM 투표 마감 시간 파싱
-        if (data.pomVotingDeadline) {
-          const pomDeadline = new Date(data.pomVotingDeadline);
-          setPomVotingDeadlineDate(pomDeadline.toISOString().split("T")[0]);
-          setPomVotingDeadlineTime(pomDeadline.toTimeString().slice(0, 5));
-        } else {
-          // 기본값: 운동 시작 2시간 후
-          const defaultPomDeadline = new Date(eventDate);
-          defaultPomDeadline.setHours(defaultPomDeadline.getHours() + 2);
-          setPomVotingDeadlineDate(defaultPomDeadline.toISOString().split("T")[0]);
-          setPomVotingDeadlineTime(defaultPomDeadline.toTimeString().slice(0, 5));
-        }
-      },
-      onError: () => {
-        setError("운동 정보를 불러오지 못했습니다");
-      },
+      revalidateOnFocus: true,
+      revalidateOnMount: true, // 컴포넌트 마운트 시 항상 최신 데이터 로드
+      revalidateIfStale: true,
+      dedupingInterval: 0, // 캐시 비활성화
     }
   );
+
+  // event 데이터가 로드되면 폼 필드 채우기
+  useEffect(() => {
+    if (!event) return;
+
+    // 폼 데이터 설정
+    setTitle(event.title || "");
+    setIsRegular(event.isRegular);
+    setEnablePomVoting(event.enablePomVoting ?? true);
+    setPomVotesPerPerson(event.pomVotesPerPerson ?? 1);
+    setLocation(event.location || "");
+    setShoes(event.shoes || []);
+    setUniform(event.uniform || "");
+    setNotes(event.notes || "");
+    setVestBringerId(event.vestBringerId || "");
+    setVestReceiverId(event.vestReceiverId || "");
+
+    // 날짜/시간 파싱
+    const eventDate = new Date(event.date);
+    setDate(eventDate.toISOString().split("T")[0]);
+    setTime(eventDate.toTimeString().slice(0, 5));
+
+    const deadline = new Date(event.rsvpDeadline);
+    setRsvpDeadlineDate(deadline.toISOString().split("T")[0]);
+    setRsvpDeadlineTime(deadline.toTimeString().slice(0, 5));
+
+    // POM 투표 마감 시간 파싱
+    if (event.pomVotingDeadline) {
+      const pomDeadline = new Date(event.pomVotingDeadline);
+      setPomVotingDeadlineDate(pomDeadline.toISOString().split("T")[0]);
+      setPomVotingDeadlineTime(pomDeadline.toTimeString().slice(0, 5));
+    } else {
+      // 기본값: 운동 시작 2시간 후
+      const defaultPomDeadline = new Date(eventDate);
+      defaultPomDeadline.setHours(defaultPomDeadline.getHours() + 2);
+      setPomVotingDeadlineDate(defaultPomDeadline.toISOString().split("T")[0]);
+      setPomVotingDeadlineTime(defaultPomDeadline.toTimeString().slice(0, 5));
+    }
+  }, [event]);
 
   const toggleShoe = (shoe: string) => {
     setShoes((prev) =>
@@ -127,9 +129,27 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
     try {
       const dateTime = new Date(`${date}T${time}:00`);
       const rsvpDeadline = new Date(`${rsvpDeadlineDate}T${rsvpDeadlineTime}:00`);
+
+      // RSVP 마감은 운동 시간 전이어야 함
+      if (rsvpDeadline >= dateTime) {
+        setError("RSVP 마감은 운동 시간 전이어야 합니다");
+        setSaving(false);
+        return;
+      }
+
       const pomVotingDeadline = enablePomVoting && pomVotingDeadlineDate && pomVotingDeadlineTime
         ? new Date(`${pomVotingDeadlineDate}T${pomVotingDeadlineTime}:00`).toISOString()
         : null;
+
+      // MVP 투표 마감은 운동 시간 이후여야 함
+      if (enablePomVoting && pomVotingDeadlineDate && pomVotingDeadlineTime) {
+        const pomDeadline = new Date(`${pomVotingDeadlineDate}T${pomVotingDeadlineTime}:00`);
+        if (pomDeadline <= dateTime) {
+          setError("MVP 투표 마감은 운동 시간 이후여야 합니다");
+          setSaving(false);
+          return;
+        }
+      }
 
       const res = await fetch(`/api/training-events/${eventId}`, {
         method: "PUT",
@@ -179,14 +199,14 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href={`/training/${eventId}`} />
-          <h1 className="text-lg font-semibold text-gray-900">운동 정보 수정</h1>
+          <h1 className="text-base font-semibold text-gray-900">운동 정보 수정</h1>
           <div className="w-6" />
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-4">
+      <main className="max-w-2xl mx-auto p-4 space-y-4">
         {/* 제목 + 정기 여부 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
@@ -195,7 +215,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 주말 운동"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
           <div className="flex items-center justify-between mt-4">
             <div>
@@ -291,14 +311,14 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="운동 장소를 입력하세요"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
 
           {/* 신발 선택 */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">신발 추천</label>
             <div className="flex gap-2">
-              {["축구화", "풋살화"].map((shoe) => (
+              {["축구화", "풋살화", "운동화"].map((shoe) => (
                 <button
                   key={shoe}
                   type="button"
@@ -327,7 +347,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             value={uniform}
             onChange={(e) => setUniform(e.target.value)}
             placeholder="예: 홈 유니폼 (흰색)"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
         </div>
 
@@ -341,7 +361,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             onChange={(e) => setNotes(e.target.value)}
             placeholder="예: 오늘은 패스 연습 집중, 짧은 패스 위주로"
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
         </div>
 
@@ -354,7 +374,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
               <select
                 value={vestBringerId}
                 onChange={(e) => setVestBringerId(e.target.value)}
-                className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                className="w-full max-w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
               >
                 <option value="">선택안함</option>
                 {members.map((m) => (
@@ -367,7 +387,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
               <select
                 value={vestReceiverId}
                 onChange={(e) => setVestReceiverId(e.target.value)}
-                className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                className="w-full max-w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
               >
                 <option value="">선택안함</option>
                 {members.map((m) => (
@@ -401,11 +421,11 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
 
       {isFormComplete && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-10">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-2xl mx-auto flex justify-center">
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="w-full py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+              className="w-full max-w-xs py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
             >
               {saving ? "저장 중..." : "저장"}
             </button>

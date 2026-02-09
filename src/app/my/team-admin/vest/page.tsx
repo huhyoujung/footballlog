@@ -113,12 +113,12 @@ export default function VestDutyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href="/my/team-admin" />
-          <h1 className="text-lg font-semibold text-gray-900">조끼 빨래 당번</h1>
+          <h1 className="text-base font-semibold text-gray-900">조끼 빨래 당번</h1>
           <button
             onClick={saveVestOrder}
             className="text-team-500 font-medium"
@@ -128,7 +128,7 @@ export default function VestDutyPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4">
+      <main className="max-w-2xl mx-auto p-4">
         <div className="bg-white rounded-xl p-4">
           <p className="text-xs text-gray-400 mb-4">
             드래그하여 순서를 조정하세요. 정기운동 생성 시 이 순서대로 자동 추천됩니다.
@@ -136,7 +136,7 @@ export default function VestDutyPage() {
 
           {/* 조끼 순서 리스트 */}
           {vestOrder.length > 0 ? (
-            <div className="space-y-2 mb-4">
+            <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 mb-4">
               {vestOrder.map((userId, index) => {
                 const member = team?.members?.find((m) => m.id === userId);
                 if (!member) return null;
@@ -147,7 +147,7 @@ export default function VestDutyPage() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white cursor-move hover:bg-gray-50 transition-colors ${
+                    className={`flex items-center gap-3 p-3 bg-white cursor-move hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl ${
                       draggedIndex === index ? "opacity-50" : ""
                     }`}
                   >

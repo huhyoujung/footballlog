@@ -59,7 +59,7 @@ export default function TickerBanner({ messages }: Props) {
       }`}
       onClick={handleClick}
     >
-      <div className="max-w-lg mx-auto px-5 h-full flex items-center">
+      <div className="max-w-2xl mx-auto px-4 h-full flex items-center">
         <p
           key={current.key}
           className={`text-xs text-team-700 truncate transition-all duration-500 ease-in-out ${

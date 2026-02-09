@@ -55,25 +55,36 @@ export default function Feed() {
   const teamMembers: TeamMember[] = teamData?.members || [];
   const teamLogoUrl = teamData?.logoUrl || null;
 
-  // SWR로 데이터 페칭 (전역 캐시 설정 사용 - 5분 캐시)
+  // SWR로 데이터 페칭 (5분 캐시, 포커스 시 재검증 비활성화)
+  const swrConfig = {
+    revalidateOnFocus: false,
+    revalidateIfStale: false,
+    dedupingInterval: 300000, // 5분 캐시
+    keepPreviousData: true,
+  };
+
   const { data: logsData, mutate: mutateLogs } = useSWR<{ logs: TrainingLog[] }>(
     "/api/training-logs",
-    fetcher
+    fetcher,
+    swrConfig
   );
 
   const { data: nudgesData } = useSWR<{ nudges: Nudge[] }>(
     "/api/nudges",
-    fetcher
+    fetcher,
+    swrConfig
   );
 
   const { data: eventsData, mutate: mutateEvents } = useSWR<{ events: TrainingEventSummary[] }>(
     "/api/training-events/next",
-    fetcher
+    fetcher,
+    swrConfig
   );
 
   const { data: mvpData } = useSWR<{ mvp: RecentMvp | null }>(
     "/api/pom/recent-mvp",
-    fetcher
+    fetcher,
+    swrConfig
   );
 
   const logs = logsData?.logs || [];
@@ -167,16 +178,22 @@ export default function Feed() {
     }
   };
 
+  // 로컬 timezone 기준 날짜 문자열 생성
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // 날짜별 그룹핑
   const groupLogsByDate = (): GroupedLogs[] => {
-    const today = new Date().toISOString().split("T")[0];
-    const yesterday = new Date(Date.now() - 86400000)
-      .toISOString()
-      .split("T")[0];
+    const today = getLocalDateString(new Date());
+    const yesterday = getLocalDateString(new Date(Date.now() - 86400000));
 
     const grouped: Record<string, TrainingLog[]> = {};
     for (const log of logs) {
-      const date = new Date(log.trainingDate).toISOString().split("T")[0];
+      const date = getLocalDateString(new Date(log.trainingDate));
       if (!grouped[date]) grouped[date] = [];
       grouped[date].push(log);
     }
@@ -200,13 +217,13 @@ export default function Feed() {
 
   // 오늘 운동한 사용자 ID 목록
   const todayActiveUserIds = (): string[] => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDateString(new Date());
     return [
       ...new Set(
         logs
           .filter(
             (log) =>
-              new Date(log.trainingDate).toISOString().split("T")[0] === today
+              getLocalDateString(new Date(log.trainingDate)) === today
           )
           .map((log) => log.user.id)
       ),
@@ -284,7 +301,7 @@ export default function Feed() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-5 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           {teamLogoUrl ? (
             <img src={teamLogoUrl} alt="팀 로고" className="w-8 h-8 object-cover rounded-full" />
           ) : (
@@ -304,9 +321,9 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* 전광판 (상단 고정) */}
+      {/* 전광판 (상단 고정) - header와 붙임 */}
       {!isLoading && (
-        <div className="sticky top-[57px] z-10">
+        <div className="sticky top-[46px] z-10">
           <TickerBanner messages={getTickerMessages()} />
         </div>
       )}
@@ -339,7 +356,7 @@ export default function Feed() {
       )}
 
       {/* 피드 */}
-      <main className={expandedDate ? "" : "max-w-lg mx-auto"}>
+      <main className={expandedDate ? "" : "max-w-2xl mx-auto"}>
         {isLoading ? (
           <LoadingSpinner />
         ) : logs.length === 0 ? (
@@ -359,7 +376,7 @@ export default function Feed() {
             </Link>
           </div>
         ) : (
-          <div className={expandedDate ? "" : "flex flex-col items-center gap-3 px-4 py-8"}>
+          <div className={expandedDate ? "" : "flex flex-col items-center gap-12 px-4 py-8"}>
             {groupedLogs.map((group) => {
               const isThisExpanded = expandedDate === group.displayDate;
               // 다른 날짜가 펼쳐진 경우 현재 스택 숨기기

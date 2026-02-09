@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
@@ -14,7 +14,7 @@ export const usePWA = () => {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  async function injectManifest({
+  const injectManifest = useCallback(async ({
     name,
     shortName,
     faviconLocation,
@@ -34,7 +34,7 @@ export const usePWA = () => {
     themeColor?: string;
     backgroundColor?: string;
     orientation?: "portrait" | "landscape";
-  }) {
+  }) => {
     // 팀 로고가 있으면 팀 로고, 없으면 faviconLocation 사용
     const getIconUrl = (size: string) => {
       if (logoUrl) return logoUrl; // 팀 로고는 모든 사이즈에 동일 URL (브라우저가 리사이즈)
@@ -42,32 +42,35 @@ export const usePWA = () => {
       return `/icons/${size}.png`; // 기본값
     };
 
+    // 팀 로고나 faviconLocation이 있을 때만 아이콘 포함
+    const icons = (logoUrl || faviconLocation) ? [
+      {
+        src: getIconUrl("48x48"),
+        sizes: "48x48",
+        type: "image/png",
+      },
+      {
+        src: getIconUrl("180x180"),
+        sizes: "180x180",
+        type: "image/png",
+      },
+      {
+        src: getIconUrl("192x192"),
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: getIconUrl("512x512"),
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ] : [];
+
     const manifest = {
       name,
       short_name: shortName,
       display: "standalone",
-      icons: [
-        {
-          src: getIconUrl("48x48"),
-          sizes: "48x48",
-          type: "image/png",
-        },
-        {
-          src: getIconUrl("180x180"),
-          sizes: "180x180",
-          type: "image/png",
-        },
-        {
-          src: getIconUrl("192x192"),
-          sizes: "192x192",
-          type: "image/png",
-        },
-        {
-          src: getIconUrl("512x512"),
-          sizes: "512x512",
-          type: "image/png",
-        },
-      ],
+      icons,
       start_url: startUrl,
       description,
       background_color: backgroundColor,
@@ -75,51 +78,65 @@ export const usePWA = () => {
       orientation: orientation,
     };
 
-    const oldLink = document.querySelector('link[rel="manifest"]');
-    if (oldLink) oldLink.remove();
+    // 기존 manifest link 찾기 또는 생성
+    let link = document.querySelector('link[rel="manifest"]');
+
+    // 기존 blob URL이 있으면 정리
+    if (link) {
+      const oldHref = link.getAttribute('href');
+      if (oldHref?.startsWith('blob:')) {
+        URL.revokeObjectURL(oldHref);
+      }
+    } else {
+      // 없으면 새로 생성 (제거하지 않고 계속 재사용)
+      link = document.createElement("link");
+      link.rel = "manifest";
+      link.type = "application/json";
+      document.head.appendChild(link);
+    }
+
+    // href만 업데이트
     const manifestBlob = new Blob([JSON.stringify(manifest)], {
       type: "application/json",
     });
     const manifestURL = URL.createObjectURL(manifestBlob);
-    const link = document.createElement("link");
-    link.rel = "manifest";
-    link.type = "application/json";
     link.href = manifestURL;
-    document.head.appendChild(link);
-  }
+  }, []);
 
-  function injectFavicon(logoUrl?: string | null, faviconLocation = "/") {
-    const getFaviconUrl = (size: string) => {
-      if (logoUrl) return logoUrl;
-      if (faviconLocation) return `${faviconLocation}/${size}.png`;
-      return `/icons/${size}.png`;
-    };
+  const injectFavicon = useCallback((logoUrl?: string | null, faviconLocation = "/") => {
+    // 로고가 없으면 favicon을 주입하지 않음 (브라우저 기본값 사용)
+    if (!logoUrl) return;
 
-    const oldFavicon = document.querySelector('link[rel="icon"]');
-    if (oldFavicon) oldFavicon.remove();
-    const favicon = document.createElement("link");
-    favicon.rel = "icon";
-    favicon.type = "image/png";
-    favicon.setAttribute("sizes", "48x48");
-    favicon.href = getFaviconUrl("48x48");
+    // favicon 찾기 또는 생성
+    let favicon = document.querySelector('link[rel="icon"]');
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      favicon.type = "image/png";
+      favicon.setAttribute("sizes", "48x48");
+      document.head.appendChild(favicon);
+    }
+    favicon.href = logoUrl;
 
-    const oldMsIcon = document.querySelector('meta[name="msapplication-TileImage"]');
-    if (oldMsIcon) oldMsIcon.remove();
-    const msIcon = document.createElement("meta");
-    msIcon.name = "msapplication-TileImage";
-    msIcon.content = getFaviconUrl("192x192");
+    // MS 타일 이미지 찾기 또는 생성
+    let msIcon = document.querySelector('meta[name="msapplication-TileImage"]');
+    if (!msIcon) {
+      msIcon = document.createElement("meta");
+      msIcon.name = "msapplication-TileImage";
+      document.head.appendChild(msIcon);
+    }
+    msIcon.content = logoUrl;
 
-    const oldAppleIcon = document.querySelector('link[rel="apple-touch-icon"]');
-    if (oldAppleIcon) oldAppleIcon.remove();
-    const appleIcon = document.createElement("link");
-    appleIcon.rel = "apple-touch-icon";
-    appleIcon.setAttribute("sizes", "180x180");
-    appleIcon.href = getFaviconUrl("180x180");
-
-    document.head.appendChild(favicon);
-    document.head.appendChild(msIcon);
-    document.head.appendChild(appleIcon);
-  }
+    // Apple 터치 아이콘 찾기 또는 생성
+    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!appleIcon) {
+      appleIcon = document.createElement("link");
+      appleIcon.rel = "apple-touch-icon";
+      appleIcon.setAttribute("sizes", "180x180");
+      document.head.appendChild(appleIcon);
+    }
+    appleIcon.href = logoUrl;
+  }, []);
 
   function _isInstalled(): boolean {
     // Standalone 모드로 실행 중인지 확인 (iOS Safari, Android Chrome)

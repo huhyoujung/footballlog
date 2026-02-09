@@ -114,12 +114,29 @@ export default function TrainingCreatePage() {
       const dateTime = new Date(`${date}T${time}:00`);
       const rsvpDeadline = new Date(`${rsvpDeadlineDate}T${rsvpDeadlineTime}:00`);
 
+      // RSVP 마감은 운동 시간 전이어야 함
+      if (rsvpDeadline >= dateTime) {
+        showToast("RSVP 마감은 운동 시간 전이어야 합니다");
+        setLoading(false);
+        return;
+      }
+
       // POM 투표 마감 시간: 설정하지 않았으면 운동 시작 2시간 후가 기본값
       const pomVotingDeadline = enablePomVoting
         ? pomVotingDeadlineDate && pomVotingDeadlineTime
           ? new Date(`${pomVotingDeadlineDate}T${pomVotingDeadlineTime}:00`).toISOString()
           : new Date(dateTime.getTime() + 2 * 60 * 60 * 1000).toISOString()
         : null;
+
+      // MVP 투표 마감은 운동 시간 이후여야 함
+      if (enablePomVoting && pomVotingDeadlineDate && pomVotingDeadlineTime) {
+        const pomDeadline = new Date(`${pomVotingDeadlineDate}T${pomVotingDeadlineTime}:00`);
+        if (pomDeadline <= dateTime) {
+          showToast("MVP 투표 마감은 운동 시간 이후여야 합니다");
+          setLoading(false);
+          return;
+        }
+      }
 
       const res = await fetch("/api/training-events", {
         method: "POST",
@@ -158,16 +175,16 @@ export default function TrainingCreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-white pb-24">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <BackButton href="/" />
-          <h1 className="text-lg font-semibold text-gray-900">팀 운동</h1>
+          <h1 className="text-base font-semibold text-gray-900">팀 운동</h1>
           <div className="w-6" />
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-4">
+      <main className="max-w-2xl mx-auto p-4 space-y-4">
         {/* 제목 + 정기 여부 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
@@ -176,7 +193,7 @@ export default function TrainingCreatePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 주말 운동"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
           <div className="flex items-center justify-between mt-4">
             <div>
@@ -278,7 +295,7 @@ export default function TrainingCreatePage() {
               onChange={(e) => handleLocationChange(e.target.value)}
               onFocus={() => location && searchVenues(location)}
               placeholder="운동 장소를 입력하세요"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
             {/* 구장 자동완성 리스트 */}
             {showVenueList && venues.length > 0 && (
@@ -288,7 +305,7 @@ export default function TrainingCreatePage() {
                     key={venue.id}
                     type="button"
                     onClick={() => handleVenueSelect(venue)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                   >
                     <div className="text-sm font-medium text-gray-900">{venue.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -328,7 +345,7 @@ export default function TrainingCreatePage() {
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">신발 추천</label>
             <div className="flex gap-2">
-              {["축구화", "풋살화"].map((shoe) => (
+              {["축구화", "풋살화", "운동화"].map((shoe) => (
                 <button
                   key={shoe}
                   type="button"
@@ -357,7 +374,7 @@ export default function TrainingCreatePage() {
             value={uniform}
             onChange={(e) => setUniform(e.target.value)}
             placeholder="예: 홈 유니폼 (흰색)"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
         </div>
 
@@ -371,7 +388,7 @@ export default function TrainingCreatePage() {
             onChange={(e) => setNotes(e.target.value)}
             placeholder="예: 오늘은 패스 연습 집중, 짧은 패스 위주로"
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
           />
         </div>
 
@@ -392,7 +409,7 @@ export default function TrainingCreatePage() {
                 <select
                   value={vestBringerId}
                   onChange={(e) => setVestBringerId(e.target.value)}
-                  className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  className="w-full max-w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
                 >
                   <option value="">선택안함</option>
                   {members.map((m) => (
@@ -405,7 +422,7 @@ export default function TrainingCreatePage() {
                 <select
                   value={vestReceiverId}
                   onChange={(e) => setVestReceiverId(e.target.value)}
-                  className="w-full max-w-full mt-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  className="w-full max-w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
                 >
                   <option value="">선택안함</option>
                   {members.map((m) => (
@@ -439,11 +456,11 @@ export default function TrainingCreatePage() {
 
       {isFormComplete && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-10">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-2xl mx-auto flex justify-center">
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+              className="w-full max-w-xs py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
             >
               {loading ? "생성 중..." : "운동 올리기"}
             </button>

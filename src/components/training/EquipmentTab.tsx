@@ -200,14 +200,14 @@ export default function EquipmentTab({ eventId }: Props) {
     <>
       {/* 미배정 장비 */}
       <div className="bg-white rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1">
           <span>미배정 장비</span>
           <span className="text-xs text-gray-400 font-normal">
             ({equipments.filter((eq) => !equipmentAssignments[eq.id]?.userId).length}개)
           </span>
         </h3>
         <div
-          className="min-h-[100px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
+          className="border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2 transition-all min-h-[60px]"
           onDragOver={handleEquipmentDragOver}
           onDrop={(e) => handleEquipmentDrop(e, null)}
           data-equipment-drop-target
@@ -223,7 +223,7 @@ export default function EquipmentTab({ eventId }: Props) {
                 onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
                 onTouchMove={handleEquipmentTouchMove}
                 onTouchEnd={handleEquipmentTouchEnd}
-                className={`bg-team-50 border border-team-200 rounded-lg p-3 cursor-move hover:bg-team-100 transition-colors touch-none ${
+                className={`bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors touch-none ${
                   touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
                 }`}
               >
@@ -249,19 +249,19 @@ export default function EquipmentTab({ eventId }: Props) {
 
         return (
           <div key={manager.id} className="bg-white rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1">
               <span>{manager.name || "익명"}</span>
+              <span className="text-xs text-gray-400 font-normal">
+                ({assignedEquipments.length}개)
+              </span>
               {(manager.position || manager.number) && (
-                <span className="text-xs text-gray-400 font-normal">
+                <span className="text-xs text-gray-400 font-normal ml-1">
                   {manager.position || ""} {manager.number ? `#${manager.number}` : ""}
                 </span>
               )}
-              <span className="text-xs text-gray-400 font-normal ml-auto">
-                ({assignedEquipments.length}개)
-              </span>
             </h3>
             <div
-              className={`min-h-[80px] border-2 border-dashed rounded-lg p-3 space-y-2 ${
+              className={`border-2 border-dashed rounded-lg p-3 space-y-2 transition-all min-h-[60px] ${
                 equipmentDropTarget === manager.id ? 'border-team-500 bg-team-50' : 'border-gray-200'
               }`}
               onDragOver={handleEquipmentDragOver}
@@ -277,7 +277,7 @@ export default function EquipmentTab({ eventId }: Props) {
                   onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
                   onTouchMove={handleEquipmentTouchMove}
                   onTouchEnd={handleEquipmentTouchEnd}
-                  className={`bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors touch-none ${
+                  className={`bg-team-50 border border-team-200 rounded-lg p-3 cursor-move hover:bg-team-100 transition-colors touch-none ${
                     touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
                   }`}
                 >
@@ -297,20 +297,17 @@ export default function EquipmentTab({ eventId }: Props) {
         );
       })}
 
-      <div className="flex gap-3">
-        <button
-          onClick={() => fetchEquipments()}
-          className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-        >
-          취소
-        </button>
+      <div className="space-y-3">
         <button
           onClick={saveEquipmentAssignments}
           disabled={savingEquipment}
-          className="flex-1 py-2.5 bg-team-500 text-white rounded-lg font-medium hover:bg-team-600 disabled:opacity-50"
+          className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium hover:bg-team-600 disabled:opacity-50"
         >
           {savingEquipment ? "저장 중..." : "저장"}
         </button>
+        <p className="text-xs text-gray-400 text-center">
+          이 페이지에서 편집한 장비 배정은 다른 운동에도 동일하게 적용됩니다
+        </p>
       </div>
 
       {/* 장비 터치 드래그 고스트 요소 */}
