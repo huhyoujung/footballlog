@@ -1,11 +1,12 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import useSWR from "swr";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
 const POSITIONS = [
@@ -33,11 +34,12 @@ interface Profile {
   number: number | null;
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function SettingsPage() {
   const router = useRouter();
   const { update } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -50,30 +52,25 @@ export default function SettingsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // 푸시 알림 상태
-  const { isSupported, isSubscribed, subscribe, unsubscribe } = usePushSubscription();
+  const { isSupported, isSubscribed, isReady, subscribe, unsubscribe } = usePushSubscription();
   const [subscribing, setSubscribing] = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch("/api/profile");
-      if (res.ok) {
-        const data = await res.json();
+  // SWR로 profile 데이터 페칭
+  const { isLoading: loading } = useSWR<Profile>(
+    "/api/profile",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+      onSuccess: (data: Profile) => {
         setProfile(data);
         setName(data.name || "");
         setPosition(data.position || "");
         setNumber(data.number !== null ? String(data.number) : "");
         setImagePreview(data.image);
-      }
-    } catch (error) {
-      console.error("프로필 로드 실패:", error);
-    } finally {
-      setLoading(false);
+      },
     }
-  };
+  );
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,14 +158,20 @@ export default function SettingsPage() {
   };
 
   const handlePushToggle = async () => {
+    if (subscribing || !isReady) return;
+
     setSubscribing(true);
     setError("");
     setSuccess("");
 
     try {
       if (isSubscribed) {
-        await unsubscribe();
-        setSuccess("알림이 비활성화되었습니다");
+        const result = await unsubscribe();
+        if (result) {
+          setSuccess("알림이 비활성화되었습니다");
+        } else {
+          setError("알림 해제에 실패했습니다");
+        }
       } else {
         const result = await subscribe();
         if (result) {
@@ -179,7 +182,7 @@ export default function SettingsPage() {
       }
       setTimeout(() => setSuccess(""), 2000);
     } catch (err) {
-      console.error("Push subscription error:", err);
+      console.error("Push toggle error:", err);
       setError("알림 설정에 실패했습니다");
     } finally {
       setSubscribing(false);
@@ -323,7 +326,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handlePushToggle}
-                disabled={subscribing}
+                disabled={subscribing || !isReady}
                 className={`relative w-11 h-6 rounded-full transition-colors ${
                   isSubscribed ? "bg-team-500" : "bg-gray-300"
                 } disabled:opacity-50`}

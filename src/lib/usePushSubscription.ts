@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 // base64 URL-safe 문자열을 Uint8Array로 변환
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -21,67 +21,114 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export function usePushSubscription() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setIsSupported("serviceWorker" in navigator && "PushManager" in window);
+    const supported = typeof window !== 'undefined' &&
+                     'serviceWorker' in navigator &&
+                     'PushManager' in window;
+    setIsSupported(supported);
   }, []);
 
-  useEffect(() => {
+  const checkSubscription = useCallback(async () => {
     if (!isSupported) return;
-    checkSubscription();
+
+    try {
+      // Service worker가 준비될 때까지 최대 5초 대기
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker timeout')), 5000)
+        )
+      ]) as ServiceWorkerRegistration;
+
+      const sub = await registration.pushManager.getSubscription();
+      setIsSubscribed(!!sub);
+      setIsReady(true);
+    } catch (error) {
+      console.error('[Push] Failed to check subscription:', error);
+      setIsReady(true); // 에러가 나도 ready 상태로 만들어 UI 차단 방지
+    }
   }, [isSupported]);
 
-  async function checkSubscription() {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    setIsSubscribed(!!sub);
-  }
+  useEffect(() => {
+    if (isSupported) {
+      checkSubscription();
+    }
+  }, [isSupported, checkSubscription]);
 
   async function subscribe() {
-    if (!isSupported) return false;
+    try {
+      if (!isSupported) {
+        console.error('Push notifications not supported');
+        return false;
+      }
 
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return false;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        console.log('Notification permission denied');
+        return false;
+      }
 
-    const reg = await navigator.serviceWorker.ready;
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker timeout')), 5000)
+        )
+      ]) as ServiceWorkerRegistration;
 
-    // VAPID 공개 키를 base64 URL-safe에서 Uint8Array로 변환
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidPublicKey) {
-      console.error('VAPID public key not configured');
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        console.error('VAPID public key not configured');
+        return false;
+      }
+
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+
+      const sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey as BufferSource,
+      });
+
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Server subscription failed:', error);
+        return false;
+      }
+
+      setIsSubscribed(true);
+      return true;
+    } catch (error) {
+      console.error('Push subscription error:', error);
       return false;
     }
-
-    const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: applicationServerKey as BufferSource,
-    });
-
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: sub.toJSON() }),
-    });
-
-    setIsSubscribed(true);
-    return true;
   }
 
   async function unsubscribe() {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      await fetch("/api/push/subscribe", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: sub.endpoint }),
-      });
-      await sub.unsubscribe();
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.getSubscription();
+      if (sub) {
+        await fetch("/api/push/subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        await sub.unsubscribe();
+      }
+      setIsSubscribed(false);
+      return true;
+    } catch (error) {
+      console.error('Unsubscribe error:', error);
+      return false;
     }
-    setIsSubscribed(false);
   }
 
-  return { isSupported, isSubscribed, subscribe, unsubscribe };
+  return { isSupported, isSubscribed, isReady, subscribe, unsubscribe };
 }
