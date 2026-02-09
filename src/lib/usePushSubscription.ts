@@ -28,21 +28,35 @@ export function usePushSubscription() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const supported = typeof window !== 'undefined' &&
-                     'serviceWorker' in navigator &&
-                     'PushManager' in window;
+    // 기본 브라우저 지원 확인
+    const browserSupported = typeof window !== 'undefined' &&
+                            'serviceWorker' in navigator &&
+                            'PushManager' in window;
+
+    // iOS PWA 모드 체크 (iOS는 PWA에서만 작동)
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+                  (window.navigator as any).standalone === true;
+
+    // iOS는 PWA 모드에서만, 다른 환경은 브라우저 지원만 확인
+    const supported = browserSupported && (!isIOS || isPWA);
+
     setIsSupported(supported);
+
+    if (!supported && isIOS && !isPWA) {
+      console.warn('[Push] iOS에서는 PWA(홈 화면에 추가)로 설치해야 푸시 알림을 사용할 수 있습니다.');
+    }
   }, []);
 
   const checkSubscription = useCallback(async () => {
     if (!isSupported) return;
 
     try {
-      // Service worker가 준비될 때까지 최대 5초 대기
+      // Service worker가 준비될 때까지 최대 15초 대기
       const registration = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker timeout')), 5000)
+          setTimeout(() => reject(new Error('Service worker timeout')), 15000)
         )
       ]) as ServiceWorkerRegistration;
 
@@ -68,6 +82,13 @@ export function usePushSubscription() {
         return { success: false, error: 'NOT_SUPPORTED' };
       }
 
+      // VAPID 키 사전 확인
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        console.error('VAPID public key not configured');
+        return { success: false, error: 'VAPID_KEY_MISSING' };
+      }
+
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         console.log('Notification permission:', permission);
@@ -77,15 +98,9 @@ export function usePushSubscription() {
       const registration = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker timeout')), 5000)
+          setTimeout(() => reject(new Error('Service worker timeout')), 15000)
         )
       ]) as ServiceWorkerRegistration;
-
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) {
-        console.error('VAPID public key not configured');
-        return { success: false, error: 'VAPID_KEY_MISSING' };
-      }
 
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
 

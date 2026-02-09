@@ -41,9 +41,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     session?.user?.teamId ? "/api/teams" : null,
     fetcher,
     {
-      revalidateOnFocus: true, // 탭 포커스 시 자동 갱신
+      revalidateOnFocus: false, // 포커스 시 재검증 비활성화 (성능 개선)
       revalidateOnReconnect: true, // 네트워크 재연결 시 자동 갱신
-      dedupingInterval: 2000, // 2초 내 중복 요청 방지
+      dedupingInterval: 300000, // 5분 캐시
+      revalidateIfStale: false, // stale 데이터도 재검증 안 함 (필요시 수동 refetch)
     }
   );
 

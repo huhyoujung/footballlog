@@ -53,8 +53,9 @@ export default function MyPage() {
     fetcher,
     {
       fallbackData: { image: session?.user?.image || null },
-      revalidateOnFocus: false, // profile은 자주 바뀌지 않으므로
-      dedupingInterval: 5000,
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
     }
   );
 

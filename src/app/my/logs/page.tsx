@@ -1,38 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import useSWR from "swr";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 import PolaroidCard from "@/components/PolaroidCard";
 import type { TrainingLog } from "@/types/training";
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function MyLogsPage() {
   const { data: session } = useSession();
-  const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchLogs();
+  // SWR로 데이터 페칭 (자동 캐싱)
+  const { data: logsData, isLoading } = useSWR<{ logs: TrainingLog[] }>(
+    session?.user?.id ? `/api/training-logs?userId=${session.user.id}&limit=100` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false, // stale 데이터도 재검증하지 않음
+      dedupingInterval: 300000, // 5분 캐시
     }
-  }, [session]);
+  );
 
-  const fetchLogs = async () => {
-    try {
-      const res = await fetch(`/api/training-logs?userId=${session?.user?.id}&limit=100`);
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs);
-      }
-    } catch (error) {
-      console.error("일지 로드 실패:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const logs = logsData?.logs || [];
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -41,11 +35,7 @@ export default function MyLogsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/my" className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href="/my" />
           <h1 className="text-lg font-semibold text-gray-900">내 운동 일지</h1>
           <div className="w-5" />
         </div>

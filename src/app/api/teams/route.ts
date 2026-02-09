@@ -148,7 +148,7 @@ export async function GET() {
       return NextResponse.json({ error: "팀에 소속되어 있지 않습니다" }, { status: 404 });
     }
 
-    // 출석률 계산을 위한 데이터 조회
+    // 출석률 계산을 위한 데이터 조회 (최적화: 단일 쿼리)
     const now = new Date();
     const totalEvents = await prisma.trainingEvent.count({
       where: {
@@ -157,27 +157,32 @@ export async function GET() {
       },
     });
 
+    // 모든 출석 데이터를 한 번에 가져오기 (N+1 쿼리 문제 해결)
+    const checkIns = await prisma.checkIn.findMany({
+      where: {
+        trainingEvent: {
+          teamId: user.team.id,
+          date: { lt: now },
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    // 메모리에서 그룹화 (userId별 출석 횟수)
+    const checkInsByUser = checkIns.reduce((acc, checkIn) => {
+      acc[checkIn.userId] = (acc[checkIn.userId] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
     // 각 멤버별 출석률 계산
-    const membersWithAttendance = await Promise.all(
-      user.team.members.map(async (member) => {
-        const checkInsCount = await prisma.checkIn.count({
-          where: {
-            userId: member.id,
-            trainingEvent: {
-              teamId: user.team!.id,
-              date: { lt: now },
-            },
-          },
-        });
-
-        const attendanceRate = totalEvents > 0 ? Math.round((checkInsCount / totalEvents) * 100) : 0;
-
-        return {
-          ...member,
-          attendanceRate,
-        };
-      })
-    );
+    const membersWithAttendance = user.team.members.map((member) => ({
+      ...member,
+      attendanceRate: totalEvents > 0
+        ? Math.round(((checkInsByUser[member.id] || 0) / totalEvents) * 100)
+        : 0,
+    }));
 
     // 출석률 순으로 정렬 (높은 순)
     membersWithAttendance.sort((a, b) => b.attendanceRate - a.attendanceRate);

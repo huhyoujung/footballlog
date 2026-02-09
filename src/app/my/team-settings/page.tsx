@@ -6,7 +6,10 @@ import BackButton from "@/components/BackButton";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import Image from "next/image";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface TeamInfo {
   id: string;
@@ -37,10 +40,8 @@ export default function TeamSettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [team, setTeam] = useState<TeamInfo | null>(null);
   const [teamName, setTeamName] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState("#967B5D");
@@ -51,30 +52,29 @@ export default function TeamSettingsPage() {
   useEffect(() => {
     if (session?.user?.role !== "ADMIN") {
       router.push("/my");
-      return;
     }
-    fetchTeam();
-  }, [session]);
+  }, [session, router]);
 
-  const fetchTeam = async () => {
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setTeam(data);
+  // SWR로 팀 데이터 페칭
+  const { data: team, isLoading: loading, mutate: refetchTeam } = useSWR<TeamInfo>(
+    session?.user?.role === "ADMIN" ? "/api/teams" : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 120000, // 2분 캐시
+      onSuccess: (data) => {
         setTeamName(data.name || "");
         setLogoUrl(data.logoUrl || null);
         setPrimaryColor(data.primaryColor || "#967B5D");
-      } else {
-        const errorData = await res.json();
-        setError(errorData.error || "팀 정보를 불러오는데 실패했습니다");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "팀 정보를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
+      },
+      onError: (err) => {
+        setError(err.message || "팀 정보를 불러오는데 실패했습니다");
+      },
     }
-  };
+  );
+
+  const fetchTeam = () => refetchTeam();
 
   const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -142,8 +142,8 @@ export default function TeamSettingsPage() {
         throw new Error(data.error || "저장에 실패했습니다");
       }
 
-      const updated = await res.json();
-      setTeam(updated);
+      await res.json();
+      await refetchTeam();
       setSuccess("저장되었습니다");
       setTimeout(() => {
         router.push("/my");
@@ -177,8 +177,8 @@ export default function TeamSettingsPage() {
       });
 
       if (res.ok) {
-        const updated = await res.json();
-        setTeam(updated);
+        await res.json();
+        await refetchTeam();
         setSuccess("초대 코드가 변경되었습니다");
         setTimeout(() => setSuccess(""), 2000);
       }

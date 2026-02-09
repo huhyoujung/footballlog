@@ -14,10 +14,38 @@ export default function PWAManager() {
       typeof window !== "undefined" &&
       "serviceWorker" in navigator
     ) {
-      navigator.serviceWorker
-        .register("/custom-sw.js", { scope: "/" })
-        .then((registration) => {
+      const registerServiceWorker = async () => {
+        try {
+          // 기존 등록 확인
+          const existingRegistration = await navigator.serviceWorker.getRegistration();
+
+          // 이미 등록된 SW가 있고 활성화되어 있으면 스킵
+          if (existingRegistration?.active) {
+            console.log("[PWA] Service Worker already registered and active");
+            return;
+          }
+
+          // 새로 등록
+          const registration = await navigator.serviceWorker.register("/custom-sw.js", {
+            scope: "/",
+            updateViaCache: "none", // 캐시 무시
+          });
+
           console.log("[PWA] Service Worker registered:", registration);
+
+          // 활성화될 때까지 대기
+          if (registration.installing) {
+            await new Promise<void>((resolve) => {
+              registration.installing!.addEventListener("statechange", function handler(e) {
+                const sw = e.target as ServiceWorker;
+                if (sw.state === "activated") {
+                  console.log("[PWA] Service Worker activated");
+                  resolve();
+                  sw.removeEventListener("statechange", handler);
+                }
+              });
+            });
+          }
 
           // 업데이트 확인
           registration.addEventListener("updatefound", () => {
@@ -33,10 +61,12 @@ export default function PWAManager() {
               }
             });
           });
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error("[PWA] Service Worker registration failed:", error);
-        });
+        }
+      };
+
+      registerServiceWorker();
     }
   }, []);
 

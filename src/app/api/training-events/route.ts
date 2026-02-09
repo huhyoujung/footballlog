@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "운영진만 생성할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, isRegular, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline } =
+    const { title, isRegular, enablePomVoting, pomVotingDeadline, pomVotesPerPerson, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline } =
       await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
@@ -114,6 +114,9 @@ export async function POST(req: Request) {
         createdById: session.user.id,
         title,
         isRegular: isRegular ?? true,
+        enablePomVoting: enablePomVoting ?? true,
+        pomVotingDeadline: pomVotingDeadline ? new Date(pomVotingDeadline) : null,
+        pomVotesPerPerson: pomVotesPerPerson ?? 1,
         date: new Date(date),
         location,
         venueId,

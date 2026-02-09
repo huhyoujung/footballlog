@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
 interface TrainingEvent {
   id: string;
@@ -17,44 +19,39 @@ interface TrainingEvent {
   };
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function TrainingEventsPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
-  const [upcomingEvents, setUpcomingEvents] = useState<TrainingEvent[]>([]);
-  const [pastEvents, setPastEvents] = useState<TrainingEvent[]>([]);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  useEffect(() => {
-    if (session) {
-      fetchEvents();
+  // SWR로 데이터 페칭 (자동 캐싱)
+  const { data: upcomingData, isLoading: upcomingLoading } = useSWR<{ events: TrainingEvent[] }>(
+    session ? "/api/training-events?filter=upcoming" : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
     }
-  }, [session]);
+  );
 
-  const fetchEvents = async () => {
-    try {
-      const [upcomingRes, pastRes] = await Promise.all([
-        fetch("/api/training-events?filter=upcoming"),
-        fetch("/api/training-events?filter=past"),
-      ]);
-
-      if (upcomingRes.ok) {
-        const data = await upcomingRes.json();
-        setUpcomingEvents(data.events || []);
-      }
-
-      if (pastRes.ok) {
-        const data = await pastRes.json();
-        setPastEvents(data.events || []);
-      }
-    } catch (error) {
-      console.error("운동 목록 로드 실패:", error);
-    } finally {
-      setLoading(false);
+  const { data: pastData, isLoading: pastLoading } = useSWR<{ events: TrainingEvent[] }>(
+    session ? "/api/training-events?filter=past" : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
     }
-  };
+  );
+
+  const upcomingEvents = upcomingData?.events || [];
+  const pastEvents = pastData?.events || [];
+  const loading = upcomingLoading || pastLoading;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -67,22 +64,18 @@ export default function TrainingEventsPage() {
     });
   };
 
+  const events = tab === "upcoming" ? upcomingEvents : pastEvents;
+
   if (loading) {
     return <LoadingSpinner />;
   }
-
-  const events = tab === "upcoming" ? upcomingEvents : pastEvents;
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/my" className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href="/my" />
           <h1 className="text-lg font-semibold text-gray-900">팀 운동</h1>
           {isAdmin ? (
             <Link href="/training/create" className="text-team-500 text-sm font-medium">

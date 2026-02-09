@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { useTeam } from "@/contexts/TeamContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
 import Image from "next/image";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Equipment {
   id: string;
@@ -30,9 +33,7 @@ export default function TeamEquipmentPage() {
   const router = useRouter();
   const { teamData } = useTeam();
   const [activeTab, setActiveTab] = useState<Tab>("equipment");
-  const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [managers, setManagers] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -44,27 +45,26 @@ export default function TeamEquipmentPage() {
   useEffect(() => {
     if (session?.user?.role !== "ADMIN") {
       router.push("/my");
-      return;
     }
-    fetchEquipments();
-  }, [session]);
+  }, [session, router]);
 
-  const fetchEquipments = async () => {
-    try {
-      const res = await fetch("/api/teams/equipment");
-      if (res.ok) {
-        const data = await res.json();
-        setEquipments(data);
+  // SWR로 장비 데이터 페칭
+  const { data: equipments = [], isLoading, mutate: refetchEquipments } = useSWR<Equipment[]>(
+    session?.user?.role === "ADMIN" ? "/api/teams/equipment" : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 120000, // 2분 캐시
+      onSuccess: (data) => {
         // 장비 관리자 목록 추출
-        const managerIds = new Set<string>(data.filter((eq: Equipment) => eq.ownerId).map((eq: Equipment) => eq.ownerId!));
+        const managerIds = new Set<string>(data.filter((eq) => eq.ownerId).map((eq) => eq.ownerId!));
         setManagers(managerIds);
-      }
-    } catch (error) {
-      console.error("장비 조회 실패:", error);
-    } finally {
-      setLoading(false);
+      },
     }
-  };
+  );
+
+  const fetchEquipments = () => refetchEquipments();
 
   const handleAdd = async () => {
     if (!name.trim()) return;
@@ -150,7 +150,7 @@ export default function TeamEquipmentPage() {
   };
 
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import useSWR from "swr";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
@@ -16,6 +17,9 @@ import { timeAgo } from "@/lib/timeAgo";
 import { isCheckInPeriod } from "@/lib/timeUntil";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
+
+// SWR fetcher
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Nudge {
   id: string;
@@ -42,12 +46,7 @@ interface RecentMvp {
 export default function Feed() {
   const { data: session } = useSession();
   const { teamData, loading: teamLoading } = useTeam();
-  const [logs, setLogs] = useState<TrainingLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [nudges, setNudges] = useState<Nudge[]>([]);
-  const [nextEvents, setNextEvents] = useState<TrainingEventSummary[]>([]);
-  const [recentMvp, setRecentMvp] = useState<RecentMvp | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
@@ -56,50 +55,58 @@ export default function Feed() {
   const teamMembers: TeamMember[] = teamData?.members || [];
   const teamLogoUrl = teamData?.logoUrl || null;
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // SWR로 데이터 페칭 (자동 캐싱)
+  const { data: logsData, mutate: mutateLogs } = useSWR<{ logs: TrainingLog[] }>(
+    "/api/training-logs",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000, // 30초 캐시
+    }
+  );
+
+  const { data: nudgesData } = useSWR<{ nudges: Nudge[] }>(
+    "/api/nudges",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  const { data: eventsData, mutate: mutateEvents } = useSWR<{ events: TrainingEventSummary[] }>(
+    "/api/training-events/next",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  const { data: mvpData } = useSWR<{ mvp: RecentMvp | null }>(
+    "/api/pom/recent-mvp",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  const logs = logsData?.logs || [];
+  const nudges = nudgesData?.nudges || [];
+  const nextEvents = eventsData?.events || [];
+  const recentMvp = mvpData?.mvp || null;
 
   // 로그인 후 알림 구독 요청
   useEffect(() => {
     if (session && isSupported && !isSubscribed) {
       subscribe();
     }
-  }, [session, isSupported, isSubscribed]);
+  }, [session, isSupported, isSubscribed, subscribe]);
 
   const fetchData = async () => {
-    try {
-      const [logsRes, nudgesRes, eventRes, mvpRes] = await Promise.all([
-        fetch("/api/training-logs"),
-        fetch("/api/nudges"),
-        fetch("/api/training-events/next"),
-        fetch("/api/pom/recent-mvp"),
-      ]);
-
-      if (logsRes.ok) {
-        const data = await logsRes.json();
-        setLogs(data.logs);
-      }
-
-      if (nudgesRes.ok) {
-        const data = await nudgesRes.json();
-        setNudges(data.nudges || []);
-      }
-
-      if (eventRes.ok) {
-        const data = await eventRes.json();
-        setNextEvents(data.events || []);
-      }
-
-      if (mvpRes.ok) {
-        const data = await mvpRes.json();
-        setRecentMvp(data.mvp || null);
-      }
-    } catch (error) {
-      console.error("데이터 로드 실패:", error);
-    } finally {
-      setLoading(false);
-    }
+    // SWR mutate로 데이터 새로고침
+    await Promise.all([mutateLogs(), mutateEvents()]);
   };
 
   const handleExpand = useCallback((date: string) => {
@@ -118,16 +125,24 @@ export default function Feed() {
     const wasLiked = target.isLiked;
     const prevCount = target._count.likes;
 
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === logId
-          ? {
-              ...log,
-              isLiked: !wasLiked,
-              _count: { ...log._count, likes: wasLiked ? prevCount - 1 : prevCount + 1 },
-            }
-          : log
-      )
+    // SWR mutate로 낙관적 업데이트
+    mutateLogs(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          logs: current.logs.map((log) =>
+            log.id === logId
+              ? {
+                  ...log,
+                  isLiked: !wasLiked,
+                  _count: { ...log._count, likes: wasLiked ? prevCount - 1 : prevCount + 1 },
+                }
+              : log
+          ),
+        };
+      },
+      false // revalidate하지 않음 (낙관적 업데이트만)
     );
 
     try {
@@ -137,46 +152,34 @@ export default function Feed() {
 
       if (res.ok) {
         const data = await res.json();
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === logId
-              ? {
-                  ...log,
-                  isLiked: data.liked,
-                  _count: { ...log._count, likes: data.likeCount },
-                }
-              : log
-          )
+        // 서버 응답으로 최종 업데이트
+        mutateLogs(
+          (current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              logs: current.logs.map((log) =>
+                log.id === logId
+                  ? {
+                      ...log,
+                      isLiked: data.liked,
+                      _count: { ...log._count, likes: data.likeCount },
+                    }
+                  : log
+              ),
+            };
+          },
+          false
         );
         showToast(data.liked ? "좋아요를 눌렀어요" : "좋아요를 취소했어요");
       } else {
         // 실패 시 롤백
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === logId
-              ? {
-                  ...log,
-                  isLiked: wasLiked,
-                  _count: { ...log._count, likes: prevCount },
-                }
-              : log
-          )
-        );
+        mutateLogs();
       }
     } catch (error) {
       console.error("좋아요 실패:", error);
       // 실패 시 롤백
-      setLogs((prev) =>
-        prev.map((log) =>
-          log.id === logId
-            ? {
-                ...log,
-                isLiked: wasLiked,
-                _count: { ...log._count, likes: prevCount },
-              }
-            : log
-        )
-      );
+      mutateLogs();
     }
   };
 
@@ -290,7 +293,8 @@ export default function Feed() {
       isCheckInPeriod(event.date)
   );
 
-  const isLoading = loading || teamLoading;
+  // 초기 로딩 상태 (데이터가 아직 로드되지 않음)
+  const isLoading = !logsData || teamLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">

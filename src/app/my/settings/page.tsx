@@ -61,7 +61,8 @@ export default function SettingsPage() {
     fetcher,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 30000,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
       onSuccess: (data: Profile) => {
         setProfile(data);
         setName(data.name || "");
@@ -178,10 +179,15 @@ export default function SettingsPage() {
           setSuccess("알림이 활성화되었습니다");
         } else {
           // 구체적인 에러 메시지 표시
+          const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+          const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+
           const errorMessages: Record<string, string> = {
-            NOT_SUPPORTED: "이 브라우저는 푸시 알림을 지원하지 않습니다",
+            NOT_SUPPORTED: isIOS && !isPWA
+              ? "iOS에서는 홈 화면에 추가한 후에만 푸시 알림을 사용할 수 있습니다"
+              : "이 브라우저는 푸시 알림을 지원하지 않습니다",
             PERMISSION_DENIED: "알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요",
-            VAPID_KEY_MISSING: "서버 설정 오류 (VAPID 키 누락)",
+            VAPID_KEY_MISSING: "서버 설정 오류입니다. 관리자에게 문의하세요",
             SERVER_ERROR: "서버 구독 실패. 잠시 후 다시 시도해주세요",
             "Service worker timeout": "서비스 워커 준비 시간 초과. 페이지를 새로고침해주세요",
           };

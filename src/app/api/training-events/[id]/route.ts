@@ -135,8 +135,13 @@ export async function PUT(
       data: {
         ...(body.title && { title: body.title }),
         ...(body.isRegular !== undefined && { isRegular: body.isRegular }),
+        ...(body.enablePomVoting !== undefined && { enablePomVoting: body.enablePomVoting }),
+        ...(body.pomVotingDeadline !== undefined && { pomVotingDeadline: body.pomVotingDeadline ? new Date(body.pomVotingDeadline) : null }),
+        ...(body.pomVotesPerPerson !== undefined && { pomVotesPerPerson: body.pomVotesPerPerson }),
         ...(body.date && { date: new Date(body.date) }),
         ...(body.location && { location: body.location }),
+        ...(body.shoes !== undefined && { shoes: Array.isArray(body.shoes) ? body.shoes : [] }),
+        ...(body.notes !== undefined && { notes: body.notes || null }),
         ...(body.uniform !== undefined && { uniform: body.uniform || null }),
         ...(body.vestBringerId !== undefined && { vestBringerId: body.vestBringerId || null }),
         ...(body.vestReceiverId !== undefined && { vestReceiverId: body.vestReceiverId || null }),

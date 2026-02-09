@@ -1,15 +1,20 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
-import { useState, useEffect, use } from "react";
+import { useState, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import useSWR from "swr";
 import ConditionBadge from "@/components/ConditionBadge";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { useTeam } from "@/contexts/TeamContext";
 import MentionTextarea from "@/components/MentionTextarea";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Comment {
   id: string;
@@ -75,8 +80,7 @@ export default function LogDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { data: session } = useSession();
-  const [log, setLog] = useState<TrainingLog | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { teamData } = useTeam(); // TeamContext에서 teamMembers 가져오기
   const [comment, setComment] = useState("");
   const [commentMentions, setCommentMentions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -84,53 +88,38 @@ export default function LogDetailPage({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState("");
   const [editCommentMentions, setEditCommentMentions] = useState<string[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const { toast, showToast, hideToast } = useToast();
 
+  // SWR로 log 데이터 페칭
+  const { data: log, isLoading, mutate } = useSWR<TrainingLog>(
+    `/api/training-logs/${id}`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 120000, // 2분 캐시 (댓글 등 실시간 변경 가능)
+    }
+  );
+
+  const teamMembers = teamData?.members || []; // 중복 API 호출 제거
   const isMyPost = log && session?.user?.id === log.user.id;
   const isAdmin = session?.user?.role === "ADMIN";
-
-  useEffect(() => {
-    fetchLog();
-    fetchTeamMembers();
-  }, [id]);
-
-  const fetchLog = async () => {
-    try {
-      const res = await fetch(`/api/training-logs/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLog(data);
-      }
-    } catch (error) {
-      console.error("로드 실패:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTeamMembers = async () => {
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setTeamMembers(data.members || []);
-      }
-    } catch {
-      // ignore
-    }
-  };
 
   const handleLike = async () => {
     if (!log) return;
 
     const wasLiked = log.isLiked;
     const prevCount = log._count.likes;
-    setLog({
-      ...log,
-      isLiked: !wasLiked,
-      _count: { ...log._count, likes: wasLiked ? prevCount - 1 : prevCount + 1 },
-    });
+
+    // SWR mutate로 낙관적 업데이트
+    mutate(
+      {
+        ...log,
+        isLiked: !wasLiked,
+        _count: { ...log._count, likes: wasLiked ? prevCount - 1 : prevCount + 1 },
+      },
+      false
+    );
 
     try {
       const res = await fetch(`/api/training-logs/${id}/likes`, {
@@ -139,30 +128,21 @@ export default function LogDetailPage({
 
       if (res.ok) {
         const data = await res.json();
-        setLog((prev) =>
-          prev
-            ? {
-                ...prev,
-                isLiked: data.liked,
-                _count: { ...prev._count, likes: data.likeCount },
-              }
-            : null
+        mutate(
+          {
+            ...log,
+            isLiked: data.liked,
+            _count: { ...log._count, likes: data.likeCount },
+          },
+          false
         );
         showToast(data.liked ? "좋아요를 눌렀어요" : "좋아요를 취소했어요");
       } else {
-        setLog((prev) =>
-          prev
-            ? { ...prev, isLiked: wasLiked, _count: { ...prev._count, likes: prevCount } }
-            : null
-        );
+        mutate(); // 롤백
       }
     } catch (error) {
       console.error("좋아요 실패:", error);
-      setLog((prev) =>
-        prev
-          ? { ...prev, isLiked: wasLiked, _count: { ...prev._count, likes: prevCount } }
-          : null
-      );
+      mutate(); // 롤백
     }
   };
 
@@ -185,7 +165,7 @@ export default function LogDetailPage({
 
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim() || submitting) return;
+    if (!comment.trim() || submitting || !log) return;
 
     setSubmitting(true);
     try {
@@ -197,9 +177,7 @@ export default function LogDetailPage({
 
       if (res.ok) {
         const newComment = await res.json();
-        setLog((prev) =>
-          prev ? { ...prev, comments: [...prev.comments, newComment] } : null
-        );
+        mutate({ ...log, comments: [...log.comments, newComment] }, false);
         setComment("");
         setCommentMentions([]);
         showToast("댓글을 남겼어요");
@@ -212,7 +190,7 @@ export default function LogDetailPage({
   };
 
   const handleEditComment = async (commentId: string) => {
-    if (!editCommentContent.trim()) return;
+    if (!editCommentContent.trim() || !log) return;
 
     try {
       const res = await fetch(`/api/training-logs/${id}/comments/${commentId}`, {
@@ -223,15 +201,14 @@ export default function LogDetailPage({
 
       if (res.ok) {
         const updated = await res.json();
-        setLog((prev) =>
-          prev
-            ? {
-                ...prev,
-                comments: prev.comments.map((c) =>
-                  c.id === commentId ? { ...c, content: updated.content, mentions: updated.mentions, updatedAt: updated.updatedAt } : c
-                ),
-              }
-            : null
+        mutate(
+          {
+            ...log,
+            comments: log.comments.map((c) =>
+              c.id === commentId ? { ...c, content: updated.content, mentions: updated.mentions, updatedAt: updated.updatedAt } : c
+            ),
+          },
+          false
         );
         setEditingCommentId(null);
         setEditCommentContent("");
@@ -244,7 +221,7 @@ export default function LogDetailPage({
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!confirm("댓글을 삭제하시겠어요?")) return;
+    if (!confirm("댓글을 삭제하시겠어요?") || !log) return;
 
     try {
       const res = await fetch(`/api/training-logs/${id}/comments/${commentId}`, {
@@ -252,11 +229,7 @@ export default function LogDetailPage({
       });
 
       if (res.ok) {
-        setLog((prev) =>
-          prev
-            ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId) }
-            : null
-        );
+        mutate({ ...log, comments: log.comments.filter((c) => c.id !== commentId) }, false);
         showToast("댓글이 삭제되었어요");
       }
     } catch (error) {
@@ -330,7 +303,7 @@ export default function LogDetailPage({
     return parts.length > 0 ? parts : text;
   };
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -346,16 +319,12 @@ export default function LogDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-28">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <Link href="/" className="text-gray-500 hover:text-gray-700 mr-4">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </Link>
+          <div className="flex items-center gap-3">
+            <BackButton href="/" />
             <h1 className="text-lg font-semibold text-gray-900">운동 일지</h1>
           </div>
           {(isMyPost || isAdmin) && (
@@ -654,7 +623,7 @@ export default function LogDetailPage({
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
         <form
           onSubmit={handleComment}
-          className="max-w-lg mx-auto px-4 py-3 flex gap-2 items-end"
+          className="max-w-lg mx-auto px-4 py-4 flex gap-2 items-end"
         >
           <div className="flex-1">
             <MentionTextarea
@@ -666,14 +635,14 @@ export default function LogDetailPage({
               teamMembers={teamMembers}
               placeholder="댓글을 입력하세요..."
               rows={2}
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
               dropdownPosition="top"
             />
           </div>
           <button
             type="submit"
             disabled={!comment.trim() || submitting}
-            className="px-4 py-2 bg-team-500 text-white rounded-full font-medium disabled:opacity-50 flex-shrink-0"
+            className="h-10 px-5 bg-team-500 text-white rounded-full text-sm font-medium disabled:opacity-50 flex-shrink-0"
           >
             {submitting ? "..." : "등록"}
           </button>

@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
+import { useTeam } from "@/contexts/TeamContext";
 import BackButton from "@/components/BackButton";
 import LoadingSpinner from "@/components/LoadingSpinner";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface MemberOption {
   id: string;
@@ -30,12 +34,12 @@ interface EventData {
 
 export default function TrainingEditPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { teamData } = useTeam();
   const [eventId, setEventId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [members, setMembers] = useState<MemberOption[]>([]);
-  const [event, setEvent] = useState<EventData | null>(null);
+
+  const members = teamData?.members || [];
 
   const [title, setTitle] = useState("");
   const [isRegular, setIsRegular] = useState(true);
@@ -58,20 +62,15 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
     params.then((p) => setEventId(p.id));
   }, [params]);
 
-  useEffect(() => {
-    if (eventId) {
-      fetchEvent();
-      fetchMembers();
-    }
-  }, [eventId]);
-
-  const fetchEvent = async () => {
-    try {
-      const res = await fetch(`/api/training-events/${eventId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEvent(data);
-
+  // SWR로 event 데이터 페칭
+  const { data: event, isLoading } = useSWR<EventData>(
+    eventId ? `/api/training-events/${eventId}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 120000, // 2분 캐시
+      onSuccess: (data) => {
         // 폼 데이터 설정
         setTitle(data.title || "");
         setIsRegular(data.isRegular);
@@ -105,25 +104,12 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
           setPomVotingDeadlineDate(defaultPomDeadline.toISOString().split("T")[0]);
           setPomVotingDeadlineTime(defaultPomDeadline.toTimeString().slice(0, 5));
         }
-      }
-    } catch {
-      setError("운동 정보를 불러오지 못했습니다");
-    } finally {
-      setLoading(false);
+      },
+      onError: () => {
+        setError("운동 정보를 불러오지 못했습니다");
+      },
     }
-  };
-
-  const fetchMembers = async () => {
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data.members || []);
-      }
-    } catch {
-      // ignore
-    }
-  };
+  );
 
   const toggleShoe = (shoe: string) => {
     setShoes((prev) =>
@@ -170,7 +156,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
         throw new Error(data.error || "저장에 실패했습니다");
       }
 
-      router.push(`/training/${eventId}/manage`);
+      router.push(`/training/${eventId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
     } finally {
@@ -178,7 +164,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
@@ -194,7 +180,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <BackButton href={`/training/${eventId}/manage`} />
+          <BackButton href={`/training/${eventId}`} />
           <h1 className="text-lg font-semibold text-gray-900">운동 정보 수정</h1>
           <div className="w-6" />
         </div>

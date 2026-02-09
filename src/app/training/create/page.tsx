@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
+import BackButton from "@/components/BackButton";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface MemberOption {
   id: string;
@@ -22,11 +28,15 @@ interface VenueOption {
 export default function TrainingCreatePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [members, setMembers] = useState<MemberOption[]>([]);
+  const { toast, showToast, hideToast } = useToast();
 
   const [title, setTitle] = useState("");
   const [isRegular, setIsRegular] = useState(true);
+  const [enablePomVoting, setEnablePomVoting] = useState(true);
+  const [pomVotingDeadlineDate, setPomVotingDeadlineDate] = useState("");
+  const [pomVotingDeadlineTime, setPomVotingDeadlineTime] = useState("22:00");
+  const [pomVotesPerPerson, setPomVotesPerPerson] = useState(1);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("14:00");
   const [location, setLocation] = useState("");
@@ -38,30 +48,24 @@ export default function TrainingCreatePage() {
   const [rsvpDeadlineDate, setRsvpDeadlineDate] = useState("");
   const [rsvpDeadlineTime, setRsvpDeadlineTime] = useState("22:00");
 
-  const [vestLoading, setVestLoading] = useState(true);
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [showVenueList, setShowVenueList] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<VenueOption | null>(null);
 
-  useEffect(() => {
-    fetchVestSuggestion();
-  }, []);
-
-  const fetchVestSuggestion = async () => {
-    try {
-      const res = await fetch("/api/training-events/vest-suggestion");
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data.members || []);
-        if (data.bringer) setVestBringerId(data.bringer.id);
-        if (data.receiver) setVestReceiverId(data.receiver.id);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setVestLoading(false);
-    }
-  };
+  // SWR로 조끼 당번 추천 캐싱
+  const { data: vestData, isLoading: vestLoading } = useSWR<{
+    members: MemberOption[];
+    bringer: { id: string } | null;
+    receiver: { id: string } | null;
+  }>("/api/training-events/vest-suggestion", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+    onSuccess: (data) => {
+      setMembers(data.members || []);
+      if (data.bringer) setVestBringerId(data.bringer.id);
+      if (data.receiver) setVestReceiverId(data.receiver.id);
+    },
+  });
 
   const searchVenues = async (query: string) => {
     if (!query.trim()) {
@@ -105,11 +109,17 @@ export default function TrainingCreatePage() {
   const handleSubmit = async () => {
     if (!isFormComplete) return;
     setLoading(true);
-    setError("");
 
     try {
       const dateTime = new Date(`${date}T${time}:00`);
       const rsvpDeadline = new Date(`${rsvpDeadlineDate}T${rsvpDeadlineTime}:00`);
+
+      // POM 투표 마감 시간: 설정하지 않았으면 운동 시작 2시간 후가 기본값
+      const pomVotingDeadline = enablePomVoting
+        ? pomVotingDeadlineDate && pomVotingDeadlineTime
+          ? new Date(`${pomVotingDeadlineDate}T${pomVotingDeadlineTime}:00`).toISOString()
+          : new Date(dateTime.getTime() + 2 * 60 * 60 * 1000).toISOString()
+        : null;
 
       const res = await fetch("/api/training-events", {
         method: "POST",
@@ -117,6 +127,9 @@ export default function TrainingCreatePage() {
         body: JSON.stringify({
           title,
           isRegular,
+          enablePomVoting,
+          pomVotingDeadline,
+          pomVotesPerPerson: enablePomVoting ? pomVotesPerPerson : 0,
           date: dateTime.toISOString(),
           location,
           shoes,
@@ -134,11 +147,13 @@ export default function TrainingCreatePage() {
       }
 
       const event = await res.json();
-      router.push(`/training/${event.id}`);
+
+      // 성공 토스트 표시 후 네비게이션
+      showToast("팀 운동이 생성되었습니다");
+      setTimeout(() => router.push(`/training/${event.id}`), 500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다");
-    } finally {
-      setLoading(false);
+      showToast(err instanceof Error ? err.message : "오류가 발생했습니다");
+      setLoading(false); // 에러 시에만 loading 해제
     }
   };
 
@@ -146,11 +161,7 @@ export default function TrainingCreatePage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href="/" />
           <h1 className="text-lg font-semibold text-gray-900">팀 운동</h1>
           <div className="w-6" />
         </div>
@@ -182,6 +193,61 @@ export default function TrainingCreatePage() {
               />
             </button>
           </div>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div>
+              <span className="text-sm font-medium text-gray-700">MVP 투표</span>
+              <p className="text-xs text-gray-400 mt-0.5">체크인한 사람들 대상 투표</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEnablePomVoting(!enablePomVoting)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${enablePomVoting ? "bg-team-500" : "bg-gray-300"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${enablePomVoting ? "translate-x-5" : ""}`}
+              />
+            </button>
+          </div>
+
+          {/* POM 투표 설정 */}
+          {enablePomVoting && (
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">투표 마감 날짜 (선택)</label>
+                <input
+                  type="date"
+                  value={pomVotingDeadlineDate}
+                  onChange={(e) => setPomVotingDeadlineDate(e.target.value)}
+                  placeholder="비워두면 운동 2시간 후"
+                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                />
+                <p className="text-xs text-gray-400 mt-1">비워두면 운동 시작 2시간 후로 자동 설정됩니다</p>
+              </div>
+              {pomVotingDeadlineDate && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">투표 마감 시간</label>
+                  <input
+                    type="time"
+                    value={pomVotingDeadlineTime}
+                    onChange={(e) => setPomVotingDeadlineTime(e.target.value)}
+                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">1인당 투표 가능 인원</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={pomVotesPerPerson}
+                  onChange={(e) => setPomVotesPerPerson(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                />
+                <p className="text-xs text-gray-400 mt-1">최소 1명, 최대 10명</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 운동 날짜/시간 */}
@@ -369,7 +435,6 @@ export default function TrainingCreatePage() {
           />
         </div>
 
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
       </main>
 
       {isFormComplete && (
@@ -385,6 +450,13 @@ export default function TrainingCreatePage() {
           </div>
         </div>
       )}
+
+      {/* 토스트 */}
+      <Toast
+        message={toast?.message || ""}
+        visible={!!toast}
+        onHide={hideToast}
+      />
     </div>
   );
 }

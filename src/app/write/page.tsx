@@ -4,10 +4,16 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
+import { useTeam } from "@/contexts/TeamContext";
 import ConditionPicker from "@/components/ConditionPicker";
 import MentionTextarea from "@/components/MentionTextarea";
 import BackButton from "@/components/BackButton";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 import { getConditionLevel, getConditionColor } from "@/lib/condition";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function WritePage() {
   return (
@@ -32,27 +38,29 @@ function WritePageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(isEditMode);
-  const [error, setError] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const { toast, showToast, hideToast } = useToast();
 
   const [showConditionPicker, setShowConditionPicker] = useState(false);
-  const [teamMembers, setTeamMembers] = useState<
-    Array<{
-      id: string;
-      name: string | null;
-      position: string | null;
-      number: number | null;
-    }>
-  >([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<
-    Array<{
+
+  // TeamContext에서 팀원 목록 가져오기
+  const { teamData } = useTeam();
+  const teamMembers = teamData?.members || [];
+
+  // SWR로 예정된 팀 운동 목록 캐싱
+  const { data: eventsData } = useSWR<{
+    events: Array<{
       id: string;
       title: string;
       date: string;
       location: string;
-    }>
-  >([]);
+    }>;
+  }>("/api/training-events/next?includeToday=true", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  });
+  const upcomingEvents = eventsData?.events || [];
   const [formData, setFormData] = useState<{
     logType: "team" | "personal";
     trainingEventId: string | null;
@@ -96,10 +104,10 @@ function WritePageContent() {
             setImagePreview(data.imageUrl);
           }
         } else {
-          setError("일지를 불러올 수 없습니다");
+          showToast("일지를 불러올 수 없습니다");
         }
       } catch {
-        setError("일지를 불러올 수 없습니다");
+        showToast("일지를 불러올 수 없습니다");
       } finally {
         setLoadingData(false);
       }
@@ -107,40 +115,6 @@ function WritePageContent() {
 
     fetchLog();
   }, [editId]);
-
-  // 팀원 목록 로드
-  useEffect(() => {
-    const fetchTeamMembers = async () => {
-      try {
-        const res = await fetch("/api/teams");
-        if (res.ok) {
-          const data = await res.json();
-          setTeamMembers(data.members || []);
-        }
-      } catch {
-        // 팀원 목록 로드 실패 시 무시 (멘션 기능만 사용 불가)
-      }
-    };
-
-    fetchTeamMembers();
-  }, []);
-
-  // 예정된 팀 운동 목록 로드 (오늘 0시 이후 포함)
-  useEffect(() => {
-    const fetchUpcomingEvents = async () => {
-      try {
-        const res = await fetch("/api/training-events/next?includeToday=true");
-        if (res.ok) {
-          const data = await res.json();
-          setUpcomingEvents(data.events || []);
-        }
-      } catch {
-        // 팀 운동 목록 로드 실패 시 무시
-      }
-    };
-
-    fetchUpcomingEvents();
-  }, []);
 
   const isFormComplete =
     (formData.logType === "team" || formData.title.trim() !== "") &&
@@ -154,18 +128,17 @@ function WritePageContent() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError("이미지는 5MB 이하만 가능합니다");
+      showToast("이미지는 5MB 이하만 가능합니다");
       return;
     }
 
     if (!file.type.startsWith("image/")) {
-      setError("이미지 파일만 업로드 가능합니다");
+      showToast("이미지 파일만 업로드 가능합니다");
       return;
     }
 
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
-    setError("");
   };
 
   const removeImage = () => {
@@ -177,7 +150,6 @@ function WritePageContent() {
   const handleSubmit = async () => {
     if (!isFormComplete) return;
     setLoading(true);
-    setError("");
 
     try {
       if (isEditMode) {
@@ -193,7 +165,9 @@ function WritePageContent() {
           throw new Error(data.error || "수정에 실패했습니다");
         }
 
-        router.replace("/");
+        // 성공 토스트 표시 후 네비게이션
+        showToast("일지가 수정되었습니다");
+        setTimeout(() => router.replace("/"), 500);
       } else {
         // 신규 작성: POST
         let imageUrl = null;
@@ -227,13 +201,14 @@ function WritePageContent() {
           throw new Error(data.error || "작성에 실패했습니다");
         }
 
-        router.replace("/");
+        // 성공 토스트 표시 후 네비게이션
+        showToast("일지가 작성되었습니다");
+        setTimeout(() => router.replace("/"), 500);
       }
     } catch (err) {
       console.error("일지 제출 오류:", err);
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다");
-    } finally {
-      setLoading(false);
+      showToast(err instanceof Error ? err.message : "오류가 발생했습니다");
+      setLoading(false); // 에러 시에만 loading 해제
     }
   };
 
@@ -547,9 +522,6 @@ function WritePageContent() {
           </div>
         )}
 
-        {error && (
-          <p className="text-red-500 text-sm text-center">{error}</p>
-        )}
       </main>
 
       {/* 하단 제출 CTA */}
@@ -577,6 +549,13 @@ function WritePageContent() {
           onClose={() => setShowConditionPicker(false)}
         />
       )}
+
+      {/* 토스트 */}
+      <Toast
+        message={toast?.message || ""}
+        visible={!!toast}
+        onHide={hideToast}
+      />
     </div>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
 
 interface TrainingEventItem {
   id: string;
@@ -15,35 +17,33 @@ interface TrainingEventItem {
   _count: { rsvps: number };
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function MyTrainingPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [trainingEvents, setTrainingEvents] = useState<TrainingEventItem[]>([]);
 
+  // 권한 체크
   useEffect(() => {
-    if (session?.user?.role !== "ADMIN") {
+    if (session && session.user?.role !== "ADMIN") {
       router.push("/my");
-      return;
     }
-    fetchTrainingEvents();
-  }, [session]);
+  }, [session, router]);
 
-  const fetchTrainingEvents = async () => {
-    try {
-      const res = await fetch("/api/training-events");
-      if (res.ok) {
-        const data = await res.json();
-        setTrainingEvents(data.events || []);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
+  // SWR로 데이터 페칭
+  const { data: eventsData, isLoading } = useSWR<{ events: TrainingEventItem[] }>(
+    session?.user?.role === "ADMIN" ? "/api/training-events" : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
     }
-  };
+  );
 
-  if (loading) {
+  const trainingEvents = eventsData?.events || [];
+
+  if (isLoading || !session) {
     return <LoadingSpinner />;
   }
 
@@ -52,11 +52,7 @@ export default function MyTrainingPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/my" className="text-gray-500 hover:text-gray-700">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
+          <BackButton href="/my" />
           <h1 className="text-lg font-semibold text-gray-900">팀 운동 관리</h1>
           <Link
             href="/training/create"
