@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/training-event";
 import PomVoting from "@/components/PomVoting";
-import ConditionBadge from "@/components/ConditionBadge";
 
 export default function TrainingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -132,11 +131,12 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
   const isAdmin = session?.user?.role === "ADMIN";
   const isDeadlinePassed = new Date() > new Date(event.rsvpDeadline);
 
-  // 체크인 가능 시간: 운동 시작 2시간 전 ~ 운동 시작 시간까지
+  // 체크인 가능 시간: 운동 시작 2시간 전 ~ 운동 시작 2시간 후까지
   const now = new Date();
   const eventDate = new Date(event.date);
   const twoHoursBefore = new Date(eventDate.getTime() - 2 * 60 * 60 * 1000);
-  const canCheckIn = now >= twoHoursBefore && now <= eventDate;
+  const twoHoursAfter = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000);
+  const canCheckIn = now >= twoHoursBefore && now <= twoHoursAfter;
 
   const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -334,108 +334,248 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
           {showAttendance && (
             <>
-          {/* 내 응답 표시 및 수정 */}
-          {event.myRsvp && !isDeadlinePassed && (
-            <div className="mb-4 p-3 border border-gray-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">내 응답</span>
-                  <span className={`text-sm font-semibold ${
-                    event.myRsvp === "ATTEND" ? "text-green-600" :
-                    event.myRsvp === "ABSENT" ? "text-red-600" : "text-yellow-600"
-                  }`}>
-                    {event.myRsvp === "ATTEND" ? "✅ 참석" : event.myRsvp === "ABSENT" ? "❌ 불참" : "⏰ 늦참"}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowEditRsvp(!showEditRsvp)}
-                  className="text-xs text-team-600 hover:text-team-700 font-medium px-2 py-1"
-                >
-                  {showEditRsvp ? "취소" : "수정"}
-                </button>
-              </div>
-
-              {showEditRsvp && (
-                <div className="space-y-2 pt-3 mt-3 border-t border-gray-100">
-                  <div className="flex gap-2">
-                    {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-                      const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
-                      const colors = {
-                        ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
-                        ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
-                        LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
-                      };
-                      return (
-                        <button
-                          key={s}
-                          onClick={() => {
-                            if (s === "ATTEND") {
-                              handleRsvp("ATTEND");
-                              setShowEditRsvp(false);
-                            } else {
-                              setRsvpStatus(s);
-                            }
-                          }}
-                          disabled={submitting}
-                          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${colors[s]}`}
-                        >
-                          {labels[s]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        placeholder="사유를 입력해주세요"
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
-                      />
-                      <button
-                        onClick={() => {
-                          handleRsvp(rsvpStatus);
-                          setShowEditRsvp(false);
-                        }}
-                        disabled={!reason.trim() || submitting}
-                        className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                      >
-                        {submitting ? "전송 중..." : "응답 수정"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           {attendees.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs font-medium text-green-600 mb-1">✅ 참석 ({attendees.length}명)</div>
-              <p className="text-sm text-gray-700">
-                {attendees.map((r: RsvpEntry) => r.user.name || "이름 없음").join(", ")}
-              </p>
+              <div className="text-xs font-medium text-green-600 mb-2">✅ 참석 ({attendees.length}명)</div>
+              <div className="space-y-2">
+                {attendees.map((r: RsvpEntry) => {
+                  const isMe = r.user.id === session?.user?.id;
+                  return (
+                    <div key={r.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-700">
+                          {r.user.name || "이름 없음"}
+                          {isMe && <span className="ml-1 text-xs text-team-600 font-medium">(나)</span>}
+                        </span>
+                        {isMe && !isDeadlinePassed && (
+                          <button
+                            onClick={() => setShowEditRsvp(!showEditRsvp)}
+                            className="text-xs text-team-600 hover:text-team-700 font-medium underline"
+                          >
+                            수정
+                          </button>
+                        )}
+                      </div>
+                      {isMe && showEditRsvp && (
+                        <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
+                          <div className="flex gap-2">
+                            {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
+                              const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                              const colors = {
+                                ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
+                                ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
+                                LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
+                              };
+                              return (
+                                <button
+                                  key={s}
+                                  onClick={() => {
+                                    if (s === "ATTEND") {
+                                      handleRsvp("ATTEND");
+                                      setShowEditRsvp(false);
+                                    } else {
+                                      setRsvpStatus(s);
+                                    }
+                                  }}
+                                  disabled={submitting}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${colors[s]}`}
+                                >
+                                  {labels[s]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
+                            <div className="space-y-2">
+                              <textarea
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="사유를 입력해주세요"
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  handleRsvp(rsvpStatus);
+                                  setShowEditRsvp(false);
+                                }}
+                                disabled={!reason.trim() || submitting}
+                                className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                              >
+                                {submitting ? "전송 중..." : "응답 수정"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           {absentees.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs font-medium text-red-600 mb-1">❌ 불참 ({absentees.length}명)</div>
-              {absentees.map((r: RsvpEntry) => (
-                <p key={r.id} className="text-sm text-gray-700">
-                  {r.user.name || "이름 없음"} — <span className="text-gray-500">{r.reason}</span>
-                </p>
-              ))}
+              <div className="text-xs font-medium text-red-600 mb-2">❌ 불참 ({absentees.length}명)</div>
+              <div className="space-y-2">
+                {absentees.map((r: RsvpEntry) => {
+                  const isMe = r.user.id === session?.user?.id;
+                  return (
+                    <div key={r.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-700">
+                          {r.user.name || "이름 없음"}
+                          {isMe && <span className="ml-1 text-xs text-team-600 font-medium">(나)</span>}
+                          {" — "}
+                          <span className="text-gray-500">{r.reason}</span>
+                        </span>
+                        {isMe && !isDeadlinePassed && (
+                          <button
+                            onClick={() => setShowEditRsvp(!showEditRsvp)}
+                            className="text-xs text-team-600 hover:text-team-700 font-medium underline ml-auto"
+                          >
+                            수정
+                          </button>
+                        )}
+                      </div>
+                      {isMe && showEditRsvp && (
+                        <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
+                          <div className="flex gap-2">
+                            {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
+                              const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                              const colors = {
+                                ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
+                                ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
+                                LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
+                              };
+                              return (
+                                <button
+                                  key={s}
+                                  onClick={() => {
+                                    if (s === "ATTEND") {
+                                      handleRsvp("ATTEND");
+                                      setShowEditRsvp(false);
+                                    } else {
+                                      setRsvpStatus(s);
+                                    }
+                                  }}
+                                  disabled={submitting}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${colors[s]}`}
+                                >
+                                  {labels[s]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
+                            <div className="space-y-2">
+                              <textarea
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="사유를 입력해주세요"
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  handleRsvp(rsvpStatus);
+                                  setShowEditRsvp(false);
+                                }}
+                                disabled={!reason.trim() || submitting}
+                                className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                              >
+                                {submitting ? "전송 중..." : "응답 수정"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           {lateComers.length > 0 && (
             <div className="mb-3">
-              <div className="text-xs font-medium text-yellow-600 mb-1">⏰ 늦참 ({lateComers.length}명)</div>
-              {lateComers.map((r: RsvpEntry) => (
-                <p key={r.id} className="text-sm text-gray-700">
-                  {r.user.name || "이름 없음"} — <span className="text-gray-500">{r.reason}</span>
-                </p>
-              ))}
+              <div className="text-xs font-medium text-yellow-600 mb-2">⏰ 늦참 ({lateComers.length}명)</div>
+              <div className="space-y-2">
+                {lateComers.map((r: RsvpEntry) => {
+                  const isMe = r.user.id === session?.user?.id;
+                  return (
+                    <div key={r.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-700">
+                          {r.user.name || "이름 없음"}
+                          {isMe && <span className="ml-1 text-xs text-team-600 font-medium">(나)</span>}
+                          {" — "}
+                          <span className="text-gray-500">{r.reason}</span>
+                        </span>
+                        {isMe && !isDeadlinePassed && (
+                          <button
+                            onClick={() => setShowEditRsvp(!showEditRsvp)}
+                            className="text-xs text-team-600 hover:text-team-700 font-medium underline ml-auto"
+                          >
+                            수정
+                          </button>
+                        )}
+                      </div>
+                      {isMe && showEditRsvp && (
+                        <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
+                          <div className="flex gap-2">
+                            {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
+                              const labels = { ATTEND: "참석", ABSENT: "불참", LATE: "늦참" };
+                              const colors = {
+                                ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
+                                ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
+                                LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
+                              };
+                              return (
+                                <button
+                                  key={s}
+                                  onClick={() => {
+                                    if (s === "ATTEND") {
+                                      handleRsvp("ATTEND");
+                                      setShowEditRsvp(false);
+                                    } else {
+                                      setRsvpStatus(s);
+                                    }
+                                  }}
+                                  disabled={submitting}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${colors[s]}`}
+                                >
+                                  {labels[s]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
+                            <div className="space-y-2">
+                              <textarea
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="사유를 입력해주세요"
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  handleRsvp(rsvpStatus);
+                                  setShowEditRsvp(false);
+                                }}
+                                disabled={!reason.trim() || submitting}
+                                className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                              >
+                                {submitting ? "전송 중..." : "응답 수정"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
             </>
@@ -536,54 +676,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
-        {/* 훈련 일지 */}
-        {event.trainingLogs && event.trainingLogs.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">팀원들의 훈련 일지 ({event.trainingLogs.length})</h3>
-            <div className="space-y-3">
-              {event.trainingLogs.map((log: any) => (
-                <Link
-                  key={log.id}
-                  href={`/log/${log.id}`}
-                  className="block border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start gap-3">
-                    {/* 사용자 정보 */}
-                    <div className="flex-shrink-0">
-                      {log.user.image ? (
-                        <img src={log.user.image} alt={log.user.name || ""} className="w-10 h-10 rounded-full" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-gray-500 text-xs">👤</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 일지 내용 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-gray-900">{log.user.name || "익명"}</span>
-                        <ConditionBadge condition={log.condition} />
-                      </div>
-                      <p className="text-xs text-gray-500 line-clamp-2">{log.conditionReason}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                        <span>❤️ {log.likes.length}</span>
-                        <span>💬 {log.comments.length}</span>
-                      </div>
-                    </div>
-
-                    {/* 사진 썸네일 */}
-                    {log.imageUrl && (
-                      <div className="flex-shrink-0">
-                        <img src={log.imageUrl} alt="일지 사진" className="w-16 h-16 rounded object-cover" />
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* 훈련 일지는 피드에서 확인 가능 - 성능 최적화를 위해 제거 */}
 
       </main>
     </div>

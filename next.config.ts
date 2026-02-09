@@ -20,48 +20,10 @@ const nextConfig: NextConfig = {
 
 const config = withPWA({
   dest: "public",
-  disable: process.env.NODE_ENV === "development",
-  register: true,
+  disable: true, // Custom SW를 직접 관리하므로 PWA 플러그인 비활성화
+  register: false,
   workboxOptions: {
     disableDevLogs: true,
-    skipWaiting: true,
-    clientsClaim: true,
-    runtimeCaching: [
-      {
-        urlPattern: /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/.*/i,
-        handler: "CacheFirst",
-        options: {
-          cacheName: "google-fonts",
-          expiration: {
-            maxEntries: 4,
-            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
-          },
-        },
-      },
-      {
-        urlPattern: /^https:\/\/dssyfyurslaopejnioqx\.supabase\.co\/.*/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "supabase-images",
-          expiration: {
-            maxEntries: 64,
-            maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
-          },
-        },
-      },
-      {
-        urlPattern: /\/api\/.*/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-cache",
-          networkTimeoutSeconds: 10,
-          expiration: {
-            maxEntries: 16,
-            maxAgeSeconds: 24 * 60 * 60, // 1 day
-          },
-        },
-      },
-    ],
   },
 })(nextConfig);
 

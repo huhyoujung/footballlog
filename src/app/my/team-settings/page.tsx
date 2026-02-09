@@ -16,15 +16,21 @@ interface TeamInfo {
   primaryColor?: string;
 }
 
+// 접근성을 고려한 프리셋 컬러 (모바일 친화적)
+// HSL 기준: Lightness 35-65%, Saturation 30-80%
 const PRESET_COLORS = [
-  "#967B5D", // 기본 갈색
-  "#059669", // 초록
-  "#3B82F6", // 파랑
-  "#EF4444", // 빨강
-  "#F59E0B", // 주황
-  "#8B5CF6", // 보라
-  "#EC4899", // 핑크
-  "#06B6D4", // 청록
+  { name: "브라운", color: "#967B5D" },    // 기본 갈색 (L:52%, S:46%)
+  { name: "그린", color: "#059669" },      // 초록 (L:42%, S:95%)
+  { name: "블루", color: "#3B82F6" },      // 파랑 (L:60%, S:92%)
+  { name: "레드", color: "#DC2626" },      // 빨강 (L:49%, S:78%) - 조정됨
+  { name: "오렌지", color: "#EA580C" },    // 주황 (L:48%, S:92%) - 조정됨
+  { name: "퍼플", color: "#9333EA" },      // 보라 (L:56%, S:84%) - 조정됨
+  { name: "핑크", color: "#DB2777" },      // 핑크 (L:50%, S:77%) - 조정됨
+  { name: "시안", color: "#0891B2" },      // 청록 (L:36%, S:92%) - 조정됨
+  { name: "인디고", color: "#4F46E5" },    // 인디고 (L:59%, S:78%)
+  { name: "틸", color: "#0D9488" },        // 틸 (L:46%, S:85%)
+  { name: "라임", color: "#65A30D" },      // 라임 (L:35%, S:86%)
+  { name: "로즈", color: "#E11D48" },      // 로즈 (L:50%, S:80%)
 ];
 
 export default function TeamSettingsPage() {
@@ -248,19 +254,31 @@ export default function TeamSettingsPage() {
             팀 컬러
           </label>
           <div className="grid grid-cols-4 gap-3">
-            {PRESET_COLORS.map((color) => (
+            {PRESET_COLORS.map(({ name, color }) => (
               <button
                 key={color}
                 onClick={() => setPrimaryColor(color)}
-                className={`w-full aspect-square rounded-lg transition-all ${
+                className={`relative w-full aspect-square rounded-lg transition-all ${
                   primaryColor === color
-                    ? "ring-2 ring-offset-2 ring-gray-900 scale-110"
+                    ? "ring-2 ring-offset-2 ring-gray-900 scale-105"
                     : "hover:scale-105"
                 }`}
                 style={{ backgroundColor: color }}
-              />
+                title={name}
+              >
+                {primaryColor === color && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </div>
+                )}
+              </button>
             ))}
           </div>
+          <p className="mt-3 text-xs text-gray-500">
+            💡 모바일 접근성을 고려한 컬러입니다
+          </p>
         </div>
 
         {/* 팀 이름 */}

@@ -324,7 +324,12 @@ export default function Feed() {
         <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
           <div className={`flex gap-3 ${checkInEvents.length === 1 ? '' : 'w-max'}`}>
             {checkInEvents.map((event) => (
-              <TrainingCheckInCard key={event.id} event={event} />
+              <TrainingCheckInCard
+                key={event.id}
+                event={event}
+                onCheckInSuccess={fetchData}
+                onShowToast={showToast}
+              />
             ))}
           </div>
         </div>

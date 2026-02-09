@@ -8,6 +8,38 @@ export default function PWAManager() {
   const { data: session } = useSession();
   const { injectManifest, injectFavicon } = usePWA();
 
+  // Service Worker 등록
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator
+    ) {
+      navigator.serviceWorker
+        .register("/custom-sw.js", { scope: "/" })
+        .then((registration) => {
+          console.log("[PWA] Service Worker registered:", registration);
+
+          // 업데이트 확인
+          registration.addEventListener("updatefound", () => {
+            const newWorker = registration.installing;
+            console.log("[PWA] New service worker found");
+
+            newWorker?.addEventListener("statechange", () => {
+              if (
+                newWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                console.log("[PWA] New version available");
+              }
+            });
+          });
+        })
+        .catch((error) => {
+          console.error("[PWA] Service Worker registration failed:", error);
+        });
+    }
+  }, []);
+
   useEffect(() => {
     const setupPWA = async () => {
       // 팀 정보 fetch

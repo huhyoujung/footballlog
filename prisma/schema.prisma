@@ -296,6 +296,7 @@ model CheckIn {
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, userId])
+  @@index([trainingEventId])
 }
 
 model LateFee {
@@ -311,6 +312,7 @@ model LateFee {
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, userId])
+  @@index([trainingEventId])
 }
 
 model TrainingSession {
@@ -338,6 +340,7 @@ model SessionTeamAssignment {
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingSessionId, userId])
+  @@index([trainingSessionId])
 }
 
 // === 장비 관리 ===
@@ -373,6 +376,7 @@ model EquipmentAssignment {
   user          User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([trainingEventId, equipmentId])
+  @@index([trainingEventId])
 }
 
 // === POM (Player of the Match) ===
@@ -390,4 +394,6 @@ model PomVote {
   nominee       User          @relation("PomNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, voterId]) // 한 이벤트당 1인 1표
+  @@index([trainingEventId])
+  @@index([nomineeId])
 }

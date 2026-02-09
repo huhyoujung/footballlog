@@ -31,19 +31,19 @@ function generateStackConfigs(date: string) {
     {
       top: 10 + rand(10),
       left: -12 + rand(8),
-      rotation: -7 + rand(4),
+      rotation: -12 + rand(10),
       zIndex: 1,
     },
     {
       top: 3 + rand(8),
       left: 4 + rand(14),
-      rotation: 1 + rand(5),
+      rotation: 2 + rand(10),
       zIndex: 2,
     },
     {
       top: rand(4),
       left: -2 + rand(6),
-      rotation: -2 + rand(3),
+      rotation: -8 + rand(8),
       zIndex: 3,
     },
   ];
@@ -95,7 +95,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
         })}
       </div>
       <div
-        className="mt-2 text-center stack-card"
+        className="mt-1 text-center stack-card"
         style={{ opacity: isExpanding ? 0 : 1 }}
       >
         <p className="text-sm font-semibold text-team-500">{displayDate}</p>

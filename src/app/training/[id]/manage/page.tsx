@@ -70,6 +70,15 @@ interface EquipmentWithAssignment {
   } | null;
 }
 
+interface EquipmentAssignmentEntry {
+  id: string;
+  equipmentId: string;
+  userId: string | null;
+  memo: string | null;
+  equipment: { id: string; name: string; description: string | null };
+  user: User | null;
+}
+
 interface EventDetail {
   id: string;
   title: string;
@@ -79,6 +88,7 @@ interface EventDetail {
   checkIns: CheckInEntry[];
   lateFees: LateFeeEntry[];
   sessions: SessionEntry[];
+  equipmentAssignments: EquipmentAssignmentEntry[];
 }
 
 type Tab = "attendance" | "latefee" | "session" | "equipment";
@@ -131,6 +141,10 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
   const [draggedUser, setDraggedUser] = useState<{ userId: string; userName: string; fromTeam: string } | null>(null);
 
+  // 팀 배정 알림 상태
+  const [teamAssignmentNotified, setTeamAssignmentNotified] = useState(false);
+  const [lastSavedTeamAssignments, setLastSavedTeamAssignments] = useState<string>("");
+
   // 터치 드래그 상태
   const [touchDragUser, setTouchDragUser] = useState<{ userId: string; userName: string; fromTeam: string; sessionId: string } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ sessionId: string; teamLabel: string } | null>(null);
@@ -156,6 +170,9 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
   const [equipments, setEquipments] = useState<EquipmentWithAssignment[]>([]);
   const [equipmentAssignments, setEquipmentAssignments] = useState<Record<string, { userId: string | null; memo: string }>>({});
   const [savingEquipment, setSavingEquipment] = useState(false);
+  const [touchDragEquipment, setTouchDragEquipment] = useState<{ equipmentId: string; name: string } | null>(null);
+  const [touchDragEquipmentPosition, setTouchDragEquipmentPosition] = useState<{ x: number; y: number } | null>(null);
+  const [equipmentDropTarget, setEquipmentDropTarget] = useState<string | null>(null);
 
   useEffect(() => {
     params.then((p) => setEventId(p.id));
@@ -200,7 +217,7 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
 
   const fetchEvent = async () => {
     try {
-      const res = await fetch(`/api/training-events/${eventId}`);
+      const res = await fetch(`/api/training-events/${eventId}?includeManagement=true`);
       if (res.ok) {
         const data = await res.json();
         setEvent(data);
@@ -297,6 +314,47 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
     }));
   };
 
+  // 장비 터치 드래그 핸들러
+  const handleEquipmentTouchStart = (equipmentId: string, name: string) => {
+    setTouchDragEquipment({ equipmentId, name });
+    setEquipmentDropTarget(null);
+  };
+
+  const handleEquipmentTouchMove = (e: React.TouchEvent) => {
+    if (!touchDragEquipment) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    setTouchDragEquipmentPosition({ x: touch.clientX, y: touch.clientY });
+
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const dropZone = element.closest('[data-equipment-drop-target]');
+    if (dropZone) {
+      const userId = dropZone.getAttribute('data-user-id');
+      setEquipmentDropTarget(userId);
+    } else {
+      setEquipmentDropTarget(null);
+    }
+  };
+
+  const handleEquipmentTouchEnd = () => {
+    if (touchDragEquipment && equipmentDropTarget) {
+      setEquipmentAssignments((prev) => ({
+        ...prev,
+        [touchDragEquipment.equipmentId]: {
+          ...prev[touchDragEquipment.equipmentId],
+          userId: equipmentDropTarget,
+        },
+      }));
+    }
+
+    setTouchDragEquipment(null);
+    setTouchDragEquipmentPosition(null);
+    setEquipmentDropTarget(null);
+  };
+
   // 지각비 부과
   const handleAddLateFee = async () => {
     if (!lateFeeUserId || !lateFeeAmount) return;
@@ -378,6 +436,72 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
       alert("저장되었습니다");
     } catch {
       alert("저장에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 지각비 알림 전송
+  const handleNotifyLateFees = async () => {
+    if (event!.lateFees.length === 0) {
+      alert("부과된 지각비가 없습니다");
+      return;
+    }
+
+    if (!confirm(`${event!.lateFees.length}건의 지각비 알림을 전송하시겠습니까?`)) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/notify-late-fees`, {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`${data.recipientCount}명에게 알림을 전송했습니다`);
+      } else {
+        const data = await res.json();
+        alert(data.error || "알림 전송에 실패했습니다");
+      }
+    } catch {
+      alert("알림 전송에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 팀 배정 알림 전송
+  const handleNotifyTeamAssignments = async () => {
+    // 팀 배정된 세션이 있는지 확인
+    const hasTeamAssignments = event!.sessions.some((s) => s.teamAssignments.length > 0);
+    if (!hasTeamAssignments) {
+      alert("배정된 팀이 없습니다");
+      return;
+    }
+
+    if (!confirm("팀 배정 알림을 전송하시겠습니까?")) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${eventId}/notify-team-assignments`, {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`${data.recipientCount}명에게 알림을 전송했습니다`);
+        // 알림 전송 후 상태 업데이트
+        setTeamAssignmentNotified(true);
+      } else {
+        const data = await res.json();
+        alert(data.error || "알림 전송에 실패했습니다");
+      }
+    } catch {
+      alert("알림 전송에 실패했습니다");
     } finally {
       setSubmitting(false);
     }
@@ -504,6 +628,8 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ assignments }),
         });
+        // 팀 배정 변경되었으므로 알림 상태 리셋
+        setTeamAssignmentNotified(false);
       }
 
       cancelEditing();
@@ -816,13 +942,28 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
             <div className="bg-white rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900">지각 및 미도착 명단</h3>
-                <button
-                  onClick={handleSaveLateFees}
-                  disabled={submitting}
-                  className="text-xs font-medium text-white bg-team-500 px-4 py-2 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50"
-                >
-                  {submitting ? "저장 중..." : "저장"}
-                </button>
+                <div className="flex gap-2">
+                  {(() => {
+                    // 미납 지각비만 카운트 (PAID 상태 제외)
+                    const unpaidFees = event.lateFees.filter((fee) => fee.status === "PENDING");
+                    return unpaidFees.length > 0 && (
+                      <button
+                        onClick={handleNotifyLateFees}
+                        disabled={submitting}
+                        className="text-xs font-medium text-team-600 bg-team-50 border border-team-200 px-3 py-2 rounded-lg hover:bg-team-100 transition-colors disabled:opacity-50"
+                      >
+                        💰 알리기
+                      </button>
+                    );
+                  })()}
+                  <button
+                    onClick={handleSaveLateFees}
+                    disabled={submitting}
+                    className="text-xs font-medium text-white bg-team-500 px-4 py-2 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? "저장 중..." : "저장"}
+                  </button>
+                </div>
               </div>
 
               {Object.keys(lateFeeAmounts).length > 0 ? (
@@ -885,18 +1026,29 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         {/* 세션 탭 */}
         {activeTab === "session" && (
           <>
-            {/* 참석 인원 요약 + 출석률 버튼 */}
-            <div className="bg-team-50 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-team-700">참석 인원</span>
-                <span className="text-sm font-bold text-team-600">{attendees.length}명</span>
+            {/* 참석 인원 요약 + 버튼 */}
+            <div className="bg-team-50 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-team-700">참석 인원</span>
+                  <span className="text-sm font-bold text-team-600">{attendees.length}명</span>
+                </div>
+                <button
+                  onClick={() => setShowAttendanceModal(true)}
+                  className="text-xs text-team-600 font-medium hover:text-team-700 transition-colors"
+                >
+                  출석률 📊
+                </button>
               </div>
-              <button
-                onClick={() => setShowAttendanceModal(true)}
-                className="text-xs text-team-600 font-medium hover:text-team-700 transition-colors"
-              >
-                출석률 📊
-              </button>
+              {event.sessions.some((s) => s.teamAssignments.length > 0) && (
+                <button
+                  onClick={handleNotifyTeamAssignments}
+                  disabled={submitting || teamAssignmentNotified}
+                  className="w-full mt-2 text-xs font-medium text-white bg-team-500 px-4 py-2.5 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {teamAssignmentNotified ? "✅ 알림 전송 완료" : "⚽ 팀 배정 알리기"}
+                </button>
+              )}
             </div>
 
             {event.sessions.map((sess, idx) => (
@@ -1244,6 +1396,8 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                     className="min-h-[100px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
                     onDragOver={handleEquipmentDragOver}
                     onDrop={(e) => handleEquipmentDrop(e, null)}
+                    data-equipment-drop-target
+                    data-user-id={null}
                   >
                     {equipments
                       .filter((eq) => !equipmentAssignments[eq.id]?.userId)
@@ -1252,7 +1406,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           key={eq.id}
                           draggable
                           onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
-                          className="bg-team-50 border border-team-200 rounded-lg p-3 cursor-move hover:bg-team-100 transition-colors"
+                          onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
+                          onTouchMove={handleEquipmentTouchMove}
+                          onTouchEnd={handleEquipmentTouchEnd}
+                          className={`bg-team-50 border border-team-200 rounded-lg p-3 cursor-move hover:bg-team-100 transition-colors touch-none ${
+                            touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
+                          }`}
                         >
                           <div className="font-medium text-sm text-gray-900">{eq.name}</div>
                           {eq.description && (
@@ -1300,9 +1459,13 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                           </span>
                         </h3>
                         <div
-                          className="min-h-[80px] border-2 border-dashed border-gray-200 rounded-lg p-3 space-y-2"
+                          className={`min-h-[80px] border-2 border-dashed rounded-lg p-3 space-y-2 ${
+                            equipmentDropTarget === manager.id ? 'border-team-500 bg-team-50' : 'border-gray-200'
+                          }`}
                           onDragOver={handleEquipmentDragOver}
                           onDrop={(e) => handleEquipmentDrop(e, manager.id)}
+                          data-equipment-drop-target
+                          data-user-id={manager.id}
                         >
                           {assignedEquipments.map((eq) => {
                             const assignment = equipmentAssignments[eq.id];
@@ -1311,7 +1474,12 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
                                 <div
                                   draggable
                                   onDragStart={(e) => handleEquipmentDragStart(e, eq.id)}
-                                  className="bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors"
+                                  onTouchStart={() => handleEquipmentTouchStart(eq.id, eq.name)}
+                                  onTouchMove={handleEquipmentTouchMove}
+                                  onTouchEnd={handleEquipmentTouchEnd}
+                                  className={`bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors touch-none ${
+                                    touchDragEquipment?.equipmentId === eq.id ? 'opacity-50' : ''
+                                  }`}
                                 >
                                   <div className="font-medium text-sm text-gray-900">{eq.name}</div>
                                   {eq.description && (
@@ -1504,6 +1672,22 @@ export default function TrainingManagePage({ params }: { params: Promise<{ id: s
         >
           <span className="inline-block px-2.5 py-1.5 bg-team-500 text-white rounded-md text-xs font-medium shadow-lg opacity-80">
             {touchDragUser.userName}
+          </span>
+        </div>
+      )}
+
+      {/* 장비 터치 드래그 고스트 요소 */}
+      {touchDragEquipment && touchDragEquipmentPosition && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            left: touchDragEquipmentPosition.x,
+            top: touchDragEquipmentPosition.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <span className="inline-block px-3 py-2 bg-team-600 text-white rounded-md text-xs font-medium shadow-lg opacity-80">
+            {touchDragEquipment.name}
           </span>
         </div>
       )}

@@ -35,8 +35,9 @@ export interface TrainingEventDetail {
   rsvps: RsvpEntry[];
   checkIns: CheckInEntry[];
   sessions: SessionEntry[];
+  // 관리 페이지(?includeManagement=true)에서만 포함
+  lateFees?: LateFeeEntry[];
   equipmentAssignments?: EquipmentAssignmentEntry[];
-  trainingLogs?: any[];
   myRsvp: RsvpStatus | null;
   myCheckIn: string | null; // checkedInAt ISO string
 }

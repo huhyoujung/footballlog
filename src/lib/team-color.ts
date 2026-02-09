@@ -1,102 +1,26 @@
 /**
- * 팀 커스텀 컬러 시스템
- * primaryColor(진한 색)로부터 7단계 팔레트 자동 생성
+ * 팀 커스텀 컬러 시스템 (개선 버전)
+ * primaryColor로부터 접근성을 고려한 50-700 팔레트 자동 생성
+ * - 밝은 색상(50-400)은 채도를 낮춰서 자연스러운 배경색 생성
+ * - 어두운 색상(600-700)은 채도 유지하여 강조 효과 유지
  */
 
-/**
- * HEX → HSL 변환
- */
-function hexToHSL(hex: string): { h: number; s: number; l: number } {
-  // #RRGGBB 형식
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-
-    switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-        break;
-      case g:
-        h = ((b - r) / d + 2) / 6;
-        break;
-      case b:
-        h = ((r - g) / d + 4) / 6;
-        break;
-    }
-  }
-
-  return {
-    h: Math.round(h * 360),
-    s: Math.round(s * 100),
-    l: Math.round(l * 100),
-  };
-}
+import { generatePalette as generatePaletteBase } from "./colorPalette";
 
 /**
- * HSL → HEX 변환
- */
-function hslToHex(h: number, s: number, l: number): string {
-  h = h / 360;
-  s = s / 100;
-  l = l / 100;
-
-  let r, g, b;
-
-  if (s === 0) {
-    r = g = b = l;
-  } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 1 / 2) return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-      return p;
-    };
-
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-
-    r = hue2rgb(p, q, h + 1 / 3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1 / 3);
-  }
-
-  const toHex = (x: number) => {
-    const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-/**
- * primaryColor로부터 7단계 팔레트 생성
- * team-500 = 원본, 나머지는 lightness 조절
+ * primaryColor로부터 팀 컬러 팔레트 생성
+ * 개선: 채도도 함께 조정하여 더 자연스러운 팔레트 생성
  */
 export function generatePalette(primaryColor: string): Record<string, string> {
-  const hsl = hexToHSL(primaryColor);
+  const basePalette = generatePaletteBase(primaryColor);
 
-  return {
-    "team-50": hslToHex(hsl.h, hsl.s, 95),
-    "team-100": hslToHex(hsl.h, hsl.s, 90),
-    "team-200": hslToHex(hsl.h, hsl.s, 82),
-    "team-300": hslToHex(hsl.h, hsl.s, 65),
-    "team-400": hslToHex(hsl.h, hsl.s, 55),
-    "team-500": primaryColor, // 원본
-    "team-600": hslToHex(hsl.h, hsl.s, 40),
-    "team-700": hslToHex(hsl.h, hsl.s, 30),
-  };
+  // "50" → "team-50" 형식으로 변환
+  const teamPalette: Record<string, string> = {};
+  Object.entries(basePalette).forEach(([shade, color]) => {
+    teamPalette[`team-${shade}`] = color;
+  });
+
+  return teamPalette;
 }
 
 /**

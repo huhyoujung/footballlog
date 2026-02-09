@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushToUsers } from "@/lib/push";
 
 // 지각비 목록 조회
 export async function GET(
@@ -64,17 +63,6 @@ export async function POST(
         user: { select: { id: true, name: true, image: true } },
       },
     });
-
-    // 푸시 알림
-    try {
-      await sendPushToUsers([userId], {
-        title: "지각비 알림",
-        body: `지각비 ${amount.toLocaleString()}원이 부과되었습니다`,
-        url: `/training/${id}`,
-      });
-    } catch {
-      // 푸시 실패해도 계속
-    }
 
     return NextResponse.json(lateFee, { status: 201 });
   } catch (error) {

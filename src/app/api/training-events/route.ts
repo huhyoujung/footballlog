@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushToTeam } from "@/lib/push";
+import { sendPushToTeam, sendPushToUsers } from "@/lib/push";
 
 // 구장 신발 추천 업데이트 (최근 1회 데이터 기반)
 async function updateVenueRecommendation(venueId: string, currentShoes: string[]) {
@@ -136,11 +136,46 @@ export async function POST(req: Request) {
     });
 
     try {
+      // 팀 전체에게 새 운동 알림
       await sendPushToTeam(session.user.teamId, session.user.id, {
         title: "팀 운동",
         body: `새 운동이 올라왔어요! ${dateStr}`,
         url: `/training/${event.id}`,
       });
+    } catch {
+      // 푸시 실패해도 생성은 성공
+    }
+
+    // 조끼 담당자에게 개별 알림
+    try {
+      const vestNotifyIds: string[] = [];
+      if (vestBringerId) vestNotifyIds.push(vestBringerId);
+      if (vestReceiverId) vestNotifyIds.push(vestReceiverId);
+
+      if (vestNotifyIds.length > 0) {
+        // 가져오는 사람과 가져가는 사람이 같으면 한 번만 알림
+        const uniqueIds = [...new Set(vestNotifyIds)];
+
+        for (const userId of uniqueIds) {
+          const isBringer = userId === vestBringerId;
+          const isReceiver = userId === vestReceiverId;
+
+          let message = "";
+          if (isBringer && isReceiver) {
+            message = "조끼를 가져오고 가져가주세요!";
+          } else if (isBringer) {
+            message = "조끼를 가져와주세요!";
+          } else {
+            message = "조끼를 가져가주세요!";
+          }
+
+          await sendPushToUsers([userId], {
+            title: "조끼 담당",
+            body: `${message} ${dateStr}`,
+            url: `/training/${event.id}`,
+          });
+        }
+      }
     } catch {
       // 푸시 실패해도 생성은 성공
     }

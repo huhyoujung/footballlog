@@ -3,7 +3,7 @@
 
 :root {
   color-scheme: light only;
-  --background: #ffffff;
+  --background: #f9fafb;
   --foreground: #171717;
 }
 
@@ -14,14 +14,15 @@
   --font-mono: "SF Mono", SFMono-Regular, Consolas, monospace;
 
   /* Primary - Team Brand (Warm Brown) */
-  --color-team-50: #F5F0EB;
-  --color-team-100: #EBE1D7;
-  --color-team-200: #DDD2C6;
-  --color-team-300: #C3A587;
-  --color-team-400: #AD9478;
-  --color-team-500: #967B5D;
-  --color-team-600: #7F6850;
-  --color-team-700: #685643;
+  /* 개선된 팔레트: 밝은 색상은 채도를 낮춰 자연스러운 배경색 생성 */
+  --color-team-50: #F7F5F3;
+  --color-team-100: #EFEBE7;
+  --color-team-200: #DED7CE;
+  --color-team-300: #C6B9A9;
+  --color-team-400: #B3A089;
+  --color-team-500: #977C5E;
+  --color-team-600: #7D684F;
+  --color-team-700: #5E4E3B;
 
   /* Condition Spectrum - Red → Orange → Yellow → Green */
   --color-cond-red: #DC2626;
@@ -40,10 +41,19 @@
   }
 } */
 
+html {
+  height: 100%;
+  background: var(--background);
+  overscroll-behavior: none;
+}
+
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Form 요소 텍스트 색상 강제 설정 */

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushToUsers } from "@/lib/push";
 
 // 팀 배정 저장 (전체 교체, ADMIN)
 export async function PUT(
@@ -50,23 +49,6 @@ export async function PUT(
         },
       },
     });
-
-    // 푸시 알림: 배정된 모든 사용자에게
-    if (result.length > 0) {
-      const assignedUserIds = [...new Set(result.map((r) => r.userId))];
-      const eventTitle = result[0].trainingSession.trainingEvent.title;
-      const eventId = result[0].trainingSession.trainingEvent.id;
-
-      try {
-        await sendPushToUsers(assignedUserIds, {
-          title: "⚽ 팀 배정 완료",
-          body: `${eventTitle} - 내가 어떤 팀에 배정되었는지 확인해볼까요?`,
-          url: `/training/${eventId}`,
-        });
-      } catch {
-        // 푸시 실패해도 배정은 성공
-      }
-    }
 
     return NextResponse.json({ assignments: result });
   } catch (error) {

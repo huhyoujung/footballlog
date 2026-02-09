@@ -49,12 +49,17 @@ export async function POST(
       return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
-    // 시간 검증: 운동 시작 2시간 전부터 체크인 가능
+    // 시간 검증: 운동 시작 2시간 전 ~ 2시간 후까지 체크인 가능
     const now = new Date();
     const twoHoursBefore = new Date(event.date.getTime() - 2 * 60 * 60 * 1000);
+    const twoHoursAfter = new Date(event.date.getTime() + 2 * 60 * 60 * 1000);
 
     if (now < twoHoursBefore) {
       return NextResponse.json({ error: "운동 2시간 전부터 체크인할 수 있습니다" }, { status: 400 });
+    }
+
+    if (now > twoHoursAfter) {
+      return NextResponse.json({ error: "체크인 시간이 종료되었습니다" }, { status: 400 });
     }
 
     // RSVP 확인 (ATTEND 또는 LATE만 체크인 가능)

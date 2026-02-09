@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { getTimeUntilEvent } from "@/lib/timeUntil";
 
 interface TrainingEvent {
@@ -12,11 +12,19 @@ interface TrainingEvent {
 
 interface TrainingCheckInCardProps {
   event: TrainingEvent;
+  onCheckInSuccess?: () => void;
+  onShowToast?: (message: string) => void;
 }
 
 export default function TrainingCheckInCard({
   event,
+  onCheckInSuccess,
+  onShowToast,
 }: TrainingCheckInCardProps) {
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [checkInTime, setCheckInTime] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+
   const { message, isPast } = getTimeUntilEvent(event.date);
   const eventDate = new Date(event.date);
   const dateStr = `${eventDate.getMonth() + 1}/${eventDate.getDate()}(${
@@ -26,45 +34,124 @@ export default function TrainingCheckInCard({
     .toString()
     .padStart(2, "0")}`;
 
+  const handleCheckIn = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (submitting || isCheckedIn) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${event.id}/check-in`, {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+        setCheckInTime(timeStr);
+        setIsCheckedIn(true);
+
+        onShowToast?.(timeStr + "에 체크인되었습니다");
+        onCheckInSuccess?.();
+      } else {
+        const data = await res.json();
+        onShowToast?.(data.error || "체크인에 실패했습니다");
+      }
+    } catch (error) {
+      onShowToast?.("체크인에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelCheckIn = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    if (!confirm("체크인을 취소하시겠습니까?")) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/training-events/${event.id}/check-in`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setIsCheckedIn(false);
+        setCheckInTime("");
+        onShowToast?.("체크인이 취소되었습니다");
+        onCheckInSuccess?.();
+      } else {
+        const data = await res.json();
+        onShowToast?.(data.error || "취소에 실패했습니다");
+      }
+    } catch (error) {
+      onShowToast?.("취소에 실패했습니다");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <Link href={`/training/${event.id}`}>
-      <div className="mx-auto max-w-md px-6 py-4 animate-fade-in">
-        <div className="bg-gradient-to-br from-team-50 to-team-100 rounded-2xl shadow-lg p-6 border border-team-200 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-          {/* 체크 아이콘 + 타이틀 */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-team-600"
-            >
-              <path
-                d="M20 6L9 17L4 12"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <h3 className="text-xl font-bold text-team-700">CHECK-IN</h3>
-          </div>
+    <div className="mx-auto max-w-md px-6 py-4 animate-fade-in">
+      <div className="bg-gradient-to-br from-team-50 to-team-100 rounded-2xl shadow-lg p-6 border border-team-200 transition-all duration-300">
+        {/* 체크 아이콘 + 타이틀 */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="text-team-600"
+          >
+            <path
+              d="M20 6L9 17L4 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <h3 className="text-xl font-bold text-team-700">CHECK-IN</h3>
+        </div>
 
-          {/* 운동 정보 */}
-          <div className="text-center mb-4 space-y-1">
-            <p className="text-lg font-semibold text-gray-900">
-              {event.title || "정기운동"}
+        {/* 운동 정보 */}
+        <div className="text-center mb-4 space-y-1">
+          <p className="text-lg font-semibold text-gray-900">
+            {event.title || "정기운동"}
+          </p>
+          <p className="text-sm text-gray-600">{dateStr}</p>
+          {event.venue && (
+            <p className="text-sm text-gray-600 flex items-center justify-center gap-1">
+              <span>📍</span>
+              <span>{event.venue.name}</span>
             </p>
-            <p className="text-sm text-gray-600">{dateStr}</p>
-            {event.venue && (
-              <p className="text-sm text-gray-600 flex items-center justify-center gap-1">
-                <span>📍</span>
-                <span>{event.venue.name}</span>
-              </p>
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* 남은 시간 */}
+        {/* 체크인 완료 또는 남은 시간 */}
+        {isCheckedIn ? (
+          <div className="text-center mb-6">
+            <div className="py-3 px-4 rounded-lg bg-green-50 mb-2">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">✅</span>
+                <div>
+                  <p className="text-lg font-bold text-green-600">
+                    체크인 완료!
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {checkInTime} 도착
+                  </p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleCancelCheckIn}
+              disabled={submitting}
+              className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
+            >
+              체크인 취소
+            </button>
+          </div>
+        ) : (
           <div
             className={`text-center mb-6 py-3 px-4 rounded-lg ${
               isPast ? "bg-orange-50" : "bg-team-50"
@@ -88,14 +175,25 @@ export default function TrainingCheckInCard({
               </div>
             </div>
           </div>
+        )}
 
-          {/* CTA 버튼 */}
-          <button className="w-full bg-team-500 hover:bg-team-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
+        {/* CTA 버튼 */}
+        {isCheckedIn ? (
+          <div className="w-full bg-green-500 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 opacity-75">
+            <span>✅</span>
+            <span>체크인 완료</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleCheckIn}
+            disabled={submitting}
+            className="w-full bg-team-500 hover:bg-team-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <span>📍</span>
-            <span>체크인 하기</span>
+            <span>{submitting ? "체크인 중..." : "체크인 하기"}</span>
           </button>
-        </div>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
