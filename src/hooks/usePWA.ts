@@ -79,7 +79,7 @@ export const usePWA = () => {
     };
 
     // 기존 manifest link 찾기 또는 생성
-    let link = document.querySelector('link[rel="manifest"]');
+    let link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
 
     // 기존 blob URL이 있으면 정리
     if (link) {
@@ -89,7 +89,7 @@ export const usePWA = () => {
       }
     } else {
       // 없으면 새로 생성 (제거하지 않고 계속 재사용)
-      link = document.createElement("link");
+      link = document.createElement("link") as HTMLLinkElement;
       link.rel = "manifest";
       link.type = "application/json";
       document.head.appendChild(link);
@@ -108,9 +108,9 @@ export const usePWA = () => {
     if (!logoUrl) return;
 
     // favicon 찾기 또는 생성
-    let favicon = document.querySelector('link[rel="icon"]');
+    let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
     if (!favicon) {
-      favicon = document.createElement("link");
+      favicon = document.createElement("link") as HTMLLinkElement;
       favicon.rel = "icon";
       favicon.type = "image/png";
       favicon.setAttribute("sizes", "48x48");
@@ -119,18 +119,18 @@ export const usePWA = () => {
     favicon.href = logoUrl;
 
     // MS 타일 이미지 찾기 또는 생성
-    let msIcon = document.querySelector('meta[name="msapplication-TileImage"]');
+    let msIcon = document.querySelector('meta[name="msapplication-TileImage"]') as HTMLMetaElement | null;
     if (!msIcon) {
-      msIcon = document.createElement("meta");
+      msIcon = document.createElement("meta") as HTMLMetaElement;
       msIcon.name = "msapplication-TileImage";
       document.head.appendChild(msIcon);
     }
     msIcon.content = logoUrl;
 
     // Apple 터치 아이콘 찾기 또는 생성
-    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement | null;
     if (!appleIcon) {
-      appleIcon = document.createElement("link");
+      appleIcon = document.createElement("link") as HTMLLinkElement;
       appleIcon.rel = "apple-touch-icon";
       appleIcon.setAttribute("sizes", "180x180");
       document.head.appendChild(appleIcon);
