@@ -18,6 +18,10 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+type SubscribeResult =
+  | { success: true }
+  | { success: false; error: string; details?: any };
+
 export function usePushSubscription() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -57,17 +61,17 @@ export function usePushSubscription() {
     }
   }, [isSupported, checkSubscription]);
 
-  async function subscribe() {
+  async function subscribe(): Promise<SubscribeResult> {
     try {
       if (!isSupported) {
         console.error('Push notifications not supported');
-        return false;
+        return { success: false, error: 'NOT_SUPPORTED' };
       }
 
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        console.log('Notification permission denied');
-        return false;
+        console.log('Notification permission:', permission);
+        return { success: false, error: 'PERMISSION_DENIED' };
       }
 
       const registration = await Promise.race([
@@ -80,7 +84,7 @@ export function usePushSubscription() {
       const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
         console.error('VAPID public key not configured');
-        return false;
+        return { success: false, error: 'VAPID_KEY_MISSING' };
       }
 
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
@@ -99,14 +103,14 @@ export function usePushSubscription() {
       if (!response.ok) {
         const error = await response.json();
         console.error('Server subscription failed:', error);
-        return false;
+        return { success: false, error: 'SERVER_ERROR', details: error };
       }
 
       setIsSubscribed(true);
-      return true;
-    } catch (error) {
+      return { success: true };
+    } catch (error: any) {
       console.error('Push subscription error:', error);
-      return false;
+      return { success: false, error: error.message || 'UNKNOWN_ERROR' };
     }
   }
 

@@ -174,10 +174,18 @@ export default function SettingsPage() {
         }
       } else {
         const result = await subscribe();
-        if (result) {
+        if (result.success) {
           setSuccess("알림이 활성화되었습니다");
         } else {
-          setError("알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.");
+          // 구체적인 에러 메시지 표시
+          const errorMessages: Record<string, string> = {
+            NOT_SUPPORTED: "이 브라우저는 푸시 알림을 지원하지 않습니다",
+            PERMISSION_DENIED: "알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요",
+            VAPID_KEY_MISSING: "서버 설정 오류 (VAPID 키 누락)",
+            SERVER_ERROR: "서버 구독 실패. 잠시 후 다시 시도해주세요",
+            "Service worker timeout": "서비스 워커 준비 시간 초과. 페이지를 새로고침해주세요",
+          };
+          setError(errorMessages[result.error] || `오류: ${result.error}`);
         }
       }
       setTimeout(() => setSuccess(""), 2000);
