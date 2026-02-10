@@ -257,7 +257,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
                   type="date"
                   value={pomVotingDeadlineDate}
                   onChange={(e) => setPomVotingDeadlineDate(e.target.value)}
-                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -266,7 +266,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
                   type="time"
                   value={pomVotingDeadlineTime}
                   onChange={(e) => setPomVotingDeadlineTime(e.target.value)}
-                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -277,7 +277,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
                   max="10"
                   value={pomVotesPerPerson}
                   onChange={(e) => setPomVotesPerPerson(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-team-500 focus:border-transparent overflow-hidden"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-400 mt-1">최소 1명, 최대 10명</p>
               </div>
