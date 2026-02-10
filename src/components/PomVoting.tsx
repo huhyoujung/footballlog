@@ -140,71 +140,88 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, check
     );
   }
 
-  // 마감 후 자동으로 결과 표시
-  if (isClosed && totalVotes > 0 && !myVote) {
-    const winner = results[0];
-    return (
-      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-6 space-y-4">
-        {/* 우승자 */}
-        {winner && (
-          <div className="text-center space-y-3">
-            <div className="text-6xl animate-bounce">🏆</div>
-            <h3 className="text-xl font-bold text-gray-900">오늘의 MVP</h3>
-            <div className="flex flex-col items-center gap-2">
-              {winner.user.image ? (
-                <Image
-                  src={winner.user.image}
-                  alt={winner.user.name || ""}
-                  width={64}
-                  height={64}
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-team-100 flex items-center justify-center">
-                  <span className="text-2xl text-team-500">🎖️</span>
-                </div>
-              )}
-              <div>
-                <p className="text-lg font-semibold text-gray-900">{winner.user.name || "익명"}</p>
-                {(winner.user.position || winner.user.number) && (
-                  <p className="text-sm text-gray-500">
-                    {winner.user.position || ""} {winner.user.number ? `${winner.user.number}` : ""}
-                  </p>
+  // 마감 후 처리
+  if (isClosed) {
+    // 투표 안 했고 결과가 있는 경우 - 결과 자동 표시
+    if (!myVote && totalVotes > 0) {
+      const winner = results[0];
+      return (
+        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-6 space-y-4">
+          {/* 우승자 */}
+          {winner && (
+            <div className="text-center space-y-3">
+              <div className="text-6xl animate-bounce">🏆</div>
+              <h3 className="text-xl font-bold text-gray-900">오늘의 MVP</h3>
+              <div className="flex flex-col items-center gap-2">
+                {winner.user.image ? (
+                  <Image
+                    src={winner.user.image}
+                    alt={winner.user.name || ""}
+                    width={64}
+                    height={64}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-team-100 flex items-center justify-center">
+                    <span className="text-2xl text-team-500">🎖️</span>
+                  </div>
                 )}
-                <p className="text-sm font-medium text-team-600 mt-1">{winner.count}표 획득</p>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">{winner.user.name || "익명"}</p>
+                  {(winner.user.position || winner.user.number) && (
+                    <p className="text-sm text-gray-500">
+                      {winner.user.position || ""} {winner.user.number ? `${winner.user.number}` : ""}
+                    </p>
+                  )}
+                  <p className="text-sm font-medium text-team-600 mt-1">{winner.count}표 획득</p>
+                </div>
+              </div>
+
+              {/* 팀원 코멘트 */}
+              <div className="bg-white rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
+                <p className="text-xs font-semibold text-gray-700 mb-2">팀원 코멘트</p>
+                {winner.votes.map((vote, idx) => (
+                  <div key={idx} className="text-left p-2 bg-gray-50 rounded text-sm">
+                    <p className="font-medium text-gray-900 text-xs mb-1">{vote.voter.name || "익명"}</p>
+                    <p className="text-gray-700">{vote.reason}</p>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* 팀원 코멘트 */}
-            <div className="bg-white rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
-              <p className="text-xs font-semibold text-gray-700 mb-2">팀원 코멘트</p>
-              {winner.votes.map((vote, idx) => (
-                <div key={idx} className="text-left p-2 bg-gray-50 rounded text-sm">
-                  <p className="font-medium text-gray-900 text-xs mb-1">{vote.voter.name || "익명"}</p>
-                  <p className="text-gray-700">{vote.reason}</p>
+          {/* 전체 결과 */}
+          {results.length > 1 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-700">전체 결과</p>
+              {results.slice(1).map((result, idx) => (
+                <div key={idx} className="flex items-center justify-between text-sm bg-white rounded-lg p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">{idx + 2}위</span>
+                    <span className="font-medium text-gray-900">{result.user.name || "익명"}</span>
+                  </div>
+                  <span className="text-gray-500">{result.count}표</span>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      );
+    }
 
-        {/* 전체 결과 */}
-        {results.length > 1 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-700">전체 결과</p>
-            {results.slice(1).map((result, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm bg-white rounded-lg p-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">{idx + 2}위</span>
-                  <span className="font-medium text-gray-900">{result.user.name || "익명"}</span>
-                </div>
-                <span className="text-gray-500">{result.count}표</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    // 마감되었는데 아무도 투표 안 한 경우
+    if (!myVote && totalVotes === 0) {
+      return (
+        <div className="bg-white rounded-xl p-6 text-center space-y-3">
+          <div className="text-4xl">🏆</div>
+          <h3 className="text-sm font-semibold text-gray-900">오늘의 MVP 투표</h3>
+          <p className="text-sm text-gray-500">투표가 마감되었습니다</p>
+          <p className="text-xs text-gray-400">아직 투표한 인원이 없습니다</p>
+        </div>
+      );
+    }
+
+    // 마감되었고 본인이 투표했으면 아래 일반 UI로 계속 진행 (본인 투표 내용 + 결과 보기)
   }
 
   // 투표 진행 중
