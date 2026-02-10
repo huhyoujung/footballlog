@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { useTeam } from "@/contexts/TeamContext";
 import BackButton from "@/components/BackButton";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -176,6 +176,8 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
         throw new Error(data.error || "저장에 실패했습니다");
       }
 
+      // SWR 캐시 무효화하여 상세 페이지에서 최신 데이터 표시
+      await mutate(`/api/training-events/${eventId}?includeManagement=true`);
       router.push(`/training/${eventId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
