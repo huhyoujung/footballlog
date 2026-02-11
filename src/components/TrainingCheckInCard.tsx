@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { getTimeUntilEvent } from "@/lib/timeUntil";
+import { useSound } from "@/lib/useSound";
 
 interface TrainingEvent {
   id: string;
@@ -21,9 +23,9 @@ export default function TrainingCheckInCard({
   onCheckInSuccess,
   onShowToast,
 }: TrainingCheckInCardProps) {
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [checkInTime, setCheckInTime] = useState<string>("");
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const { playSound } = useSound();
 
   const { message, isPast } = getTimeUntilEvent(event.date);
   const eventDate = new Date(event.date);
@@ -36,20 +38,23 @@ export default function TrainingCheckInCard({
 
   const handleCheckIn = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (submitting || isCheckedIn) return;
+    if (submitting) return;
 
     setSubmitting(true);
+
+    // Optimistic UI: 즉시 페이지 이동
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    router.push(`/training/${event.id}`);
+
+    // 백그라운드에서 API 호출
     try {
       const res = await fetch(`/api/training-events/${event.id}/check-in`, {
         method: "POST",
       });
 
       if (res.ok) {
-        const now = new Date();
-        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-        setCheckInTime(timeStr);
-        setIsCheckedIn(true);
-
+        playSound("whistle"); // 🎵 체크인 성공 - 휘슬 소리!
         onShowToast?.(timeStr + "에 체크인되었습니다");
         onCheckInSuccess?.();
       } else {
@@ -58,167 +63,45 @@ export default function TrainingCheckInCard({
       }
     } catch (error) {
       onShowToast?.("체크인에 실패했습니다");
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  const handleCancelCheckIn = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (submitting) return;
-    if (!confirm("체크인을 취소하시겠습니까?")) return;
-
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/training-events/${event.id}/check-in`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setIsCheckedIn(false);
-        setCheckInTime("");
-        onShowToast?.("체크인이 취소되었습니다");
-        onCheckInSuccess?.();
-      } else {
-        const data = await res.json();
-        onShowToast?.(data.error || "취소에 실패했습니다");
-      }
-    } catch (error) {
-      onShowToast?.("취소에 실패했습니다");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // 체크인 완료 상태: 일반 카드
-  if (isCheckedIn) {
-    return (
-      <div className="mx-auto max-w-md px-6 py-3 animate-fade-in">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          {/* 상단: 체크인 완료 상태 */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="text-green-600"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">체크인 완료</p>
-                <p className="text-xs text-gray-500">{checkInTime} 도착</p>
-              </div>
-            </div>
-            <button
-              onClick={handleCancelCheckIn}
-              disabled={submitting}
-              className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
-            >
-              취소
-            </button>
-          </div>
-
-          {/* 하단: 운동 정보 */}
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-gray-900">
-              {event.title || "정기운동"}
-            </p>
-            <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span>{dateStr}</span>
-              {event.venue && (
-                <>
-                  <span>·</span>
-                  <span>{event.venue.name}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 체크인 미완료 상태: 전체가 CTA 버튼
+  // 명확한 버튼이 있는 체크인 카드
   return (
-    <div className="mx-auto max-w-md px-6 py-3 animate-fade-in">
+    <div className="flex-shrink-0 w-[280px] bg-team-500 rounded-2xl p-4 pt-6 shadow-md">
+      {/* 상단: 운동 제목 */}
+      <div className="text-center mb-3">
+        <h3 className="text-base font-bold text-white">
+          {event.title || "정기운동"}
+        </h3>
+      </div>
+
+      {/* 시간 메시지 */}
+      <div className="mb-6 text-center">
+        <p className="text-sm text-white">
+          {message}
+        </p>
+      </div>
+
+      {/* 체크인 버튼 - 명확하고 큰 버튼 */}
       <button
         onClick={handleCheckIn}
         disabled={submitting}
-        className="w-full bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-200 hover:shadow-md hover:border-team-300 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-white text-team-600 font-bold py-3.5 px-4 rounded-xl hover:bg-white/95 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
       >
-        {/* 상단: 운동 정보 */}
-        <div className="space-y-1 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-team-50 rounded-full flex items-center justify-center flex-shrink-0">
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-team-600"
-              >
-                <path
-                  d="M20 6L9 17L4 12"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-gray-900">
-              {event.title || "정기운동"}
-            </p>
+        {submitting ? (
+          <div className="flex items-center justify-center gap-2">
+            <div className="inline-block animate-spin w-4 h-4 border-2 border-team-600 border-t-transparent rounded-full"></div>
+            <span>체크인 중...</span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-gray-500 ml-8">
-            <span>{dateStr}</span>
-            {event.venue && (
-              <>
-                <span>·</span>
-                <span>{event.venue.name}</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 하단: 남은 시간 또는 지각 경고 */}
-        <div
-          className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${
-            isPast
-              ? "bg-orange-50 border border-orange-200"
-              : "bg-team-50 border border-team-200"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{isPast ? "⚠️" : "⏰"}</span>
-            <div className="text-left">
-              <p
-                className={`text-sm font-semibold ${
-                  isPast ? "text-orange-700" : "text-team-700"
-                }`}
-              >
-                {message}
-              </p>
-              <p className={`text-xs ${isPast ? "text-orange-600" : "text-team-600"}`}>
-                {isPast ? "지금 바로 체크인하세요" : "탭하여 체크인"}
-              </p>
-            </div>
-          </div>
-          {submitting && (
-            <div className="inline-block animate-spin w-4 h-4 border-2 border-team-500 border-t-transparent rounded-full"></div>
-          )}
-        </div>
+        ) : (
+          <span className="flex items-center justify-center gap-1">
+            여기를 눌러 체크인
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </span>
+        )}
       </button>
     </div>
   );

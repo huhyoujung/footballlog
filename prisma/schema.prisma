@@ -53,17 +53,18 @@ enum Role {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role      @default(MEMBER)
-  teamId        String?
-  position      String?
-  number        Int?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  name               String?
+  email              String?   @unique
+  emailVerified      DateTime?
+  image              String?
+  role               Role      @default(MEMBER)
+  teamId             String?
+  position           String?
+  number             Int?
+  isEquipmentManager Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // 관계
   team         Team?         @relation(fields: [teamId], references: [id])
@@ -86,13 +87,14 @@ model User {
   lateFees               LateFee[]
   sessionTeamAssignments SessionTeamAssignment[]
   equipmentAssignments   EquipmentAssignment[]
-  ownedEquipments        Equipment[]             @relation("EquipmentOwner")
+  managedEquipments      Equipment[]             @relation("EquipmentManagers")
   taggedInLogs           TrainingLog[]           @relation("TaggedInLogs")
   pomVotesCast           PomVote[]               @relation("PomVoter")
   pomVotesReceived       PomVote[]               @relation("PomNominee")
 
   // 인덱스 - 팀별 조회 성능 최적화
   @@index([teamId])
+  @@index([teamId, isEquipmentManager])
 }
 
 model Team {
@@ -283,6 +285,7 @@ model Rsvp {
   @@unique([trainingEventId, userId])
   // 인덱스 - RSVP 조회 성능 최적화
   @@index([trainingEventId])
+  @@index([userId, status])
 }
 
 model CheckIn {
@@ -297,6 +300,7 @@ model CheckIn {
 
   @@unique([trainingEventId, userId])
   @@index([trainingEventId])
+  @@index([userId])
 }
 
 model LateFee {
@@ -350,13 +354,12 @@ model Equipment {
   teamId      String
   name        String
   description String?
-  ownerId     String?  // 장비 담당자 (팀 레벨 고정)
   orderIndex  Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   team        Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  owner       User?                 @relation("EquipmentOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  managers    User[]                @relation("EquipmentManagers")
   assignments EquipmentAssignment[]
 
   @@unique([teamId, name])

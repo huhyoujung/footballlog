@@ -356,16 +356,14 @@ export default function LateFeeTab({ eventId, eventDate, rsvps, checkIns, lateFe
                       onClick={() => handleTogglePaid(existingFee.id, currentStatus || "PENDING")}
                       className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
                         currentStatus === "PAID"
-                          ? "bg-green-600 hover:bg-green-700 hover:scale-110 active:scale-95 opacity-40"
-                          : "border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 hover:scale-110 active:scale-95"
+                          ? "bg-green-500 hover:bg-green-600 hover:scale-110 active:scale-95"
+                          : "bg-gray-300 hover:bg-gray-400 hover:scale-110 active:scale-95"
                       }`}
                       title={currentStatus === "PAID" ? "클릭하여 미납으로 변경" : "클릭하여 납부 완료로 표시"}
                     >
-                      {currentStatus === "PAID" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
                     </button>
                   )}
                   {!existingFee && <div className="w-6" />}

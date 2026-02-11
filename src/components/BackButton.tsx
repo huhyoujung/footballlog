@@ -21,11 +21,11 @@ export default function BackButton({ href, onClick }: BackButtonProps) {
     }
   };
 
-  // 더 큰 터치 영역 제공 (모바일 최적화)
-  const className = "text-gray-500 hover:text-gray-700 p-2 inline-flex items-center justify-center touch-manipulation";
+  // 더 큰 터치 영역 제공 (모바일 최적화 - 최소 48x48px)
+  const className = "text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200 active:scale-95 min-w-[48px] min-h-[48px] inline-flex items-center justify-center touch-manipulation rounded-lg transition-all";
 
   const content = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="m15 18-6-6 6-6" />
     </svg>
   );

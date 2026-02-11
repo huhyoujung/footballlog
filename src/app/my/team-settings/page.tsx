@@ -145,7 +145,7 @@ export default function TeamSettingsPage() {
 
       // 팀 컬러 변경 시 CSS 변수 업데이트를 위해 새로고침
       setTimeout(() => {
-        window.location.href = "/my";
+        window.location.href = "/my/team-admin";
       }, 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
@@ -194,7 +194,7 @@ export default function TeamSettingsPage() {
     <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/my/team-admin" />
           <h1 className="text-base font-semibold text-gray-900">팀 프로필</h1>
           <button

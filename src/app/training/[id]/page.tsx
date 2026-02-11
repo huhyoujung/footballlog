@@ -9,10 +9,9 @@ import KebabMenu from "@/components/training/KebabMenu";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { fetcher } from "@/lib/fetcher";
 import useSWR from "swr";
 import type { TrainingEventDetail } from "@/types/training-event";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 type AdminTab = "info" | "latefee" | "session" | "equipment";
 
@@ -33,13 +32,13 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
   // SWR로 event 데이터 페칭
   const { data: event, isLoading, mutate } = useSWR<TrainingEventDetail>(
-    eventId ? `/api/training-events/${eventId}${session?.user?.role === "ADMIN" ? "?includeManagement=true" : ""}` : null,
+    eventId ? `/api/training-events/${eventId}` : null,
     fetcher,
     {
-      revalidateOnFocus: true, // 페이지 재진입 시 데이터 새로고침
-      revalidateIfStale: true,
-      dedupingInterval: 5000, // 5초 캐시로 단축
-      keepPreviousData: true, // 이전 데이터 유지하여 화면 깜빡임 방지
+      revalidateOnFocus: false, // 캐시 사용 (속도 개선)
+      revalidateIfStale: false,
+      dedupingInterval: 60000, // 1분 캐시
+      keepPreviousData: true,
     }
   );
 
@@ -68,7 +67,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
     <div className="min-h-screen bg-white pb-8">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/" />
           <h1 className="text-base font-semibold text-gray-900">{event?.title || "팀 운동"}</h1>
           {isAdmin ? (
@@ -86,6 +85,43 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </header>
+
+      {/* 체크인 완료 배너 */}
+      {event.myCheckIn && (
+        <div className="bg-emerald-50 border-b border-emerald-200">
+          <div className="max-w-2xl mx-auto px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-emerald-600"
+                >
+                  <path
+                    d="M20 6L9 17L4 12"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-900">체크인 완료</p>
+                <p className="text-xs text-emerald-700">
+                  {new Date(event.myCheckIn).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  도착
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 탭 (관리자만 표시) */}
       {isAdmin && (

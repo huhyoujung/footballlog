@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { fetcher } from "@/lib/fetcher";
+import { useToast } from "@/lib/useToast";
+import Toast from "@/components/Toast";
+import useSWR from "swr";
 
 interface User {
   id: string;
@@ -14,7 +18,7 @@ interface EquipmentWithAssignment {
   id: string;
   name: string;
   description: string | null;
-  owner: User | null;
+  managers: User[];
   assignment: {
     id: string;
     userId: string | null;
@@ -28,48 +32,35 @@ interface Props {
 }
 
 export default function EquipmentTab({ eventId }: Props) {
-  const [equipments, setEquipments] = useState<EquipmentWithAssignment[]>([]);
+  const { toast, showToast, hideToast } = useToast();
   const [equipmentAssignments, setEquipmentAssignments] = useState<Record<string, { userId: string | null; memo: string }>>({});
-  const [loading, setLoading] = useState(true);
   const [savingEquipment, setSavingEquipment] = useState(false);
   const [touchDragEquipment, setTouchDragEquipment] = useState<{ equipmentId: string; name: string } | null>(null);
   const [touchDragEquipmentPosition, setTouchDragEquipmentPosition] = useState<{ x: number; y: number } | null>(null);
   const [equipmentDropTarget, setEquipmentDropTarget] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchEquipments();
-  }, [eventId]);
-
-  const fetchEquipments = async () => {
-    setLoading(true);
-    try {
-      const [equipRes, teamRes] = await Promise.all([
-        fetch(`/api/training-events/${eventId}/equipment`),
-        fetch(`/api/teams/equipment`),
-      ]);
-
-      if (equipRes.ok && teamRes.ok) {
-        const data = await equipRes.json();
-        const teamEquip = await teamRes.json();
-
-        setEquipments(teamEquip);
-
+  // SWR로 이벤트별 장비 배정 페칭 (캐싱)
+  const { data: equipments, isLoading: loading, error, mutate } = useSWR<EquipmentWithAssignment[]>(
+    eventId ? `/api/training-events/${eventId}/equipment` : null,
+    fetcher,
+    {
+      revalidateOnFocus: true, // 탭 전환 시 데이터 갱신
+      revalidateIfStale: true,
+      dedupingInterval: 5000, // 5초 캐시
+      keepPreviousData: true,
+      onSuccess: (data) => {
+        // 초기 배정 상태 설정
         const assignments: Record<string, { userId: string | null; memo: string }> = {};
-        teamEquip.forEach((eq: EquipmentWithAssignment) => {
-          const eventAssignment = data.find((d: any) => d.id === eq.id)?.assignment;
+        data.forEach((eq) => {
           assignments[eq.id] = {
-            userId: eventAssignment?.userId || null,
-            memo: eventAssignment?.memo || "",
+            userId: eq.assignment?.userId || null,
+            memo: eq.assignment?.memo || "",
           };
         });
         setEquipmentAssignments(assignments);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
+      },
     }
-  };
+  );
 
   const saveEquipmentAssignments = async () => {
     setSavingEquipment(true);
@@ -87,13 +78,13 @@ export default function EquipmentTab({ eventId }: Props) {
       });
 
       if (res.ok) {
-        alert("저장되었습니다");
-        fetchEquipments();
+        showToast("저장되었습니다 ✓");
+        mutate(); // SWR 캐시 갱신
       } else {
-        alert("저장에 실패했습니다");
+        showToast("저장에 실패했습니다");
       }
     } catch {
-      alert("저장에 실패했습니다");
+      showToast("저장에 실패했습니다");
     } finally {
       setSavingEquipment(false);
     }
@@ -165,18 +156,22 @@ export default function EquipmentTab({ eventId }: Props) {
     setEquipmentDropTarget(null);
   };
 
-  // 모든 관련 사용자 수집
-  const allRelatedUsers = [
-    ...equipments.filter(eq => eq.owner).map(eq => eq.owner!),
-    ...equipments.filter(eq => eq.assignment?.user).map(eq => eq.assignment!.user!)
-  ];
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl p-6 text-center">
+        <p className="text-sm text-red-500 mb-2">장비 정보를 불러오지 못했습니다</p>
+        <p className="text-xs text-gray-400 mb-3">{error.message || "알 수 없는 오류"}</p>
+        <button
+          onClick={() => mutate()}
+          className="text-sm text-team-600 hover:text-team-700 font-medium"
+        >
+          다시 시도
+        </button>
+      </div>
+    );
+  }
 
-  // 중복 제거
-  const relevantMembers = Array.from(
-    new Map(allRelatedUsers.map(user => [user.id, user])).values()
-  );
-
-  if (loading) {
+  if (loading || !equipments) {
     return (
       <div className="bg-white rounded-xl p-6 text-center">
         <div className="animate-spin inline-block w-6 h-6 border-2 border-team-500 border-t-transparent rounded-full"></div>
@@ -185,7 +180,7 @@ export default function EquipmentTab({ eventId }: Props) {
     );
   }
 
-  if (equipments.length === 0) {
+  if (!equipments || equipments.length === 0) {
     return (
       <div className="bg-white rounded-xl p-6 text-center">
         <p className="text-sm text-gray-500 mb-2">등록된 장비가 없습니다</p>
@@ -195,6 +190,14 @@ export default function EquipmentTab({ eventId }: Props) {
       </div>
     );
   }
+
+  // 장비 관리자만 수집 (managers 필드만 사용)
+  const allManagers = equipments.flatMap(eq => eq.managers || []);
+
+  // 중복 제거
+  const relevantMembers = Array.from(
+    new Map(allManagers.map(user => [user.id, user])).values()
+  );
 
   return (
     <>
@@ -251,9 +254,6 @@ export default function EquipmentTab({ eventId }: Props) {
           <div key={manager.id} className="bg-white rounded-xl p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1">
               <span>{manager.name || "익명"}</span>
-              <span className="text-xs text-gray-400 font-normal">
-                ({assignedEquipments.length}개)
-              </span>
               {(manager.position || manager.number) && (
                 <span className="text-xs text-gray-400 font-normal ml-1">
                   {manager.position || ""} {manager.number ? `#${manager.number}` : ""}
@@ -325,6 +325,9 @@ export default function EquipmentTab({ eventId }: Props) {
           </span>
         </div>
       )}
+
+      {/* Toast */}
+      <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
     </>
   );
 }

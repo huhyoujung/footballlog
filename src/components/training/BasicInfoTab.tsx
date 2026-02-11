@@ -5,7 +5,10 @@ import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/trainin
 import type { Session } from "next-auth";
 import PomVoting from "@/components/PomVoting";
 import { useTeam } from "@/contexts/TeamContext";
+import { useToast } from "@/lib/useToast";
+import Toast from "@/components/Toast";
 import Image from "next/image";
+import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users } from "lucide-react";
 
 interface Props {
   event: TrainingEventDetail;
@@ -15,9 +18,11 @@ interface Props {
 
 export default function BasicInfoTab({ event, session, onRefresh }: Props) {
   const { teamData } = useTeam();
+  const { toast, showToast, hideToast } = useToast();
   const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(event.myRsvp);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [showEditRsvp, setShowEditRsvp] = useState(false);
   const [showAttendance, setShowAttendance] = useState(true);
   const [showAttendees, setShowAttendees] = useState(true);
@@ -92,7 +97,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         onRefresh();
       } else {
         const data = await res.json();
-        alert(data.error || "체크인에 실패했습니다");
+        showToast(data.error || "체크인에 실패했습니다");
       }
     } catch {
       // ignore
@@ -112,12 +117,33 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         onRefresh();
       } else {
         const data = await res.json();
-        alert(data.error || "취소에 실패했습니다");
+        showToast(data.error || "취소에 실패했습니다");
       }
     } catch {
       // ignore
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!confirm(`미응답자 ${noResponse.length}명에게 알림을 보내시겠습니까?`)) return;
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`/api/training-events/${event.id}/remind-rsvp`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(data.message || "알림을 전송했습니다 ✓");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "알림 전송에 실패했습니다");
+      }
+    } catch {
+      showToast("알림 전송에 실패했습니다");
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -127,96 +153,56 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
       <div className="bg-white rounded-xl p-5 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-gray-900">
-            <span>⚽</span>
+            <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
             <span className="font-semibold">{dateStr}</span>
           </div>
           {event.isRegular && (
             <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">정기</span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>📍</span>
-          <span>{event.location}</span>
-        </div>
-        {event.shoes.length > 0 && (
+        {/* 장소/신발/유니폼/조끼 (2x2 그리드) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* 장소 */}
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>👟</span>
-            <span>{event.shoes.join(", ")} 권장</span>
+            <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+            <span>{event.location}</span>
           </div>
-        )}
-        {event.uniform && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>👕</span>
-            <span>{event.uniform}</span>
-          </div>
-        )}
-        {event.notes && (
-          <div className="flex items-start gap-2 text-sm text-gray-600 border-t border-gray-100 -mx-5 px-5 pt-2.5">
-            <span className="mt-0.5">💡</span>
-            <div className="flex-1 whitespace-pre-wrap">{event.notes}</div>
-          </div>
-        )}
-        {(event.vestBringer || event.vestReceiver) && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>🧺</span>
-            <span>
-              조끼: {event.vestBringer?.name || "미정"} → {event.vestReceiver?.name || "미정"}
-            </span>
-          </div>
-        )}
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span>⏰</span>
-          <span>응답 마감: {deadlineStr} {isDeadlinePassed && <span className="text-gray-400">(마감됨)</span>}</span>
-        </div>
-      </div>
-
-      {/* RSVP - 응답하지 않은 경우에만 표시 */}
-      {!isDeadlinePassed && !event.myRsvp && (
-        <div className="bg-white rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">나의 참석 여부</h3>
-          <div className="flex gap-2 mb-3">
-            {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
-              const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
-              const colors = {
-                ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
-                ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
-                LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
-              };
-              return (
-                <button
-                  key={s}
-                  onClick={() => {
-                    if (s === "ATTEND") handleRsvp("ATTEND");
-                    else setRsvpStatus(s);
-                  }}
-                  disabled={submitting}
-                  className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${colors[s]}`}
-                >
-                  {labels[s]}
-                </button>
-              );
-            })}
-          </div>
-          {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
-            <div className="space-y-2">
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="사유를 입력해주세요"
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
-              />
-              <button
-                onClick={() => handleRsvp(rsvpStatus)}
-                disabled={!reason.trim() || submitting}
-                className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-              >
-                {submitting ? "전송 중..." : "응답 제출"}
-              </button>
+          {/* 신발 */}
+          {event.shoes.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Footprints className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+              <span>{event.shoes.join(", ")} 권장</span>
+            </div>
+          )}
+          {/* 유니폼 */}
+          {event.uniform && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Shirt className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+              <span>{event.uniform}</span>
+            </div>
+          )}
+          {/* 조끼 */}
+          {(event.vestBringer || event.vestReceiver) && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Package className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
+                  {event.vestBringer?.name || "미정"}
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
+                  {event.vestReceiver?.name || "미정"}
+                </span>
+              </span>
             </div>
           )}
         </div>
-      )}
+        {event.notes && (
+          <div className="text-sm text-gray-600 border-t border-gray-100 -mx-5 px-5 pt-2.5 whitespace-pre-wrap leading-relaxed">
+            {event.notes}
+          </div>
+        )}
+      </div>
 
       {/* 체크인 (운동 2시간 전부터) */}
       {canCheckIn && (
@@ -224,7 +210,12 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           <h3 className="text-sm font-semibold text-gray-900 mb-3">체크인</h3>
           {event.myCheckIn ? (
             <div className="text-center py-3">
-              <div className="text-green-500 text-lg font-semibold">✅ 체크인 완료</div>
+              <div className="text-green-500 text-lg font-semibold flex items-center justify-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12l5 5l10 -10" />
+                </svg>
+                <span>체크인 완료</span>
+              </div>
               <div className="text-sm text-gray-500 mt-1">
                 도착: {new Date(event.myCheckIn).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
               </div>
@@ -240,9 +231,16 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             <button
               onClick={handleCheckIn}
               disabled={submitting}
-              className="w-full py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {submitting ? "체크인 중..." : "✅ 도착 체크인"}
+              {submitting ? (
+                "체크인 중..."
+              ) : (
+                <>
+                  <Check className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                  <span>도착 체크인</span>
+                </>
+              )}
             </button>
           ) : (
             <p className="text-sm text-gray-400 text-center py-3">
@@ -257,19 +255,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         <div className="bg-white rounded-xl p-5">
           <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setShowPomVoting(!showPomVoting)}>
             <h3 className="text-sm font-semibold text-gray-900">MVP 투표</h3>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`}
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showPomVoting ? '' : '-rotate-90'}`} />
           </div>
           {showPomVoting && (
             <div className="pt-3 border-t border-gray-100">
@@ -285,40 +271,98 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
       )}
 
       {/* 참석 현황 */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="bg-white rounded-xl p-5">
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-gray-900">참석 현황</h3>
-          {event.checkIns.length > 0 && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              {event.checkIns.length}/{attendees.length + lateComers.length}명 도착
-            </p>
-          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">참석 현황</h3>
+              {event.checkIns.length > 0 && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {event.checkIns.length}/{attendees.length + lateComers.length}명 도착
+                </p>
+              )}
+            </div>
+            {/* 미응답자 알림 버튼 (운영진만, 마감 전, 미응답자 있을 때) */}
+            {session?.user?.role === "ADMIN" && !isDeadlinePassed && noResponse.length > 0 && (
+              <button
+                onClick={handleSendReminder}
+                disabled={sendingReminder}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-team-600 hover:text-team-700 hover:bg-team-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Bell className="w-3.5 h-3.5" strokeWidth={2} />
+                <span>{sendingReminder ? "전송 중..." : `알림 (${noResponse.length}명)`}</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-2">
+        {/* 응답 마감 (마감 전에만 표시) */}
+        {!isDeadlinePassed && (
+          <div className="text-sm text-gray-600 mb-4 pb-3 border-b border-gray-100">
+            응답 마감: {deadlineStr}~까지
+          </div>
+        )}
+
+        {/* 나의 응답 입력 (미응답자만) */}
+        {!isDeadlinePassed && !event.myRsvp && (
+          <div className="mb-4 pb-4 border-b border-gray-100">
+            <h4 className="text-xs font-semibold text-gray-700 mb-3">나의 응답</h4>
+            <div className="flex gap-2 mb-3">
+              {(["ATTEND", "ABSENT", "LATE"] as RsvpStatus[]).map((s) => {
+                const labels = { ATTEND: "정참", ABSENT: "불참", LATE: "늦참" };
+                const colors = {
+                  ATTEND: rsvpStatus === "ATTEND" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-700",
+                  ABSENT: rsvpStatus === "ABSENT" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700",
+                  LATE: rsvpStatus === "LATE" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-700",
+                };
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      if (s === "ATTEND") handleRsvp("ATTEND");
+                      else setRsvpStatus(s);
+                    }}
+                    disabled={submitting}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${colors[s]}`}
+                  >
+                    {labels[s]}
+                  </button>
+                );
+              })}
+            </div>
+            {(rsvpStatus === "ABSENT" || rsvpStatus === "LATE") && (
+              <div className="space-y-2">
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="사유를 입력해주세요"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+                />
+                <button
+                  onClick={() => handleRsvp(rsvpStatus)}
+                  disabled={!reason.trim() || submitting}
+                  className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                >
+                  {submitting ? "전송 중..." : "응답 제출"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-3">
         {attendees.length > 0 && (
-          <div className="bg-gray-50 rounded-lg">
+          <div>
             <div
-              className="flex items-center justify-between p-3 cursor-pointer"
+              className="flex items-center justify-between py-3 cursor-pointer"
               onClick={() => setShowAttendees(!showAttendees)}
             >
               <div className="text-xs font-semibold text-gray-700">정참 ({attendees.length}명)</div>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`text-gray-500 transition-transform ${showAttendees ? '' : '-rotate-90'}`}
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showAttendees ? '' : '-rotate-90'}`} />
             </div>
             {showAttendees && (
-            <div className="px-3 pb-3 space-y-2">
+            <div className="pb-3 space-y-2">
               {attendees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = event.checkIns.find((c) => c.userId === r.userId);
@@ -370,11 +414,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                         {/* 뱃지 및 버튼 */}
                         <div className="flex items-center gap-2 ml-auto">
-                          {isMe && (
-                            <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full">
-                              나
-                            </span>
-                          )}
                           {isMe && !isDeadlinePassed && (
                             <button
                               onClick={(e) => {
@@ -449,28 +488,16 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           </div>
         )}
         {absentees.length > 0 && (
-          <div className="bg-red-50 rounded-lg border border-red-100">
+          <div>
             <div
-              className="flex items-center justify-between p-3 cursor-pointer"
+              className="flex items-center justify-between py-3 cursor-pointer"
               onClick={() => setShowAbsentees(!showAbsentees)}
             >
-              <div className="text-xs font-semibold text-red-700">불참 ({absentees.length}명)</div>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`text-red-600 transition-transform ${showAbsentees ? '' : '-rotate-90'}`}
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              <div className="text-xs font-semibold text-gray-700">불참 ({absentees.length}명)</div>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showAbsentees ? '' : '-rotate-90'}`} />
             </div>
             {showAbsentees && (
-            <div className="px-3 pb-3 space-y-2">
+            <div className="pb-3 space-y-2">
               {absentees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
                 return (
@@ -500,11 +527,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                           {/* 뱃지 및 버튼 */}
                           <div className="flex items-center gap-2 ml-auto">
-                            {isMe && (
-                              <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full">
-                                나
-                              </span>
-                            )}
                             {isMe && !isDeadlinePassed && (
                               <button
                                 onClick={(e) => {
@@ -582,28 +604,16 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           </div>
         )}
         {lateComers.length > 0 && (
-          <div className="bg-yellow-50 rounded-lg border border-yellow-100">
+          <div>
             <div
-              className="flex items-center justify-between p-3 cursor-pointer"
+              className="flex items-center justify-between py-3 cursor-pointer"
               onClick={() => setShowLateComers(!showLateComers)}
             >
-              <div className="text-xs font-semibold text-yellow-700">늦참 ({lateComers.length}명)</div>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`text-yellow-600 transition-transform ${showLateComers ? '' : '-rotate-90'}`}
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              <div className="text-xs font-semibold text-gray-700">늦참 ({lateComers.length}명)</div>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showLateComers ? '' : '-rotate-90'}`} />
             </div>
             {showLateComers && (
-            <div className="px-3 pb-3 space-y-2">
+            <div className="pb-3 space-y-2">
               {lateComers.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = event.checkIns.find((c) => c.userId === r.userId);
@@ -656,11 +666,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                           {/* 뱃지 및 버튼 */}
                           <div className="flex items-center gap-2 ml-auto">
-                            {isMe && (
-                              <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full">
-                                나
-                              </span>
-                            )}
                             {isMe && !isDeadlinePassed && (
                               <button
                                 onClick={(e) => {
@@ -738,28 +743,42 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           </div>
         )}
         {noResponse.length > 0 && (
-          <div className="bg-gray-50 rounded-lg">
+          <div>
             <div
-              className="flex items-center justify-between p-3 cursor-pointer"
+              className="flex items-center justify-between py-3 cursor-pointer"
               onClick={() => setShowNoResponse(!showNoResponse)}
             >
-              <div className="text-xs font-semibold text-gray-500">미응답 ({noResponse.length}명)</div>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`text-gray-400 transition-transform ${showNoResponse ? '' : '-rotate-90'}`}
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              <div className="text-xs font-semibold text-gray-700">미응답 ({noResponse.length}명)</div>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showNoResponse ? '' : '-rotate-90'}`} />
             </div>
+            {session?.user?.role === "ADMIN" && !isDeadlinePassed && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (submitting) return;
+                  if (!confirm(`미응답자 ${noResponse.length}명에게 알림을 보내시겠습니까?`)) return;
+
+                  try {
+                    const res = await fetch(`/api/training-events/${event.id}/notify-rsvp`, {
+                      method: "POST",
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      showToast(`${data.recipientCount}명에게 알림을 보냈습니다 ✓`);
+                    } else {
+                      showToast(data.error || "알림 전송에 실패했습니다");
+                    }
+                  } catch (error) {
+                    showToast("알림 전송에 실패했습니다");
+                  }
+                }}
+                className="text-xs text-team-600 hover:text-team-700 font-medium px-2 py-1 rounded hover:bg-team-50 -mt-1 mb-2"
+              >
+                응답 독려하기
+              </button>
+            )}
             {showNoResponse && (
-            <div className="px-3 pb-3 space-y-2">
+            <div className="pb-3 space-y-2">
               {noResponse.map((member) => {
                 const isMe = member.id === session?.user?.id;
                 return (
@@ -822,10 +841,10 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             </svg>
           </div>
           {showSessions && (
-          <div className="space-y-3">
+          <div className="pt-3 border-t border-gray-100 space-y-3">
             {event.sessions.map((s, idx) => (
-              <div key={s.id} className="border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
+              <div key={s.id}>
+                <div className="flex items-center gap-2">
                   <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
@@ -833,34 +852,47 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                     {s.title || `세션 ${idx + 1}`}
                   </h4>
                 </div>
-                {s.memo && <p className="text-xs text-gray-500 mt-1">{s.memo}</p>}
-                {!s.requiresTeams ? (
-                  <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                    <span>👥</span>
-                    <span>전체 함께 진행</span>
-                  </div>
-                ) : s.teamAssignments.length > 0 ? (
-                  <div className="mt-2 space-y-1">
+                {s.memo && <p className="text-xs text-gray-500 mt-1 ml-8">{s.memo}</p>}
+                {s.teamAssignments.length > 0 && (
+                  <div className="mt-2 ml-8 space-y-2">
                     {Object.entries(
-                      s.teamAssignments.reduce<Record<string, string[]>>((acc, a) => {
+                      s.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
                         if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
-                        acc[a.teamLabel].push(a.user.name || "이름 없음");
+                        acc[a.teamLabel].push({
+                          name: a.user.name || "이름 없음",
+                          position: a.user.position || null,
+                        });
                         return acc;
                       }, {})
-                    ).map(([label, names]) => (
-                      <div key={label} className="text-xs text-gray-600">
-                        <span className="font-medium text-team-600">{label}팀:</span>{" "}
-                        {names.join(", ")}
+                    ).sort((a, b) => a[0].localeCompare(b[0])).map(([label, members]) => (
+                      <div key={label} className="bg-gray-50 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center flex-shrink-0">
+                            {label}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-700">{members.length}명</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {members.map((m, i) => (
+                            <span key={i} className="inline-flex items-center gap-0.5 text-xs text-gray-600">
+                              {m.name}
+                              {i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
-                ) : null}
+                )}
               </div>
             ))}
           </div>
           )}
         </div>
       )}
+
+      {/* Toast */}
+      <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
     </div>
   );
 }

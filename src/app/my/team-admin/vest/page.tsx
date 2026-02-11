@@ -29,6 +29,7 @@ export default function VestDutyPage() {
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [vestOrder, setVestOrder] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -78,6 +79,39 @@ export default function VestDutyPage() {
     setDraggedIndex(null);
   };
 
+  // 터치 이벤트 핸들러 (모바일)
+  const handleTouchStart = (index: number, e: React.TouchEvent) => {
+    setDraggedIndex(index);
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggedIndex === null || touchStartY === null) return;
+
+    e.preventDefault();
+    const touch = e.touches[0];
+    const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    // 드래그 중인 요소의 부모를 찾아서 인덱스 파악
+    const listItem = elementBelow?.closest('[data-vest-index]') as HTMLElement;
+    if (!listItem) return;
+
+    const targetIndex = parseInt(listItem.dataset.vestIndex || '', 10);
+    if (isNaN(targetIndex) || targetIndex === draggedIndex) return;
+
+    const newOrder = [...vestOrder];
+    const draggedItem = newOrder[draggedIndex];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedItem);
+    setVestOrder(newOrder);
+    setDraggedIndex(targetIndex);
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedIndex(null);
+    setTouchStartY(null);
+  };
+
   const addToVestOrder = (userId: string) => {
     if (!vestOrder.includes(userId)) {
       setVestOrder([...vestOrder, userId]);
@@ -98,7 +132,9 @@ export default function VestDutyPage() {
 
       if (res.ok) {
         setSuccess("조끼 순서가 저장되었습니다");
-        setTimeout(() => setSuccess(""), 2000);
+        setTimeout(() => {
+          router.push("/my/team-admin");
+        }, 500);
       } else {
         const data = await res.json();
         setError(data.error || "저장에 실패했습니다");
@@ -116,7 +152,7 @@ export default function VestDutyPage() {
     <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/my/team-admin" />
           <h1 className="text-base font-semibold text-gray-900">조끼 빨래 당번</h1>
           <button
@@ -143,10 +179,14 @@ export default function VestDutyPage() {
                 return (
                   <div
                     key={userId}
+                    data-vest-index={index}
                     draggable
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
+                    onTouchStart={(e) => handleTouchStart(index, e)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     className={`flex items-center gap-3 p-3 bg-white cursor-move hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl ${
                       draggedIndex === index ? "opacity-50" : ""
                     }`}

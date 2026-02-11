@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { usePWA } from "@/hooks/usePWA";
 
 export default function PWAManager() {
   const { data: session } = useSession();
   const { injectManifest, injectFavicon } = usePWA();
+  const pathname = usePathname();
+  const waitingWorkerRef = useRef<ServiceWorker | null>(null);
+  const previousPathRef = useRef<string | null>(null);
 
   // Service Worker 등록
   useEffect(() => {
@@ -62,10 +66,18 @@ export default function PWAManager() {
                 newWorker.state === "installed" &&
                 navigator.serviceWorker.controller
               ) {
-                console.log("[PWA] New version available");
+                console.log("[PWA] New version available - will update on next navigation");
+                // 새 버전이 waiting 상태로 대기 중 - 저장
+                waitingWorkerRef.current = newWorker;
               }
             });
           });
+
+          // 이미 waiting 중인 워커가 있는지 확인
+          if (registration.waiting) {
+            console.log("[PWA] Found waiting service worker");
+            waitingWorkerRef.current = registration.waiting;
+          }
         } catch (error) {
           console.error("[PWA] Service Worker registration failed:", error);
         }
@@ -74,6 +86,28 @@ export default function PWAManager() {
       registerServiceWorker();
     }
   }, []);
+
+  // 페이지 이동 감지 - 자동 업데이트
+  useEffect(() => {
+    // 첫 렌더링 시 pathname 저장
+    if (previousPathRef.current === null) {
+      previousPathRef.current = pathname;
+      return;
+    }
+
+    // 페이지가 변경되었고, waiting worker가 있으면 업데이트
+    if (previousPathRef.current !== pathname && waitingWorkerRef.current) {
+      console.log("[PWA] Page navigation detected - applying update");
+
+      // skipWaiting 메시지 전송
+      waitingWorkerRef.current.postMessage({ type: "SKIP_WAITING" });
+
+      // 새로고침
+      window.location.reload();
+    }
+
+    previousPathRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     const setupPWA = async () => {

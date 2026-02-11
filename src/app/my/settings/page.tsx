@@ -4,6 +4,7 @@ import BackButton from "@/components/BackButton";
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import useSWR from "swr";
 import { usePushSubscription } from "@/lib/usePushSubscription";
@@ -36,6 +37,7 @@ interface Profile {
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { update } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -152,7 +154,9 @@ export default function SettingsPage() {
 
       await update();
       setSuccess("저장되었습니다");
-      setTimeout(() => setSuccess(""), 2000);
+      setTimeout(() => {
+        router.push("/my");
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
@@ -213,7 +217,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-white">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/my" />
           <h1 className="text-base font-semibold text-gray-900">내 프로필 수정</h1>
           <button

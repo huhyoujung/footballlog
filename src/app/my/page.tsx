@@ -10,6 +10,7 @@ import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import { withEulReul } from "@/lib/korean";
+import { fetcher } from "@/lib/fetcher";
 import useSWR from "swr";
 
 interface Team {
@@ -31,9 +32,6 @@ interface ProfileData {
   image: string | null;
 }
 
-// SWR fetcher
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 export default function MyPage() {
   const { data: session, update } = useSession();
   const { teamData, loading: teamLoading } = useTeam();
@@ -42,6 +40,8 @@ export default function MyPage() {
   const [selectedMember, setSelectedMember] = useState<{
     id: string;
     name: string | null;
+    position?: string | null;
+    number?: number | null;
   } | null>(null);
   const { toast, showToast, hideToast } = useToast();
 
@@ -70,36 +70,36 @@ export default function MyPage() {
     // Optimistic UI: 즉시 완료 상태로 변경
     setNudgedToday((prev) => new Set(prev).add(recipientId));
 
-    // 백그라운드에서 API 호출
-    try {
-      const res = await fetch("/api/nudges", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientId }),
-      });
+    // 즉시 토스트 표시 (UX 개선)
+    showToast(`${withEulReul(recipientName)} 닦달했습니다! 👉`);
 
-      if (!res.ok) {
+    // 백그라운드에서 API 호출 (await 없음)
+    fetch("/api/nudges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientId }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          // 실패 시 롤백
+          setNudgedToday((prev) => {
+            const next = new Set(prev);
+            next.delete(recipientId);
+            return next;
+          });
+          const data = await res.json();
+          showToast(data.error || "닦달에 실패했습니다");
+        }
+      })
+      .catch(() => {
         // 실패 시 롤백
         setNudgedToday((prev) => {
           const next = new Set(prev);
           next.delete(recipientId);
           return next;
         });
-        const data = await res.json();
-        alert(data.error || "닦달에 실패했습니다");
-      } else {
-        // 성공 시 토스트 표시
-        showToast(`${withEulReul(recipientName)} 닦달했습니다! 👉`);
-      }
-    } catch {
-      // 실패 시 롤백
-      setNudgedToday((prev) => {
-        const next = new Set(prev);
-        next.delete(recipientId);
-        return next;
+        showToast("닦달에 실패했습니다");
       });
-      alert("닦달에 실패했습니다");
-    }
   };
 
   const handleLogout = () => {
@@ -116,7 +116,7 @@ export default function MyPage() {
     <div className="min-h-screen bg-white flex flex-col">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-4 py-1.5 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/" />
           <h1 className="text-base font-semibold text-gray-900">OURPAGE</h1>
           <button onClick={handleLogout} className="text-gray-400 hover:text-gray-600 p-2 -mr-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">
@@ -245,65 +245,96 @@ export default function MyPage() {
         )}
       </main>
 
-      {/* 문의하기 */}
-      <footer className="text-center py-6">
-        <a
-          href="https://open.kakao.com/o/sqBLurfi"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          문의하기
-        </a>
+      {/* 문의하기 및 버전 */}
+      <footer className="py-6 px-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <p className="text-[10px] text-gray-300">v0.1.0</p>
+          <a
+            href="https://open.kakao.com/o/sqBLurfi"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            문의하기
+          </a>
+        </div>
       </footer>
 
       {/* 팀원 액션 모달 */}
       {selectedMember && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center"
+          className="fixed inset-0 bg-black/10 backdrop-blur-lg z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedMember(null)}
         >
           <div
-            className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-3 animate-slide-up"
+            className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {withEulReul(selectedMember.name)}
+            {/* 헤더 */}
+            <div className="px-6 pt-5 pb-4 text-center">
+              <h3 className="text-lg font-bold text-gray-900">
+                {selectedMember.name}
               </h3>
+              {selectedMember.position && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedMember.position} {selectedMember.number !== null && `· #${selectedMember.number}`}
+                </p>
+              )}
             </div>
 
-            {/* 닦달하기 버튼 */}
-            <button
-              onClick={() => handleNudge(selectedMember.id)}
-              disabled={nudgedToday.has(selectedMember.id)}
-              className={`w-full py-4 rounded-xl font-medium transition-colors ${
-                nudgedToday.has(selectedMember.id)
-                  ? "bg-gray-100 text-gray-400"
-                  : "bg-team-500 text-white hover:bg-team-600"
-              }`}
-            >
-              {nudgedToday.has(selectedMember.id) ? (
-                <>✅ 오늘 닦달 완료</>
-              ) : (
-                <>👉 닦달하기</>
-              )}
-            </button>
+            {/* 액션 버튼들 */}
+            <div className="p-4 space-y-2">
+              {/* 닦달하기 버튼 */}
+              <button
+                onClick={() => handleNudge(selectedMember.id)}
+                disabled={nudgedToday.has(selectedMember.id)}
+                className={`w-full py-3.5 px-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                  nudgedToday.has(selectedMember.id)
+                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
+                    : "bg-team-500 text-white hover:bg-team-600 active:scale-[0.98]"
+                }`}
+              >
+                {nudgedToday.has(selectedMember.id) ? (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    오늘 닦달 완료
+                  </>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 8h-8.5a1.5 1.5 0 0 0 0 3h7.5"/>
+                      <path d="M11 11v-1a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1v1"/>
+                      <path d="M13 12v-1a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1v1"/>
+                      <path d="M15 13v-1a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1v1"/>
+                      <path d="M14 16h3a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h1"/>
+                      <path d="M11 11v-4a1 1 0 0 1 1 -1h2"/>
+                    </svg>
+                    닦달하기
+                  </>
+                )}
+              </button>
 
-            {/* 칭찬하기 버튼 (곧 지원) */}
-            <button
-              disabled
-              className="w-full py-4 rounded-xl font-medium bg-gray-100 text-gray-400"
-            >
-              👏 칭찬하기 (곧 지원됨)
-            </button>
+              {/* 칭찬하기 버튼 (곧 지원) */}
+              <button
+                disabled
+                className="w-full py-3.5 px-4 rounded-xl font-medium bg-gray-50 text-gray-400 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M7 10v12" />
+                  <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
+                </svg>
+                칭찬하기 (곧 지원)
+              </button>
+            </div>
 
             {/* 취소 버튼 */}
             <button
               onClick={() => setSelectedMember(null)}
-              className="w-full py-3 text-gray-500 hover:text-gray-700 transition-colors"
+              className="w-full py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
             >
-              취소
+              닫기
             </button>
           </div>
         </div>

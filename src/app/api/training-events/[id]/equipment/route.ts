@@ -12,29 +12,24 @@ export async function GET(
     const session = await getServerSession(authOptions);
     const { id: trainingEventId } = await params;
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session.user.teamId) {
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    // 운동 존재 여부 확인
-    const event = await prisma.trainingEvent.findUnique({
-      where: { id: trainingEventId },
-      select: { teamId: true },
-    });
-
-    if (!event) {
-      return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
-    }
-
-    if (event.teamId !== session.user.teamId) {
-      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
-    }
-
-    // 팀 장비 목록 + 현재 운동의 배정 정보
+    // 팀 장비 목록 + 현재 운동의 배정 정보 (한 번에 조회)
     const equipments = await prisma.equipment.findMany({
-      where: { teamId: event.teamId },
+      where: { teamId: session.user.teamId },
       orderBy: { orderIndex: "asc" },
       include: {
+        managers: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            position: true,
+            number: true,
+          },
+        },
         assignments: {
           where: { trainingEventId },
           include: {
@@ -43,6 +38,8 @@ export async function GET(
                 id: true,
                 name: true,
                 image: true,
+                position: true,
+                number: true,
               },
             },
           },
@@ -55,12 +52,13 @@ export async function GET(
       id: eq.id,
       name: eq.name,
       description: eq.description,
-      assignment: eq.assignments[0] || null, // 운동당 장비당 1개 배정만 있음
+      managers: eq.managers,
+      assignment: eq.assignments[0] || null,
     }));
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("장비 배정 조회 오류:", error);
+    console.error("장비 API 오류:", error);
     return NextResponse.json({ error: "조회에 실패했습니다" }, { status: 500 });
   }
 }

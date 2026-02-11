@@ -53,6 +53,12 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
   const visibleLogs = logs.slice(0, 3);
   const configs = useMemo(() => generateStackConfigs(date), [date]);
 
+  // 사진 1개일 때는 로그 ID 기반으로 고유한 회전 생성
+  const getSingleCardRotation = (logId: string) => {
+    const rand = seededRandom(logId);
+    return -8 + rand(16); // -8도 ~ +8도 사이 랜덤
+  };
+
   // 펼침 시 카드를 가로로 벌리는 위치 계산 (캐러셀 위치에 가깝게)
   const getExpandedOffset = (i: number, total: number) => {
     const spacing = 76;
@@ -68,6 +74,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
       <div className="relative w-44 h-56">
         {visibleLogs.map((log, i) => {
           const config = configs[visibleLogs.length - 1 - i] || configs[0];
+          const rotation = visibleLogs.length === 1 ? getSingleCardRotation(log.id) : config.rotation;
           const expandOffset = getExpandedOffset(i, visibleLogs.length);
 
           return (
@@ -85,7 +92,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                 top: config.top,
                 left: '50%',
                 marginLeft: -72 + config.left,
-                transform: `rotate(${config.rotation}deg)`,
+                transform: `rotate(${rotation}deg)`,
                 zIndex: config.zIndex,
               }}
             >
@@ -95,7 +102,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
         })}
       </div>
       <div
-        className="-mt-3 text-center stack-card"
+        className="-mt-1 text-center stack-card"
         style={{ opacity: isExpanding ? 0 : 1 }}
       >
         <p className="text-sm font-semibold text-team-500">{displayDate}</p>

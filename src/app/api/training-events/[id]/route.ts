@@ -19,11 +19,7 @@ export async function GET(
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    // 쿼리 파라미터로 추가 데이터 로드 여부 결정 (관리 페이지용)
-    const { searchParams } = new URL(req.url);
-    const includeManagement = searchParams.get("includeManagement") === "true";
-
-    // 기본 정보만 먼저 로드 (빠른 응답)
+    // 기본 정보만 로드 (빠른 응답)
     const event = await prisma.trainingEvent.findUnique({
       where: { id },
       include: {
@@ -46,20 +42,6 @@ export async function GET(
           },
           orderBy: { orderIndex: "asc" },
         },
-        // 관리 페이지에서만 필요한 데이터
-        ...(includeManagement && {
-          lateFees: {
-            include: { user: { select: userSelect } },
-            orderBy: { createdAt: "asc" },
-          },
-          equipmentAssignments: {
-            include: {
-              equipment: { select: { id: true, name: true, description: true } },
-              user: { select: userSelect },
-            },
-            orderBy: { equipment: { orderIndex: "asc" } },
-          },
-        }),
       },
     });
 

@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 
 interface TeamMember {
   id: string;
@@ -29,9 +30,6 @@ interface TeamContextType {
 }
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
-
-// SWR fetcher
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();

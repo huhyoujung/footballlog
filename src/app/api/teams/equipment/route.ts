@@ -30,6 +30,15 @@ export async function GET() {
             number: true,
           },
         },
+        managers: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            position: true,
+            number: true,
+          },
+        },
       },
     });
 

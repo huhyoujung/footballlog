@@ -77,7 +77,13 @@ export interface SessionEntry {
     id: string;
     userId: string;
     teamLabel: string;
-    user: { id: string; name: string | null; image: string | null };
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+      position: string | null;
+      number: number | null;
+    };
   }[];
 }
 

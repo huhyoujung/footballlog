@@ -65,11 +65,14 @@ self.addEventListener('fetch', (event) => {
         if (event.request.url.includes('/api/')) {
           return response;
         }
-        // 정적 리소스는 캐시
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
+        // http/https 프로토콜만 캐싱 (chrome-extension 등 제외)
+        const url = new URL(event.request.url);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
         return response;
       })
       .catch(() => {

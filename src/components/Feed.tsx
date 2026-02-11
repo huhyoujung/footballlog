@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
 import useSWR from "swr";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
@@ -15,11 +16,9 @@ import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import { timeAgo } from "@/lib/timeAgo";
 import { isCheckInPeriod } from "@/lib/timeUntil";
+import { fetcher } from "@/lib/fetcher";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
-
-// SWR fetcher
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Nudge {
   id: string;
@@ -200,19 +199,32 @@ export default function Feed() {
 
     return Object.entries(grouped)
       .sort(([a], [b]) => b.localeCompare(a))
-      .map(([date, dateLogs]) => ({
-        date, // 실제 날짜 (YYYY-MM-DD) 추가
-        displayDate:
-          date === today
-            ? "오늘"
-            : date === yesterday
-              ? "어제"
-              : new Date(date).toLocaleDateString("ko-KR", {
-                  month: "long",
-                  day: "numeric",
-                }),
-        logs: dateLogs,
-      }));
+      .map(([date, dateLogs]) => {
+        // 정렬 로직: 오늘은 최신순, 과거는 오래된 순
+        const sortedLogs = [...dateLogs].sort((a, b) => {
+          if (date === today) {
+            // 오늘: 최신순 (사람들이 신규 글을 많이 보게 하기 위함)
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          } else {
+            // 과거: 오래된 순 (먼저 올리는 경쟁을 가속시키도록)
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          }
+        });
+
+        return {
+          date, // 실제 날짜 (YYYY-MM-DD) 추가
+          displayDate:
+            date === today
+              ? "오늘"
+              : date === yesterday
+                ? "어제"
+                : new Date(date).toLocaleDateString("ko-KR", {
+                    month: "long",
+                    day: "numeric",
+                  }),
+          logs: sortedLogs,
+        };
+      });
   };
 
   // 오늘 운동한 사용자 ID 목록
@@ -252,6 +264,23 @@ export default function Feed() {
       messages.push({
         key: "mvp",
         text: `🏆 ${mvpName}님이 ${whenText} MVP였습니다!`,
+      });
+    }
+
+    // 오늘 1등 메시지 (오늘 로그가 정확히 1개일 때만)
+    const today = getLocalDateString(new Date());
+    const todayLogs = logs.filter(log => getLocalDateString(new Date(log.trainingDate)) === today);
+    if (todayLogs.length === 1) {
+      const firstLog = todayLogs[0];
+      const timeStr = new Date(firstLog.createdAt).toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+      messages.push({
+        key: "first-today",
+        text: `🏆 ${firstLog.user.name || "팀원"}님이 오늘 첫 주자! · ${timeStr}`,
+        url: `/log/${firstLog.id}`,
       });
     }
 
@@ -303,7 +332,7 @@ export default function Feed() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           {teamLogoUrl ? (
-            <img src={teamLogoUrl} alt="팀 로고" className="w-8 h-8 object-cover rounded-full" />
+            <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority />
           ) : (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="1" width="18" height="22" rx="1" fill="#E8E0D8" stroke="#967B5D" strokeWidth="1" />

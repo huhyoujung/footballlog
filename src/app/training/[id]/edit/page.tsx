@@ -201,7 +201,7 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href={`/training/${eventId}`} />
           <h1 className="text-base font-semibold text-gray-900">운동 정보 수정</h1>
           <div className="w-6" />

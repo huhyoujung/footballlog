@@ -28,7 +28,17 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
   useEffect(() => {
     if (isOpen) {
       fetchAttendanceRates();
+      // 모달 열릴 때 배경 스크롤 막기
+      document.body.style.overflow = 'hidden';
+    } else {
+      // 모달 닫힐 때 배경 스크롤 복구
+      document.body.style.overflow = '';
     }
+
+    // 컴포넌트 언마운트 시 정리
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isOpen]);
 
   const fetchAttendanceRates = async () => {
@@ -50,14 +60,20 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/10 backdrop-blur-lg z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 헤더 */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-2.5 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">팀원 출석률</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">팀원 출석률</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition-colors"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6 6 18" />
@@ -77,23 +93,35 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
               출석 데이터가 없습니다
             </div>
           ) : (
-            <div className="p-5 space-y-1">
-              <p className="text-xs text-gray-400 mb-3">
+            <div className="p-4 space-y-0.5">
+              <p className="text-xs text-gray-500 mb-3 px-2">
                 총 {totalEvents}회 운동 기준
               </p>
-              {attendanceRates.map((item) => (
+              {attendanceRates.map((item, index) => (
                 <div
                   key={item.userId}
-                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-gray-50"
+                  className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
+                  {/* 순위 */}
+                  <div className="w-5 text-center flex-shrink-0">
+                    <span className={`text-xs font-bold ${
+                      index === 0 ? "text-yellow-500" :
+                      index === 1 ? "text-gray-400" :
+                      index === 2 ? "text-orange-400" :
+                      "text-gray-300"
+                    }`}>
+                      {index + 1}
+                    </span>
+                  </div>
+
                   {/* 프로필 */}
-                  <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                     {item.image ? (
                       <Image
                         src={item.image}
                         alt={item.name || ""}
-                        width={40}
-                        height={40}
+                        width={32}
+                        height={32}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -107,26 +135,18 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
                       <span className="text-sm font-medium text-gray-900 truncate">
                         {item.name || "익명"}
                       </span>
-                      {item.position && (
-                        <span className="text-xs text-gray-400">
-                          {item.position}
+                      {(item.position || item.number !== null) && (
+                        <span className="text-xs text-gray-500">
+                          {item.position || ""}{item.number !== null ? ` ${item.number}` : ""}
                         </span>
                       )}
-                      {item.number !== null && (
-                        <span className="text-xs text-gray-400">
-                          #{item.number}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {item.checkInCount}회 / {item.totalEvents}회
                     </div>
                   </div>
 
-                  {/* 출석률 */}
-                  <div className="flex-shrink-0 text-right">
-                    <div
-                      className={`text-lg font-bold ${
+                  {/* 출석 횟수 + 출석률 */}
+                  <div className="flex-shrink-0">
+                    <span
+                      className={`text-sm font-semibold ${
                         item.rate >= 80
                           ? "text-green-600"
                           : item.rate >= 50
@@ -134,8 +154,8 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
                             : "text-gray-400"
                       }`}
                     >
-                      {item.rate}%
-                    </div>
+                      {item.checkInCount}회 ({item.rate}%)
+                    </span>
                   </div>
                 </div>
               ))}

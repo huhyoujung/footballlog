@@ -1,11 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
+
 interface Props {
   onSelect: (mode: "balanced" | "grouped") => void;
   onClose: () => void;
 }
 
 export default function AutoAssignSheet({ onSelect, onClose }: Props) {
+  useEffect(() => {
+    // 모달 열릴 때 배경 스크롤 막기
+    document.body.style.overflow = 'hidden';
+
+    // 컴포넌트 언마운트 시 배경 스크롤 복구
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
     <>
       {/* Backdrop */}

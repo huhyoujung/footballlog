@@ -322,7 +322,7 @@ export default function LogDetailPage({
     <div className="min-h-screen bg-white pb-28">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
           <BackButton href="/" />
           <h1 className="text-base font-semibold text-gray-900">운동 일지</h1>
           {(isMyPost || isAdmin) && (
@@ -377,6 +377,7 @@ export default function LogDetailPage({
               src={log.imageUrl}
               alt="운동 사진"
               className="w-full aspect-[4/3] object-cover"
+              loading="eager"
             />
           </div>
         )}
@@ -404,7 +405,7 @@ export default function LogDetailPage({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <p className="font-medium text-gray-900">
+                <p className="text-sm font-medium text-gray-900">
                   {log.user.name || "익명"}
                 </p>
                 {(log.user.position || log.user.number != null) && (
@@ -433,12 +434,12 @@ export default function LogDetailPage({
         </div>
 
         {/* 운동 일지 본문 */}
-        <div className="bg-white mt-3 mx-4 rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="bg-white mt-3 mx-4 rounded-xl divide-y divide-gray-100">
           {/* 컨디션 */}
           <div className="p-4">
             <div className="flex items-center gap-3">
               <ConditionBadge condition={log.condition} />
-              <p className="text-gray-700 text-sm flex-1">{log.conditionReason}</p>
+              <p className="text-sm text-gray-800 flex-1">{log.conditionReason}</p>
             </div>
           </div>
 
@@ -462,7 +463,7 @@ export default function LogDetailPage({
             className="flex items-center gap-1.5 py-1"
           >
             {log.isLiked ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#F87171" stroke="none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#D1D5DB" stroke="none">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
             ) : (
@@ -470,7 +471,7 @@ export default function LogDetailPage({
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
             )}
-            <span className={`text-sm ${log.isLiked ? "text-red-400" : "text-gray-400"}`}>
+            <span className="text-sm text-gray-400">
               {log._count.likes}
             </span>
           </button>
@@ -489,7 +490,7 @@ export default function LogDetailPage({
           </h3>
 
           {log.comments.length === 0 ? (
-            <p className="px-4 py-6 text-center text-gray-500">
+            <p className="px-4 py-6 text-sm text-center text-gray-500">
               첫 번째 댓글을 남겨보세요!
             </p>
           ) : (
@@ -566,7 +567,7 @@ export default function LogDetailPage({
                           </div>
                         ) : (
                           <>
-                            <p className="text-gray-700 text-sm mt-1">
+                            <p className="text-sm text-gray-800 mt-1">
                               {renderMentionedText(c.content)}
                             </p>
                             {(isMyComment || canDelete) && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { CONDITION_LEVELS, getConditionColor } from "@/lib/condition";
 
 interface Props {
@@ -14,6 +14,16 @@ export default function ConditionPicker({ value, onConfirm, onClose }: Props) {
   const barRef = useRef<HTMLDivElement>(null);
   const level = CONDITION_LEVELS[selected];
   const color = getConditionColor(selected);
+
+  useEffect(() => {
+    // 모달 열릴 때 배경 스크롤 막기
+    document.body.style.overflow = 'hidden';
+
+    // 컴포넌트 언마운트 시 배경 스크롤 복구
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const getValueFromPosition = useCallback(
     (clientX: number) => {
