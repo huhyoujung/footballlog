@@ -19,20 +19,10 @@ export async function PUT(
       return NextResponse.json({ error: "운영진만 수정할 수 있습니다" }, { status: 403 });
     }
 
-    const { name, description, ownerId } = await req.json();
+    const { name, description } = await req.json();
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "장비 이름을 입력해주세요" }, { status: 400 });
-    }
-
-    // ownerId 검증 (제공된 경우)
-    if (ownerId !== undefined && ownerId !== null && ownerId !== "") {
-      const ownerExists = await prisma.user.findUnique({
-        where: { id: ownerId },
-      });
-      if (!ownerExists || ownerExists.teamId !== session.user.teamId) {
-        return NextResponse.json({ error: "유효하지 않은 담당자입니다" }, { status: 400 });
-      }
     }
 
     // 장비 존재 여부 및 팀 확인
@@ -69,18 +59,6 @@ export async function PUT(
       data: {
         name: name.trim(),
         description: description?.trim() || null,
-        ownerId: ownerId === "" ? null : ownerId,
-      },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            position: true,
-            number: true,
-          },
-        },
       },
     });
 
