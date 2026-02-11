@@ -21,15 +21,6 @@ export async function GET() {
       where: { teamId: session.user.teamId },
       orderBy: { orderIndex: "asc" },
       include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            position: true,
-            number: true,
-          },
-        },
         managers: {
           select: {
             id: true,
