@@ -22,7 +22,7 @@ export default function AutoAssignSheet({ onSelect, onClose }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 z-40 animate-fade-in"
+        className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
         onClick={onClose}
       />
 
