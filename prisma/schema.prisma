@@ -121,6 +121,9 @@ model Venue {
   teamId          String
   name            String
   address         String?
+  mapUrl          String?  // 네이버 지도 URL
+  latitude        Float?   // 위도
+  longitude       Float?   // 경도
   surface         String?
   recommendedShoes String[] @default([])
   usageCount      Int      @default(0)

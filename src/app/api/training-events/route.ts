@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "운영진만 생성할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, isRegular, enablePomVoting, pomVotingDeadline, pomVotesPerPerson, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline } =
+    const { title, isRegular, enablePomVoting, pomVotingDeadline, pomVotesPerPerson, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline, venueData } =
       await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
@@ -97,12 +97,25 @@ export async function POST(req: Request) {
           data: {
             teamId: session.user.teamId,
             name: location.trim(),
+            address: venueData?.address || null,
+            mapUrl: venueData?.mapUrl || null,
+            latitude: venueData?.latitude || null,
+            longitude: venueData?.longitude || null,
             recommendedShoes: Array.isArray(shoes) ? shoes : [],
             usageCount: 1,
           },
         });
       } else {
-        // 기존 구장: 사용 횟수 증가 + 신발 추천 업데이트
+        // 기존 구장: 사용 횟수 증가 + 신발 추천 업데이트 + 지도 정보 업데이트
+        await prisma.venue.update({
+          where: { id: venue.id },
+          data: {
+            address: venueData?.address || venue.address,
+            mapUrl: venueData?.mapUrl || venue.mapUrl,
+            latitude: venueData?.latitude || venue.latitude,
+            longitude: venueData?.longitude || venue.longitude,
+          },
+        });
         await updateVenueRecommendation(venue.id, Array.isArray(shoes) ? shoes : []);
       }
       venueId = venue.id;

@@ -17,12 +17,17 @@ interface MemberOption {
 }
 
 interface VenueOption {
-  id: string;
+  id?: string;
   name: string;
   address: string | null;
-  surface: string | null;
-  recommendedShoes: string[];
-  usageCount: number;
+  roadAddress?: string;
+  mapUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  surface?: string | null;
+  recommendedShoes?: string[];
+  usageCount?: number;
+  category?: string;
 }
 
 export default function TrainingCreatePage() {
@@ -74,11 +79,12 @@ export default function TrainingCreatePage() {
       return;
     }
     try {
-      const res = await fetch(`/api/venues?search=${encodeURIComponent(query)}`);
+      // 네이버 지도 API로 장소 검색
+      const res = await fetch(`/api/places/search?query=${encodeURIComponent(query)}`);
       if (res.ok) {
         const data = await res.json();
-        setVenues(data.venues || []);
-        setShowVenueList(data.venues.length > 0);
+        setVenues(data.places || []);
+        setShowVenueList(data.places && data.places.length > 0);
       }
     } catch {
       // ignore
@@ -94,7 +100,9 @@ export default function TrainingCreatePage() {
   const handleVenueSelect = (venue: VenueOption) => {
     setLocation(venue.name);
     setSelectedVenue(venue);
-    setShoes(venue.recommendedShoes);
+    if (venue.recommendedShoes) {
+      setShoes(venue.recommendedShoes);
+    }
     setShowVenueList(false);
   };
 
@@ -155,6 +163,13 @@ export default function TrainingCreatePage() {
           vestBringerId: vestBringerId || null,
           vestReceiverId: vestReceiverId || null,
           rsvpDeadline: rsvpDeadline.toISOString(),
+          // 지도 정보
+          venueData: selectedVenue ? {
+            address: selectedVenue.address,
+            mapUrl: selectedVenue.mapUrl,
+            latitude: selectedVenue.latitude,
+            longitude: selectedVenue.longitude,
+          } : null,
         }),
       });
 
@@ -297,28 +312,23 @@ export default function TrainingCreatePage() {
               placeholder="운동 장소를 입력하세요"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
-            {/* 구장 자동완성 리스트 */}
+            {/* 장소 검색 결과 리스트 */}
             {showVenueList && venues.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                {venues.map((venue) => (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
+                {venues.map((venue, index) => (
                   <button
-                    key={venue.id}
+                    key={venue.id || `place-${index}`}
                     type="button"
                     onClick={() => handleVenueSelect(venue)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                   >
                     <div className="text-sm font-medium text-gray-900">{venue.name}</div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-400">방문 {venue.usageCount}회</span>
-                      {venue.recommendedShoes.length > 0 && (
-                        <>
-                          <span className="text-xs text-gray-300">·</span>
-                          <span className="text-xs text-team-500">
-                            {venue.recommendedShoes.join(", ")} 권장
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    {venue.address && (
+                      <div className="text-xs text-gray-500 mt-1">{venue.roadAddress || venue.address}</div>
+                    )}
+                    {venue.category && (
+                      <div className="text-xs text-gray-400 mt-0.5">{venue.category}</div>
+                    )}
                   </button>
                 ))}
               </div>
