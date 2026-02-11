@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -105,6 +105,18 @@ export default function MyPage() {
   const handleLogout = () => {
     signOut({ callbackUrl: "/login" });
   };
+
+  // 모달 열릴 때 body 스크롤 방지
+  useEffect(() => {
+    if (selectedMember) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedMember]);
 
   const isLoading = profileLoading || teamLoading;
 
