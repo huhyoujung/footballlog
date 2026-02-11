@@ -173,7 +173,8 @@ export default function MyPage() {
               </p>
               <div className="space-y-2 px-4">
                 {teamData.members.map((member) => (
-                  <div
+                  <button
+                    type="button"
                     key={member.id}
                     onClick={() => {
                       if (member.id !== session?.user?.id) {
@@ -183,10 +184,11 @@ export default function MyPage() {
                         });
                       }
                     }}
-                    className={`flex items-center gap-3 py-1.5 ${
+                    disabled={member.id === session?.user?.id}
+                    className={`flex items-center gap-3 py-1.5 w-full text-left ${
                       member.id !== session?.user?.id
                         ? "cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors"
-                        : ""
+                        : "-mx-2 px-2"
                     }`}
                   >
                     <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -237,7 +239,7 @@ export default function MyPage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
