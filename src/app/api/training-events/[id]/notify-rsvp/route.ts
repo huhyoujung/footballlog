@@ -46,7 +46,7 @@ export async function POST(
     });
 
     // RSVP한 사람들 조회
-    const rsvps = await prisma.rSVP.findMany({
+    const rsvps = await prisma.rsvp.findMany({
       where: { trainingEventId },
       select: { userId: true },
     });
