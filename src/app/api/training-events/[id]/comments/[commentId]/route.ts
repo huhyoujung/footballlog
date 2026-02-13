@@ -17,7 +17,7 @@ export async function DELETE(
     const { commentId } = await params;
 
     // 댓글 조회
-    const comment = await prisma.comment.findUnique({
+    const comment = await prisma.trainingEventComment.findUnique({
       where: { id: commentId },
       select: {
         authorId: true,
@@ -52,7 +52,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.comment.delete({
+    await prisma.trainingEventComment.delete({
       where: { id: commentId },
     });
 

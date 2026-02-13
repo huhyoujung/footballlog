@@ -64,7 +64,7 @@ export async function POST(
     // 팀 운동 존재 확인
     const trainingEvent = await prisma.trainingEvent.findUnique({
       where: { id },
-      select: { teamId: true },
+      select: { teamId: true, title: true, date: true },
     });
 
     if (!trainingEvent) {
