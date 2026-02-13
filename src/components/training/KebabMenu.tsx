@@ -2,11 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 
 interface Props {
   eventId: string;
+  eventTitle: string;
   eventDate: string;
   eventLocation: string;
+  eventUniform?: string | null;
+  eventNotes?: string | null;
   rsvpCount: number;
   checkInCount: number;
   lateFeeCount: number;
@@ -15,8 +20,11 @@ interface Props {
 
 export default function KebabMenu({
   eventId,
+  eventTitle,
   eventDate,
   eventLocation,
+  eventUniform,
+  eventNotes,
   rsvpCount,
   checkInCount,
   lateFeeCount,
@@ -26,6 +34,7 @@ export default function KebabMenu({
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { toast, showToast, hideToast } = useToast();
 
   // 메뉴 외부 클릭 감지
   useEffect(() => {
@@ -43,6 +52,41 @@ export default function KebabMenu({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showMenu]);
+
+  const handleShare = async () => {
+    setShowMenu(false);
+    const url = `${window.location.origin}/training/${eventId}`;
+
+    // 운동 정보 포맷팅
+    const dateStr = new Date(eventDate).toLocaleDateString("ko-KR", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const shareText = [
+      `[${eventTitle || "팀 운동"}]`,
+      "",
+      `📅 ${dateStr}`,
+      `📍 ${eventLocation}`,
+      eventUniform ? `👕 ${eventUniform}` : null,
+      eventNotes ? `📝 ${eventNotes}` : null,
+      "",
+      url,
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+
+    // 클립보드에 복사
+    try {
+      await navigator.clipboard.writeText(shareText);
+      showToast("운동 정보가 복사되었습니다!");
+    } catch {
+      showToast("복사에 실패했습니다");
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -85,11 +129,17 @@ export default function KebabMenu({
         {showMenu && (
           <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-[100]">
             <button
+              onClick={handleShare}
+              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              공유하기
+            </button>
+            <button
               onClick={() => {
                 setShowMenu(false);
                 router.push(`/training/${eventId}/edit`);
               }}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
             >
               기본 정보 수정
             </button>
@@ -173,6 +223,9 @@ export default function KebabMenu({
           </div>
         </div>
       )}
+
+      {/* Toast */}
+      <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
     </>
   );
 }

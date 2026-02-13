@@ -6,23 +6,44 @@ import LateFeeTab from "@/components/training/LateFeeTab";
 import SessionTab from "@/components/training/SessionTab";
 import EquipmentTab from "@/components/training/EquipmentTab";
 import KebabMenu from "@/components/training/KebabMenu";
+import Toast from "@/components/Toast";
+import { Share2 } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { fetcher } from "@/lib/fetcher";
 import useSWR from "swr";
 import type { TrainingEventDetail } from "@/types/training-event";
+import { useToast } from "@/lib/useToast";
 
 type AdminTab = "info" | "latefee" | "session" | "equipment";
 
 export default function TrainingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [eventId, setEventId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<AdminTab>("info");
+  const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
     params.then((p) => setEventId(p.id));
   }, [params]);
+
+  // URL 쿼리 파라미터에서 탭 설정
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "info" || tabParam === "latefee" || tabParam === "session" || tabParam === "equipment") {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  // 세션 탭으로 전환 시 데이터 갱신
+  useEffect(() => {
+    if (activeTab === "session" && eventId) {
+      mutate();
+    }
+  }, [activeTab, eventId, mutate]);
 
   useEffect(() => {
     if (eventId) {
@@ -30,9 +51,14 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [eventId]);
 
-  // SWR로 event 데이터 페칭
+  // SWR로 event 데이터 페칭 - session 탭일 때만 sessions 포함
+  const shouldIncludeSessions = activeTab === "session";
+  const apiUrl = eventId
+    ? `/api/training-events/${eventId}${shouldIncludeSessions ? "?includeSessions=true" : ""}`
+    : null;
+
   const { data: event, isLoading, mutate } = useSWR<TrainingEventDetail>(
-    eventId ? `/api/training-events/${eventId}` : null,
+    apiUrl,
     fetcher,
     {
       revalidateOnFocus: false, // 캐시 사용 (속도 개선)
@@ -56,6 +82,54 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
   const isAdmin = session?.user?.role === "ADMIN";
 
+  const handleShare = async () => {
+    if (!event) {
+      showToast("운동 정보를 불러오는 중입니다...");
+      return;
+    }
+
+    const url = `${window.location.origin}/training/${eventId}`;
+
+    // 운동 정보 포맷팅
+    const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const shareText = [
+      `[${event.title || "팀 운동"}]`,
+      "",
+      `📅 ${dateStr}`,
+      `📍 ${event.location}`,
+      event.uniform ? `👕 ${event.uniform}` : null,
+      event.notes ? `📝 ${event.notes}` : null,
+      "",
+      url,
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+
+    console.log("=== 공유 디버그 ===");
+    console.log("event 객체:", event);
+    console.log("복사할 텍스트:");
+    console.log(shareText);
+    console.log("텍스트 길이:", shareText.length);
+    console.log("=================");
+
+    // 클립보드에 복사
+    try {
+      await navigator.clipboard.writeText(shareText);
+      showToast("운동 정보가 복사되었습니다!");
+      console.log("✅ 복사 성공!");
+    } catch (error) {
+      console.error("❌ 복사 실패:", error);
+      showToast("복사에 실패했습니다");
+    }
+  };
+
   const tabs: { key: AdminTab; label: string }[] = [
     { key: "info", label: "기본 정보" },
     { key: "session", label: "세션" },
@@ -73,15 +147,23 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           {isAdmin ? (
             <KebabMenu
               eventId={eventId}
+              eventTitle={event.title}
               eventDate={event.date}
               eventLocation={event.location}
+              eventUniform={event.uniform}
+              eventNotes={event.notes}
               rsvpCount={event.rsvps.length}
               checkInCount={event.checkIns.length}
               lateFeeCount={event.lateFees?.length || 0}
               sessionCount={event.sessions.length}
             />
           ) : (
-            <div className="w-6" />
+            <button
+              onClick={handleShare}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Share2 className="w-5 h-5 text-gray-600" />
+            </button>
           )}
         </div>
       </header>
@@ -125,7 +207,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
 
       {/* 탭 (관리자만 표시) */}
       {isAdmin && (
-        <div className="bg-white border-b border-gray-200 sticky top-[46px] z-10">
+        <div className="bg-white border-b border-gray-200 sticky top-[49px] z-10">
           <div className="max-w-2xl mx-auto flex">
             {tabs.map((tab) => (
               <button
@@ -179,6 +261,9 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
           <EquipmentTab eventId={eventId} />
         )}
       </main>
+
+      {/* Toast */}
+      <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
     </div>
   );
 }
