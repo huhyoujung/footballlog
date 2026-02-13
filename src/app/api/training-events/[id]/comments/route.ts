@@ -113,7 +113,7 @@ export async function POST(
       });
 
       // RSVP 조회 (불참자 찾기)
-      const rsvps = await prisma.trainingEventRSVP.findMany({
+      const rsvps = await prisma.rsvp.findMany({
         where: {
           trainingEventId: id,
           status: "ABSENT",
