@@ -236,7 +236,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
             <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
 
             {/* 운동일지 섹션 */}
-            <TrainingLogsSection eventId={eventId} eventTime={event.time} eventDate={event.date} />
+            <TrainingLogsSection eventId={eventId} eventDate={event.date} />
 
             {/* 댓글 섹션 */}
             <CommentsSection eventId={eventId} />
@@ -249,7 +249,7 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
             <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
 
             {/* 운동일지 섹션 */}
-            <TrainingLogsSection eventId={eventId} eventTime={event.time} eventDate={event.date} />
+            <TrainingLogsSection eventId={eventId} eventDate={event.date} />
 
             {/* 댓글 섹션 */}
             <CommentsSection eventId={eventId} />
