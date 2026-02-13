@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import useSWR from "swr";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -12,6 +13,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function MyLogsPage() {
   const { data: session } = useSession();
+  const router = useRouter();
 
   // SWR로 데이터 페칭 (자동 캐싱)
   const { data: logsData, isLoading } = useSWR<{ logs: TrainingLog[] }>(
@@ -35,7 +37,7 @@ export default function MyLogsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton href="/my" />
+          <BackButton />
           <h1 className="text-base font-semibold text-gray-900">내 운동 일지</h1>
           <div className="w-5" />
         </div>

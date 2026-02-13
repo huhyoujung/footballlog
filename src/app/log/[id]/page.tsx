@@ -323,9 +323,9 @@ export default function LogDetailPage({
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton href="/" />
+          <BackButton />
           <h1 className="text-base font-semibold text-gray-900">운동 일지</h1>
-          {(isMyPost || isAdmin) && (
+          {(isMyPost || isAdmin) ? (
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
@@ -365,6 +365,8 @@ export default function LogDetailPage({
                 </>
               )}
             </div>
+          ) : (
+            <div className="w-6" />
           )}
         </div>
       </header>
@@ -393,6 +395,7 @@ export default function LogDetailPage({
                   width={48}
                   height={48}
                   className="w-full h-full object-cover"
+                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -434,7 +437,7 @@ export default function LogDetailPage({
         </div>
 
         {/* 운동 일지 본문 */}
-        <div className="bg-white mt-3 mx-4 rounded-xl divide-y divide-gray-100">
+        <div className="bg-white mt-3 mx-4 rounded-xl divide-y divide-gray-100 shadow-sm">
           {/* 컨디션 */}
           <div className="p-4">
             <div className="flex items-center gap-3">
@@ -483,6 +486,31 @@ export default function LogDetailPage({
           </div>
         </div>
 
+        {/* 칭찬하기 배너 (다른 사람 글일 때만) */}
+        {!isMyPost && (
+          <div className="bg-white px-4 py-3 border-t border-gray-100">
+            <Link
+              href={`/locker/${log.user.id}`}
+              className="block bg-gradient-to-r from-team-50 to-team-100 rounded-xl p-3.5 hover:from-team-100 hover:to-team-200 transition-all shadow-sm border border-team-200"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🗃️</span>
+                  <div>
+                    <h3 className="text-gray-800 font-semibold text-sm">
+                      {log.user.name}님에게 칭찬하기
+                    </h3>
+                    <p className="text-gray-600 text-xs">
+                      락커에 칭찬 쪽지를 남겨보세요!
+                    </p>
+                  </div>
+                </div>
+                <span className="text-gray-600 text-2xl">&rsaquo;</span>
+              </div>
+            </Link>
+          </div>
+        )}
+
         {/* 댓글 목록 */}
         <div className="bg-white border-t border-gray-200">
           <h3 className="px-4 py-3 text-sm font-medium text-gray-900 border-b border-gray-100">
@@ -510,6 +538,7 @@ export default function LogDetailPage({
                             width={32}
                             height={32}
                             className="w-full h-full object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">

@@ -7,7 +7,8 @@ export function middleware(req: NextRequest) {
   // 공개 경로는 통과
   if (
     pathname === "/login" ||
-    pathname.startsWith("/invite/")
+    pathname.startsWith("/invite/") ||
+    pathname === "/test-modal"
   ) {
     return NextResponse.next();
   }
@@ -27,5 +28,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icons|manifest.json|custom-sw.js).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icons|manifest.json|custom-sw.js|.*\\.(?:jpg|jpeg|png|gif|svg|webp|ico|mp3|wav|ogg)).*)"],
 };

@@ -2,6 +2,7 @@
 
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
+import UniformManager from "@/components/UniformManager";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -213,19 +214,17 @@ export default function TeamSettingsPage() {
           <div className="flex flex-col items-center mb-6">
             <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden mb-3 flex items-center justify-center">
               {logoUrl ? (
-                <Image
+                <img
                   src={logoUrl}
                   alt="팀 로고"
-                  width={96}
-                  height={96}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
                 />
-              ) : (
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 7 L15.5 10 L14 14.5 L10 14.5 L8.5 10 Z" fill="none" />
-                </svg>
-              )}
+              ) : null}
+              <span className={`text-5xl ${logoUrl ? 'hidden' : ''}`}>⚽</span>
             </div>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -321,17 +320,20 @@ export default function TeamSettingsPage() {
           <label className="block text-sm font-medium text-gray-700 mb-3">
             팀 컬러
           </label>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="flex flex-wrap gap-3">
             {PRESET_COLORS.map(({ name, color }) => (
               <button
                 key={color}
                 onClick={() => setPrimaryColor(color)}
-                className={`relative w-full aspect-square rounded-lg transition-all ${
+                className={`relative w-12 h-12 rounded-full transition-all ${
                   primaryColor === color
-                    ? "ring-2 ring-offset-2 ring-gray-900 scale-105"
-                    : "hover:scale-105"
+                    ? "ring-2 ring-offset-2 scale-110"
+                    : "hover:scale-110"
                 }`}
-                style={{ backgroundColor: color }}
+                style={{
+                  backgroundColor: color,
+                  '--tw-ring-color': color
+                } as React.CSSProperties}
                 title={name}
               >
                 {primaryColor === color && (
@@ -348,6 +350,9 @@ export default function TeamSettingsPage() {
             💡 모바일 접근성을 고려한 컬러입니다
           </p>
         </div>
+
+        {/* 유니폼 관리 */}
+        <UniformManager />
 
         {error && (
           <p className="text-red-500 text-sm text-center">{error}</p>

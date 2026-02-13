@@ -68,7 +68,7 @@ export default function TrainingCheckInCard({
 
   // 명확한 버튼이 있는 체크인 카드
   return (
-    <div className="flex-shrink-0 w-[280px] bg-team-500 rounded-2xl p-4 pt-6 shadow-md">
+    <div className="flex-shrink-0 w-[280px] bg-team-500 rounded-2xl p-4 pt-6 shadow-xl">
       {/* 상단: 운동 제목 */}
       <div className="text-center mb-3">
         <h3 className="text-base font-bold text-white">

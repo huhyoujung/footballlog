@@ -28,9 +28,9 @@ export default function TrainingEventsPage() {
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // SWR로 데이터 페칭 (자동 캐싱)
+  // SWR로 데이터 페칭 (자동 캐싱) - 현재 탭만 로드
   const { data: upcomingData, isLoading: upcomingLoading } = useSWR<{ events: TrainingEvent[] }>(
-    session ? "/api/training-events?filter=upcoming" : null,
+    session && tab === "upcoming" ? "/api/training-events?filter=upcoming" : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -40,7 +40,7 @@ export default function TrainingEventsPage() {
   );
 
   const { data: pastData, isLoading: pastLoading } = useSWR<{ events: TrainingEvent[] }>(
-    session ? "/api/training-events?filter=past" : null,
+    session && tab === "past" ? "/api/training-events?filter=past" : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -51,7 +51,7 @@ export default function TrainingEventsPage() {
 
   const upcomingEvents = upcomingData?.events || [];
   const pastEvents = pastData?.events || [];
-  const loading = upcomingLoading || pastLoading;
+  const loading = (tab === "upcoming" && upcomingLoading) || (tab === "past" && pastLoading);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -75,7 +75,7 @@ export default function TrainingEventsPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton href="/my" />
+          <BackButton />
           <h1 className="text-base font-semibold text-gray-900">팀 운동</h1>
           {isAdmin ? (
             <Link href="/training/create" className="text-team-500 text-sm font-medium">
@@ -88,7 +88,7 @@ export default function TrainingEventsPage() {
       </header>
 
       {/* 탭 */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-gray-200 sticky top-[46px] z-10">
         <div className="max-w-2xl mx-auto px-4 flex">
           <button
             onClick={() => setTab("upcoming")}

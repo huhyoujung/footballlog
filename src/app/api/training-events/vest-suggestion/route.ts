@@ -31,10 +31,11 @@ export async function GET() {
       return NextResponse.json({ bringer: null, receiver: null, members });
     }
 
-    // 최근 이벤트에서 조끼 받은 사람 찾기
+    // 최근 정기 운동에서 조끼 받은 사람 찾기
     const lastEvent = await prisma.trainingEvent.findFirst({
       where: {
         teamId: session.user.teamId,
+        isRegular: true,
         vestReceiverId: { not: null },
       },
       orderBy: { date: "desc" },

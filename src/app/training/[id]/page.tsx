@@ -7,6 +7,8 @@ import SessionTab from "@/components/training/SessionTab";
 import EquipmentTab from "@/components/training/EquipmentTab";
 import KebabMenu from "@/components/training/KebabMenu";
 import Toast from "@/components/Toast";
+import TrainingLogsSection from "@/components/training/TrainingLogsSection";
+import CommentsSection from "@/components/training/CommentsSection";
 import { Share2 } from "lucide-react";
 
 import { useState, useEffect } from "react";
@@ -38,19 +40,6 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [searchParams]);
 
-  // 세션 탭으로 전환 시 데이터 갱신
-  useEffect(() => {
-    if (activeTab === "session" && eventId) {
-      mutate();
-    }
-  }, [activeTab, eventId, mutate]);
-
-  useEffect(() => {
-    if (eventId) {
-      window.scrollTo(0, 0);
-    }
-  }, [eventId]);
-
   // SWR로 event 데이터 페칭 - session 탭일 때만 sessions 포함
   const shouldIncludeSessions = activeTab === "session";
   const apiUrl = eventId
@@ -68,7 +57,21 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
     }
   );
 
-  if (isLoading) {
+  // 세션 탭으로 전환 시 데이터 갱신
+  useEffect(() => {
+    if (activeTab === "session" && eventId) {
+      mutate();
+    }
+  }, [activeTab, eventId, mutate]);
+
+  useEffect(() => {
+    if (eventId) {
+      window.scrollTo(0, 0);
+    }
+  }, [eventId]);
+
+  // eventId가 없거나 초기 로딩일 때 스피너 표시
+  if (!eventId || (isLoading && !event)) {
     return <LoadingSpinner />;
   }
 
@@ -229,12 +232,28 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
       <main className="max-w-2xl mx-auto p-4 space-y-3">
         {/* Regular users see only basic info */}
         {!isAdmin && (
-          <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
+          <>
+            <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
+
+            {/* 운동일지 섹션 */}
+            <TrainingLogsSection eventId={eventId} eventTime={event.time} eventDate={event.date} />
+
+            {/* 댓글 섹션 */}
+            <CommentsSection eventId={eventId} />
+          </>
         )}
 
         {/* Admin tabs */}
         {isAdmin && activeTab === "info" && (
-          <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
+          <>
+            <BasicInfoTab event={event} session={session} onRefresh={() => mutate()} />
+
+            {/* 운동일지 섹션 */}
+            <TrainingLogsSection eventId={eventId} eventTime={event.time} eventDate={event.date} />
+
+            {/* 댓글 섹션 */}
+            <CommentsSection eventId={eventId} />
+          </>
         )}
 
         {isAdmin && activeTab === "session" && (

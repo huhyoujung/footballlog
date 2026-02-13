@@ -17,10 +17,10 @@ export const prisma =
         : ["error"],
   });
 
-// 개발 환경에서 느린 쿼리 로그 (100ms 이상)
+// 개발 환경에서 느린 쿼리 로그 (200ms 이상)
 if (process.env.NODE_ENV === "development") {
   prisma.$on("query" as never, (e: any) => {
-    if (e.duration > 100) {
+    if (e.duration > 200) {
       console.log(`🐌 Slow query (${e.duration}ms):`, e.query);
     }
   });

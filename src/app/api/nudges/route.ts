@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
     }
 
-    const { recipientId } = await req.json();
+    const { recipientId, message } = await req.json();
 
     if (!recipientId) {
       return NextResponse.json({ error: "대상을 선택해주세요" }, { status: 400 });
@@ -61,9 +61,13 @@ export async function POST(req: Request) {
     // 대상에게 푸시 알림
     try {
       console.log(`[NUDGE] Sending push to user ${recipientId}`);
+      const pushBody = message
+        ? `${session.user.name || "팀원"}: ${message}`
+        : `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`;
+
       const results = await sendPushToUsers([recipientId], {
         title: "💪 닦달!",
-        body: `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`,
+        body: pushBody,
         url: "/write",
       });
       console.log(`[NUDGE] Push sent, results:`, results);

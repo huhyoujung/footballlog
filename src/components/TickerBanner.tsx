@@ -108,10 +108,10 @@ export default function TickerBanner({ messages }: Props) {
                 : "translate-y-0 opacity-100"
           }`}
           style={{
-            fontFamily: 'var(--font-ticker)',
-            color: '#FFB84D',
-            textShadow: '0 0 12px rgba(255, 184, 77, 0.8), 0 0 6px rgba(255, 184, 77, 0.6), 0 0 3px rgba(255, 184, 77, 0.4)',
-            filter: 'brightness(1.1)',
+            fontFamily: '"Umdot", monospace',
+            color: '#ffffff',
+            textShadow: '0 0 16px rgba(150, 123, 93, 1), 0 0 8px rgba(150, 123, 93, 0.8), 0 0 4px rgba(150, 123, 93, 0.6), 0 1px 2px rgba(0, 0, 0, 0.8)',
+            filter: 'brightness(1)',
           }}
         >
           {current.text}

@@ -10,6 +10,7 @@ import useSWR from "swr";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
 const POSITIONS = [
+  "감독",
   "GK",
   "CB",
   "LB",

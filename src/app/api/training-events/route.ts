@@ -28,11 +28,29 @@ export async function GET(req: Request) {
     const filter = searchParams.get("filter") || "upcoming";
 
     const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    let whereCondition: any = { teamId: session.user.teamId };
+
+    if (filter === "upcoming") {
+      whereCondition.date = { gte: now };
+    } else if (filter === "recent") {
+      // 최근 30일 이내 또는 현재 시각 이전
+      whereCondition.date = { gte: thirtyDaysAgo, lte: now };
+    } else {
+      // past: 현재 시각 이전
+      whereCondition.date = { lt: now };
+    }
+
+    console.log("🔍 [Training Events Query]", {
+      filter,
+      teamId: session.user.teamId,
+      now: now.toISOString(),
+      whereCondition,
+    });
+
     const events = await prisma.trainingEvent.findMany({
-      where: {
-        teamId: session.user.teamId,
-        ...(filter === "upcoming" ? { date: { gte: now } } : { date: { lt: now } }),
-      },
+      where: whereCondition,
       include: {
         createdBy: { select: { id: true, name: true } },
         vestBringer: { select: { id: true, name: true } },
@@ -43,10 +61,30 @@ export async function GET(req: Request) {
           select: { status: true },
           take: 1,
         },
+        // 친선경기 관련
+        linkedEvent: {
+          select: {
+            id: true,
+            title: true,
+            teamId: true,
+            team: { select: { name: true } },
+          },
+        },
+        opponentTeam: {
+          select: { id: true, name: true, logoUrl: true },
+        },
+        matchRules: true,
       },
       orderBy: { date: filter === "upcoming" ? "asc" : "desc" },
       take: 20,
     });
+
+    console.log(`✅ Found ${events.length} events:`, events.map(e => ({
+      id: e.id,
+      title: e.title,
+      date: e.date.toISOString(),
+      teamId: e.teamId,
+    })));
 
     const result = events.map((e) => ({
       ...e,
@@ -72,8 +110,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "운영진만 생성할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, isRegular, enablePomVoting, pomVotingDeadline, pomVotesPerPerson, date, location, shoes, uniform, notes, vestBringerId, vestReceiverId, rsvpDeadline, venueData } =
-      await req.json();
+    const {
+      title,
+      isRegular,
+      enablePomVoting,
+      pomVotingDeadline,
+      pomVotesPerPerson,
+      date,
+      location,
+      shoes,
+      uniform,
+      notes,
+      vestBringerId,
+      vestReceiverId,
+      rsvpDeadline,
+      venueData,
+      weatherData,
+      // 친선경기 관련
+      isFriendlyMatch,
+      minimumPlayers,
+      rsvpDeadlineOffset,
+    } = await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
       return NextResponse.json({ error: "필수 항목을 입력해주세요" }, { status: 400 });
@@ -139,6 +196,25 @@ export async function POST(req: Request) {
         vestBringerId: vestBringerId || null,
         vestReceiverId: vestReceiverId || null,
         rsvpDeadline: new Date(rsvpDeadline),
+        weather: weatherData?.weather || null,
+        weatherDescription: weatherData?.weatherDescription || null,
+        temperature: weatherData?.temperature || null,
+        minTempC: weatherData?.minTempC || null,
+        maxTempC: weatherData?.maxTempC || null,
+        feelsLikeC: weatherData?.feelsLikeC || null,
+        precipMm: weatherData?.precipMm || null,
+        chanceOfRain: weatherData?.chanceOfRain || null,
+        windKph: weatherData?.windKph || null,
+        uvIndex: weatherData?.uvIndex || null,
+        airQualityIndex: weatherData?.airQualityIndex || null,
+        pm25: weatherData?.pm25 || null,
+        pm10: weatherData?.pm10 || null,
+        sunrise: weatherData?.sunrise || null,
+        sunset: weatherData?.sunset || null,
+        // 친선경기 관련
+        isFriendlyMatch: isFriendlyMatch ?? false,
+        minimumPlayers: minimumPlayers || null,
+        rsvpDeadlineOffset: rsvpDeadlineOffset || null,
       },
     });
 

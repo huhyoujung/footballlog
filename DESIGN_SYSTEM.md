@@ -132,17 +132,64 @@ font-bold:      700  /* 특별한 강조 */
 
 #### Primary Button
 ```tsx
-<button className="px-4 py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors">
+<button className="px-4 py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors">
   버튼 텍스트
 </button>
 ```
 
+**특징**
+- 배경: `bg-team-500`
+- 호버: `hover:bg-team-600`
+- 패딩: `px-4 py-3` (중요 액션) 또는 `px-4 py-2.5` (일반)
+- 폰트: `font-semibold`
+
 #### Secondary Button
 ```tsx
-<button className="px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-team-300 transition-colors">
+<button className="px-4 py-2.5 bg-team-50 border border-team-200 text-team-700 rounded-lg hover:bg-team-100 transition-colors">
   버튼 텍스트
 </button>
 ```
+
+**특징**
+- 배경: `bg-team-50` (밝은 배경)
+- 테두리: `border-team-200`
+- 호버: `hover:bg-team-100`
+- 텍스트: `text-team-700`
+
+#### Button Group (나란히 배치)
+```tsx
+<div className="flex gap-2">
+  <button className="flex-1 px-4 py-2.5 bg-team-50 border border-team-200 text-team-700 rounded-lg hover:bg-team-100">
+    보조 액션
+  </button>
+  <button className="flex-1 px-4 py-2.5 bg-team-500 text-white rounded-lg hover:bg-team-600">
+    주요 액션
+  </button>
+</div>
+```
+
+**특징**
+- `flex-1`로 동일한 너비
+- `gap-2` (8px) 간격
+- 좌측: Secondary, 우측: Primary
+
+#### CTA (Call-to-Action) Button
+```tsx
+<div className="bg-white rounded-xl p-4">
+  <button className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors">
+    장비 배정 저장
+  </button>
+  <p className="text-xs text-gray-500 text-center mt-3">
+    부가 설명 텍스트
+  </p>
+</div>
+```
+
+**권장사항**
+- CTA는 독립된 카드로 분리
+- `w-full`로 전체 너비 사용
+- 명확한 액션 텍스트 사용
+- 필요시 설명 텍스트 추가
 
 #### Icon Button (터치 영역 확보)
 ```tsx
@@ -239,11 +286,25 @@ font-bold:      700  /* 특별한 강조 */
 
 **최대 너비**: `max-w-2xl` (672px)
 
+### Card Spacing
+```tsx
+<main className="max-w-2xl mx-auto p-4 space-y-3">
+  <div className="bg-white rounded-xl p-4">카드 1</div>
+  <div className="bg-white rounded-xl p-4">카드 2</div>
+  <div className="bg-white rounded-xl p-4">카드 3</div>
+</main>
+```
+
+**권장사항**
+- 카드 사이 간격: `space-y-3` (12px)
+- 컨테이너 패딩: `p-4` (16px)
+- 모든 카드는 동일한 너비 유지 (`bg-white rounded-xl p-4`)
+
 ### Gaps
 ```css
 gap-1:  0.25rem  (4px)
-gap-2:  0.5rem   (8px)   /* 가장 많이 사용 */
-gap-3:  0.75rem  (12px)
+gap-2:  0.5rem   (8px)   /* 버튼 그룹, 가장 많이 사용 */
+gap-3:  0.75rem  (12px)  /* 카드 내부 요소 */
 gap-4:  1rem     (16px)  /* 많이 사용 */
 gap-6:  1.5rem   (24px)
 ```

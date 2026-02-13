@@ -44,6 +44,7 @@ export default function TeamMemberStrip({ members, activeUserIds }: Props) {
                       width={56}
                       height={56}
                       className="w-full h-full object-cover"
+                      unoptimized
                     />
                   ) : (
                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-lg">

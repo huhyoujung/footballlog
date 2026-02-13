@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "팀에 소속되어 있지 않습니다" }, { status: 400 });
     }
 
-    const { trainingEventId, title, trainingDate, condition, conditionReason, keyPoints, improvement, imageUrl } =
+    const { trainingEventId, title, trainingDate, condition, conditionReason, keyPoints, improvement, notes, imageUrl } =
       await req.json();
 
     // 유효성 검사
@@ -174,6 +174,7 @@ export async function POST(req: Request) {
         conditionReason: conditionReason.trim(),
         keyPoints: keyPoints.trim(),
         improvement: improvement.trim(),
+        ...(notes && { notes: notes.trim() }),
         ...(imageUrl && { imageUrl }),
         ...(taggedUserIds.length > 0 && {
           taggedUsers: {

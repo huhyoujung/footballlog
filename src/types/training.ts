@@ -12,6 +12,7 @@ export interface TrainingLog {
     id: string;
     title: string | null;
     date: string;
+    mvpId?: string | null;
   } | null;
   createdAt: string;
   user: {
@@ -26,6 +27,7 @@ export interface TrainingLog {
     likes: number;
   };
   isLiked: boolean;
+  isMvp?: boolean; // MVP 여부
 }
 
 export interface TeamMember {

@@ -32,11 +32,16 @@ export async function GET(req: Request) {
     });
 
     if (!response.ok) {
-      console.error("네이버 API 오류:", await response.text());
-      return NextResponse.json({ error: "검색에 실패했습니다" }, { status: 500 });
+      const errorText = await response.text();
+      console.error("네이버 API 오류:", errorText);
+      return NextResponse.json({
+        error: "검색에 실패했습니다",
+        details: errorText
+      }, { status: 500 });
     }
 
     const data = await response.json();
+    console.log("네이버 API 응답:", data);
 
     // 네이버 API 응답 형식을 우리 앱 형식으로 변환
     const places = data.items.map((item: any) => ({

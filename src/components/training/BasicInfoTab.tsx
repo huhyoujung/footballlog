@@ -8,7 +8,11 @@ import { useTeam } from "@/contexts/TeamContext";
 import { useToast } from "@/lib/useToast";
 import Toast from "@/components/Toast";
 import Image from "next/image";
-import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users } from "lucide-react";
+import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users, Cloud, Sun, Moon, CloudRain, CloudDrizzle, Snowflake, CloudLightning, CloudFog, Wind } from "lucide-react";
+import useSWR from "swr";
+import { getAirQualityGrade, getWeatherRecommendations, getWeatherInKorean, getWeatherCardStyle, getWeatherIcon, getTimeOfDay, getUvGrade } from "@/lib/weather";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Props {
   event: TrainingEventDetail;
@@ -22,15 +26,82 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
   const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(event.myRsvp);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [sendingReminder, setSendingReminder] = useState(false);
   const [showEditRsvp, setShowEditRsvp] = useState(false);
   const [showAttendance, setShowAttendance] = useState(true);
+
+  // 실시간 날씨 조회
+  const shouldFetchWeather = event.venue?.latitude && event.venue?.longitude;
+  const weatherUrl = shouldFetchWeather
+    ? `/api/weather?lat=${event.venue!.latitude}&lon=${event.venue!.longitude}&date=${new Date(event.date).toISOString().split('T')[0]}`
+    : null;
+  const { data: liveWeather } = useSWR<{
+    weather: string;
+    weatherDescription: string;
+    temperature: number;
+    minTempC: number;
+    maxTempC: number;
+    feelsLikeC: number;
+    precipMm: number;
+    chanceOfRain: number;
+    windKph: number;
+    uvIndex: number;
+    airQualityIndex: number | null;
+    pm25: number | null;
+    pm10: number | null;
+    sunrise: string | null;
+    sunset: string | null;
+  }>(weatherUrl, fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+
+  // 실시간 날씨가 있으면 사용, 없으면 DB 저장 데이터 사용
+  const displayWeather = liveWeather || {
+    weather: event.weather,
+    weatherDescription: event.weatherDescription,
+    temperature: event.temperature,
+    minTempC: event.minTempC,
+    maxTempC: event.maxTempC,
+    feelsLikeC: event.feelsLikeC,
+    precipMm: event.precipMm,
+    chanceOfRain: event.chanceOfRain,
+    windKph: event.windKph,
+    uvIndex: event.uvIndex,
+    airQualityIndex: event.airQualityIndex,
+    pm25: event.pm25,
+    pm10: event.pm10,
+    sunrise: event.sunrise,
+    sunset: event.sunset,
+  };
+
+  console.log('[Weather Debug]', {
+    eventDate: event.date,
+    isFuture: new Date(event.date) > new Date(),
+    hasWeather: !!displayWeather.weather,
+    displayWeather,
+    liveWeather,
+    savedWeather: event.weather,
+  });
   const [showAttendees, setShowAttendees] = useState(true);
   const [showAbsentees, setShowAbsentees] = useState(true);
   const [showLateComers, setShowLateComers] = useState(true);
   const [showNoResponse, setShowNoResponse] = useState(true);
   const [showSessions, setShowSessions] = useState(true);
   const [showPomVoting, setShowPomVoting] = useState(true);
+
+  // 유니폼 목록 가져오기
+  const { data: uniformData } = useSWR<{ uniforms: Array<{ id: string; name: string; color: string }> }>(
+    "/api/teams/uniforms",
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 300000 }
+  );
+
+  // 유니폼 색상 찾기
+  const uniformColor = event.uniform
+    ? uniformData?.uniforms.find(
+        (u) => u.name.toLowerCase() === event.uniform?.toLowerCase()
+      )?.color
+    : null;
 
   const isDeadlinePassed = new Date() > new Date(event.rsvpDeadline);
 
@@ -126,26 +197,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     }
   };
 
-  const handleSendReminder = async () => {
-    if (!confirm(`미응답자 ${noResponse.length}명에게 알림을 보내시겠습니까?`)) return;
-    setSendingReminder(true);
-    try {
-      const res = await fetch(`/api/training-events/${event.id}/remind-rsvp`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        showToast(data.message || "알림을 전송했습니다 ✓");
-      } else {
-        const data = await res.json();
-        showToast(data.error || "알림 전송에 실패했습니다");
-      }
-    } catch {
-      showToast("알림 전송에 실패했습니다");
-    } finally {
-      setSendingReminder(false);
-    }
-  };
 
   return (
     <div className="space-y-3">
@@ -156,53 +207,211 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
             <span className="font-semibold">{dateStr}</span>
           </div>
-          {event.isRegular && (
-            <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">정기</span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {event.isFriendlyMatch && (
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-medium rounded-full">친선경기</span>
+            )}
+            {event.isRegular && (
+              <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">정기</span>
+            )}
+          </div>
         </div>
-        {/* 장소/신발/유니폼/조끼 (2x2 그리드) */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* 장소 */}
+        {/* 장소 */}
+        {event.venue?.mapUrl && event.venue.mapUrl.trim() !== "" ? (
+          <a
+            href={event.venue.mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log("Map link clicked:", event.venue.mapUrl);
+            }}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-team-600 transition-colors cursor-pointer"
+          >
+            <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+            <span className="underline underline-offset-2">{event.location}</span>
+          </a>
+        ) : (
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
             <span>{event.location}</span>
           </div>
-          {/* 신발 */}
-          {event.shoes.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Footprints className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
-              <span>{event.shoes.join(", ")} 권장</span>
-            </div>
-          )}
-          {/* 유니폼 */}
-          {event.uniform && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Shirt className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
-              <span>{event.uniform}</span>
-            </div>
-          )}
-          {/* 조끼 */}
-          {(event.vestBringer || event.vestReceiver) && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Package className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
-              <span className="flex items-center gap-1.5 flex-wrap">
-                <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
-                  {event.vestBringer?.name || "미정"}
-                </span>
-                <span className="text-gray-400">→</span>
-                <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
-                  {event.vestReceiver?.name || "미정"}
-                </span>
+        )}
+
+        {/* 신발/유니폼 (2열 그리드) */}
+        {(event.shoes.length > 0 || event.uniform) && (
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* 신발 */}
+            {event.shoes.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Footprints className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+                <span>{event.shoes.join(", ")}</span>
+              </div>
+            )}
+            {/* 유니폼 */}
+            {event.uniform && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Shirt
+                  className="w-4 h-4 flex-shrink-0"
+                  strokeWidth={1.5}
+                  style={{ color: uniformColor || "#9ca3af" }}
+                />
+                <span>{event.uniform}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 조끼 순서 (전체 너비) */}
+        {(event.vestBringer || event.vestReceiver) && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Package className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
+                {event.vestBringer?.name || "미정"}
               </span>
-            </div>
-          )}
-        </div>
+              <span className="text-gray-400">→</span>
+              <span className="bg-team-100 text-team-700 px-1 rounded font-medium">
+                {event.vestReceiver?.name || "미정"}
+              </span>
+            </span>
+          </div>
+        )}
         {event.notes && (
           <div className="text-sm text-gray-600 border-t border-gray-100 -mx-5 px-5 pt-2.5 whitespace-pre-wrap leading-relaxed">
             {event.notes}
           </div>
         )}
       </div>
+
+      {/* 예상 날씨 카드 (미래 운동만) */}
+      {displayWeather.weather && new Date(event.date) > new Date() && (() => {
+        const timeOfDay = getTimeOfDay(new Date(event.date), displayWeather.sunrise, displayWeather.sunset);
+        const weatherStyle = getWeatherCardStyle(displayWeather.weather, timeOfDay);
+        const iconName = getWeatherIcon(displayWeather.weather, timeOfDay);
+        const IconComponent = {
+          Sun,
+          Moon,
+          Cloud,
+          CloudRain,
+          CloudDrizzle,
+          Snowflake,
+          CloudLightning,
+          CloudFog,
+          Wind,
+        }[iconName] || Cloud;
+
+        const isNight = timeOfDay === "night";
+        const textColor = isNight ? "text-white" : "text-gray-900";
+        const secondaryTextColor = isNight ? "text-gray-200" : "text-gray-600";
+        const tertiaryTextColor = isNight ? "text-gray-300" : "text-gray-700";
+
+        return (
+        <div className="max-w-md mx-auto">
+        <div className={`relative overflow-hidden bg-gradient-to-br ${weatherStyle.gradient} rounded-xl p-3 border ${weatherStyle.border} shadow-sm backdrop-blur-sm space-y-2`}>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-1.5 mb-2">
+                <IconComponent className={`w-4 h-4 ${weatherStyle.iconColor}`} strokeWidth={2} />
+                <h3 className={`text-xs font-bold ${textColor}`}>예상 날씨</h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  {displayWeather.temperature !== null && (
+                    <>
+                      <span className={`text-3xl font-extrabold ${textColor} tracking-tight`}>{displayWeather.temperature}°C</span>
+                      {displayWeather.feelsLikeC !== null && displayWeather.feelsLikeC !== displayWeather.temperature && (
+                        <span className={`text-xs ${secondaryTextColor} font-medium`}>체감 {displayWeather.feelsLikeC}°</span>
+                      )}
+                    </>
+                  )}
+                  {displayWeather.minTempC !== null && displayWeather.maxTempC !== null && (
+                    <span className={`text-xs ${secondaryTextColor} font-semibold`}>
+                      ↓{displayWeather.minTempC}° ↑{displayWeather.maxTempC}°
+                    </span>
+                  )}
+                </div>
+                {displayWeather.weatherDescription && (
+                  <span className={`text-xs ${secondaryTextColor} font-medium`}>{displayWeather.weatherDescription}</span>
+                )}
+                <div className="mt-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {displayWeather.weather && (
+                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${isNight ? 'bg-white/10 backdrop-blur-sm' : 'bg-white/60'}`}>
+                      <span className={`text-[11px] font-medium ${isNight ? 'text-gray-100' : 'text-gray-700'}`}>{getWeatherInKorean(displayWeather.weather)}</span>
+                    </div>
+                  )}
+                  {displayWeather.airQualityIndex !== null && (() => {
+                    const aqGrade = getAirQualityGrade(displayWeather.airQualityIndex);
+                    return (
+                      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${isNight ? 'bg-white/10 backdrop-blur-sm' : 'bg-white/60'}`}>
+                        <span className="text-[11px]">{aqGrade.emoji}</span>
+                        <span className="text-[11px] font-medium" style={{ color: isNight ? '#d1d5db' : aqGrade.color }}>
+                          대기질
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {/* 자외선 칩 - 낮에만 표시 */}
+                  {!isNight && displayWeather.uvIndex !== null && displayWeather.uvIndex !== undefined && displayWeather.uvIndex > 0 && (() => {
+                    const uvGrade = getUvGrade(displayWeather.uvIndex);
+                    return (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/60 rounded-full">
+                        <span className="text-[11px]">☀️</span>
+                        <span className="text-[11px] font-medium" style={{ color: uvGrade.color }}>
+                          자외선 {uvGrade.grade}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+                {/* 추가 날씨 정보 - 한 줄로 표시 */}
+                <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                  {displayWeather.chanceOfRain !== null && displayWeather.chanceOfRain !== undefined && displayWeather.chanceOfRain > 0 && (
+                    <div className={`flex items-center gap-0.5 text-[10px] ${tertiaryTextColor}`}>
+                      <span className="font-medium">강수확률</span>
+                      <span>{displayWeather.chanceOfRain}%</span>
+                    </div>
+                  )}
+                  {displayWeather.precipMm !== null && displayWeather.precipMm !== undefined && displayWeather.precipMm > 0 && (
+                    <div className={`flex items-center gap-0.5 text-[10px] ${tertiaryTextColor}`}>
+                      <span className="font-medium">강수량</span>
+                      <span>{displayWeather.precipMm}mm</span>
+                    </div>
+                  )}
+                  {displayWeather.windKph !== null && displayWeather.windKph !== undefined && (
+                    <div className={`flex items-center gap-0.5 text-[10px] ${tertiaryTextColor}`}>
+                      <span className="font-medium">풍속</span>
+                      <span>{displayWeather.windKph}km/h</span>
+                    </div>
+                  )}
+                </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 준비물 추천 */}
+          {(() => {
+            const recommendations = getWeatherRecommendations(
+              displayWeather.weather,
+              displayWeather.temperature,
+              displayWeather.airQualityIndex
+            );
+            if (recommendations.length === 0) return null;
+            return (
+              <div className={`border-t ${weatherStyle.border} pt-2 space-y-0.5`}>
+                <p className="text-[10px] font-semibold text-gray-700">준비물 추천</p>
+                {recommendations.map((rec, idx) => (
+                  <p key={idx} className="text-[10px] text-gray-600">• {rec}</p>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+        </div>
+      );
+    })()}
 
       {/* 체크인 (운동 2시간 전부터) */}
       {canCheckIn && (
@@ -282,17 +491,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 </p>
               )}
             </div>
-            {/* 미응답자 알림 버튼 (운영진만, 마감 전, 미응답자 있을 때) */}
-            {session?.user?.role === "ADMIN" && !isDeadlinePassed && noResponse.length > 0 && (
-              <button
-                onClick={handleSendReminder}
-                disabled={sendingReminder}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-team-600 hover:text-team-700 hover:bg-team-50 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Bell className="w-3.5 h-3.5" strokeWidth={2} />
-                <span>{sendingReminder ? "전송 중..." : `알림 (${noResponse.length}명)`}</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -378,6 +576,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             width={24}
                             height={24}
                             className="w-full h-full object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full bg-team-50" />
@@ -512,6 +711,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             width={24}
                             height={24}
                             className="w-full h-full object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full bg-team-50" />
@@ -629,6 +829,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             width={24}
                             height={24}
                             className="w-full h-full object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full bg-team-50" />
@@ -748,35 +949,38 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
               className="flex items-center justify-between py-3 cursor-pointer"
               onClick={() => setShowNoResponse(!showNoResponse)}
             >
-              <div className="text-xs font-semibold text-gray-700">미응답 ({noResponse.length}명)</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-700">미응답 ({noResponse.length}명)</span>
+                {session?.user?.role === "ADMIN" && noResponse.length > 0 && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (submitting) return;
+                      if (!confirm(`미응답자 ${noResponse.length}명에게 알림을 보내시겠습니까?`)) return;
+
+                      try {
+                        const res = await fetch(`/api/training-events/${event.id}/notify-rsvp`, {
+                          method: "POST",
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          showToast(`${data.recipientCount}명에게 알림을 보냈습니다 ✓`);
+                        } else {
+                          showToast(data.error || "알림 전송에 실패했습니다");
+                        }
+                      } catch (error) {
+                        showToast("알림 전송에 실패했습니다");
+                      }
+                    }}
+                    className="flex items-center gap-0.5 text-xs text-team-600 hover:text-team-700 font-medium px-1.5 py-0.5 rounded hover:bg-team-50"
+                  >
+                    <Bell className="w-3 h-3" strokeWidth={2} />
+                    <span>독려</span>
+                  </button>
+                )}
+              </div>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showNoResponse ? '' : '-rotate-90'}`} />
             </div>
-            {session?.user?.role === "ADMIN" && !isDeadlinePassed && (
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (submitting) return;
-                  if (!confirm(`미응답자 ${noResponse.length}명에게 알림을 보내시겠습니까?`)) return;
-
-                  try {
-                    const res = await fetch(`/api/training-events/${event.id}/notify-rsvp`, {
-                      method: "POST",
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      showToast(`${data.recipientCount}명에게 알림을 보냈습니다 ✓`);
-                    } else {
-                      showToast(data.error || "알림 전송에 실패했습니다");
-                    }
-                  } catch (error) {
-                    showToast("알림 전송에 실패했습니다");
-                  }
-                }}
-                className="text-xs text-team-600 hover:text-team-700 font-medium px-2 py-1 rounded hover:bg-team-50 -mt-1 mb-2"
-              >
-                응답 독려하기
-              </button>
-            )}
             {showNoResponse && (
             <div className="pb-3 space-y-2">
               {noResponse.map((member) => {
@@ -792,6 +996,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                           width={24}
                           height={24}
                           className="w-full h-full object-cover"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-full h-full bg-team-50" />

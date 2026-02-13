@@ -4,6 +4,32 @@ import PolaroidStack from "./PolaroidStack";
 import PolaroidCarousel from "./PolaroidCarousel";
 import type { TrainingLog } from "@/types/training";
 
+interface LockerNote {
+  id: string;
+  content: string;
+  color: string;
+  rotation: number;
+  positionX: number;
+  positionY: number;
+  tags: string[];
+  createdAt: string;
+  isAnonymous: boolean;
+  recipient: {
+    id: string;
+    name: string | null;
+  };
+  author: {
+    id: string;
+    name: string | null;
+  };
+  trainingLog?: {
+    trainingDate: string;
+  } | null;
+  trainingEvent?: {
+    date: string;
+  } | null;
+}
+
 interface Props {
   logs: TrainingLog[];
   date: string; // 실제 날짜 (YYYY-MM-DD)
@@ -13,6 +39,10 @@ interface Props {
   onExpand: () => void;
   onCollapse: () => void;
   onLikeToggle: (logId: string) => void;
+  notes?: LockerNote[];
+  hideCount?: boolean;
+  disableNoteOpen?: boolean;
+  currentUserId?: string;
 }
 
 export default function PolaroidDateGroup({
@@ -24,6 +54,10 @@ export default function PolaroidDateGroup({
   onExpand,
   onCollapse,
   onLikeToggle,
+  notes = [],
+  hideCount = false,
+  disableNoteOpen = false,
+  currentUserId,
 }: Props) {
   return (
     <div className="transition-all duration-300 ease-out">
@@ -41,6 +75,10 @@ export default function PolaroidDateGroup({
           displayDate={displayDate}
           onClick={onExpand}
           isExpanding={isExpanding}
+          notes={notes}
+          hideCount={hideCount}
+          disableNoteOpen={disableNoteOpen}
+          currentUserId={currentUserId}
         />
       )}
     </div>

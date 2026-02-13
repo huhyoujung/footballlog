@@ -8,41 +8,38 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between bg-gradient-to-b from-green-600 to-green-800 px-4 py-8 relative overflow-hidden">
-      {/* 잔디 패턴 효과 */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `repeating-linear-gradient(
-            0deg,
-            rgba(255,255,255,0.1) 0px,
-            transparent 1px,
-            transparent 2px,
-            rgba(255,255,255,0.1) 3px
-          )`
-        }} />
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-between px-6 py-16 relative overflow-hidden">
+      {/* 라커룸 배경 이미지 */}
+      <div
+        className="absolute inset-0 bg-cover bg-center blur-[3px]"
+        style={{
+          backgroundImage: `url('/locker-room.jpg')`,
+          transform: 'scale(1.1)',
+        }}
+      />
+
+      {/* 어두운 오버레이 */}
+      <div className="absolute inset-0 bg-black/70" />
 
       {/* 상단 여백 */}
       <div />
 
       <div className="w-full max-w-sm relative z-10">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mx-auto mb-4">
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-              <rect x="14" y="10" width="36" height="44" rx="2" fill="#A7F3D0" stroke="#065F46" strokeWidth="1.5" />
-              <line x1="14" y1="32" x2="50" y2="32" stroke="#065F46" strokeWidth="1.5" />
-              <circle cx="32" cy="32" r="7" stroke="#065F46" strokeWidth="1.5" fill="none" />
-              <rect x="20" y="10" width="24" height="10" stroke="#065F46" strokeWidth="1.5" fill="none" />
-              <rect x="20" y="44" width="24" height="10" stroke="#065F46" strokeWidth="1.5" fill="none" />
-            </svg>
+        <div className="text-center mb-10">
+          <div className="mb-5 flex justify-center">
+            <img
+              src="/locker-logo.svg"
+              alt="라커룸 로고"
+              className="w-24 h-24"
+            />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">네모의 꿈</h1>
-          <p className="text-white text-lg font-medium">둥근 팀을 만들기</p>
+          <h1 className="text-4xl font-bold text-white mb-3">라커룸</h1>
+          <p className="text-base text-white/80">필드 밖에서도 이어지는 우리의 이야기</p>
         </div>
 
         <button
           onClick={handleGoogleSignIn}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-xl"
+          className="w-full flex items-center justify-center gap-3 bg-white rounded-xl py-3.5 px-4 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -71,7 +68,7 @@ export default function LoginPage() {
         href="https://open.kakao.com/o/sqBLurfi"
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-white/60 hover:text-white/80 transition-colors text-center relative z-10"
+        className="text-sm text-white/70 hover:text-white/90 transition-colors text-center relative z-10"
       >
         문의하기
       </a>

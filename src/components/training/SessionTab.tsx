@@ -58,6 +58,7 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
   const [sessionRequiresTeams, setSessionRequiresTeams] = useState(false);
   const [newSessionTeamCount, setNewSessionTeamCount] = useState(2);
   const [newSessionTeamAssignments, setNewSessionTeamAssignments] = useState<{ userId: string; teamLabel: string }[]>([]);
+  const [teamNames, setTeamNames] = useState<Record<string, string>>({});
 
   // 세션 편집 상태
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -113,10 +114,15 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
         // 팀 배정이 있으면 세션 생성 후 바로 저장
         if (sessionRequiresTeams && newSessionTeamAssignments.length > 0) {
           const sessionData = await res.json();
+          // teamLabel을 사용자 입력 이름으로 변환
+          const assignmentsWithCustomNames = newSessionTeamAssignments.map((a) => ({
+            userId: a.userId,
+            teamLabel: teamNames[a.teamLabel] || `${a.teamLabel}팀`,
+          }));
           await fetch(`/api/training-events/${eventId}/sessions/${sessionData.id}/team-assignments`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assignments: newSessionTeamAssignments }),
+            body: JSON.stringify({ assignments: assignmentsWithCustomNames }),
           });
         }
 
@@ -128,6 +134,7 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
         setSessionRequiresTeams(false);
         setNewSessionTeamCount(2);
         setNewSessionTeamAssignments([]);
+        setTeamNames({});
       }
     } catch {
       // ignore
@@ -160,6 +167,13 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
     setEditRequiresTeams(hasTeams);
     setEditTeamCount(hasTeams ? labels.length : 2);
     setTeamAssignments((prev) => ({ ...prev, [sess.id]: assignments }));
+
+    // 기존 팀 이름을 teamNames에 로드
+    const existingTeamNames: Record<string, string> = {};
+    labels.forEach((label) => {
+      existingTeamNames[label] = label;
+    });
+    setTeamNames(existingTeamNames);
   }, []);
 
   // 편집 취소
@@ -209,10 +223,15 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
       // 팀 배정 저장 (팀 나누기가 활성화된 경우에만)
       if (editRequiresTeams) {
         const assignments = teamAssignments[sessionId] || [];
+        // teamLabel을 사용자 입력 이름으로 변환
+        const assignmentsWithCustomNames = assignments.map((a) => ({
+          userId: a.userId,
+          teamLabel: teamNames[a.teamLabel] || a.teamLabel,
+        }));
         await fetch(`/api/training-events/${eventId}/sessions/${sessionId}/teams`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assignments }),
+          body: JSON.stringify({ assignments: assignmentsWithCustomNames }),
         });
         // 팀 배정 변경되었으므로 알림 상태 리셋
         setTeamAssignmentNotified(false);
@@ -426,43 +445,47 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
   return (
     <>
       {/* 참석 인원 요약 + 버튼 */}
-      <div className="bg-team-50 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-team-700">참석 인원</span>
-            <span className="text-sm text-team-600">{attendees.length}명</span>
-          </div>
+      <div className="bg-white rounded-xl p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-sm text-gray-700">참석 인원</span>
+          <span className="text-sm font-semibold text-team-600">{attendees.length}명</span>
+        </div>
+
+        {/* 버튼들 */}
+        <div className="flex gap-2">
           <button
             onClick={() => setShowAttendanceModal(true)}
-            className="text-sm text-team-600 hover:text-team-700 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-team-700 bg-team-50 border border-team-200 rounded-lg hover:bg-team-100 transition-colors flex items-center justify-center gap-1.5"
           >
-            출석률 📊
+            <span>출석률</span>
+            <span>📊</span>
           </button>
+
+          {sessions.some((s) => s.teamAssignments.length > 0) && (
+            <button
+              onClick={handleNotifyTeamAssignments}
+              disabled={submitting || teamAssignmentNotified}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-team-500 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              {teamAssignmentNotified ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12l5 5l10 -10" />
+                  </svg>
+                  <span>알림 완료</span>
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
+                    <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+                  </svg>
+                  <span>팀 배정 알리기</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
-        {sessions.some((s) => s.teamAssignments.length > 0) && (
-          <button
-            onClick={handleNotifyTeamAssignments}
-            disabled={submitting || teamAssignmentNotified}
-            className="w-full mt-2 text-xs font-medium text-white bg-team-500 px-4 py-2.5 rounded-lg hover:bg-team-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-          >
-            {teamAssignmentNotified ? (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12l5 5l10 -10" />
-                </svg>
-                <span>알림 전송 완료</span>
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
-                  <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
-                </svg>
-                <span>팀 배정 알리기</span>
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {sessions.map((sess, idx) => (
@@ -584,9 +607,16 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                       const teamMembers = (teamAssignments[sess.id] || []).filter((a) => a.teamLabel === label);
                       return (
                         <div key={label}>
-                          <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            {label}팀 ({teamMembers.length}명)
-                          </label>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <input
+                              type="text"
+                              value={teamNames[label] || `${label}팀`}
+                              onChange={(e) => setTeamNames({ ...teamNames, [label]: e.target.value })}
+                              placeholder={`${label}팀`}
+                              className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 hover:border-gray-300 focus:border-team-500 focus:bg-white focus:outline-none px-2 py-1 rounded max-w-[120px]"
+                            />
+                            <span className="text-xs text-gray-500">({teamMembers.length}명)</span>
+                          </div>
                           <div
                             className={`border border-gray-300 rounded-lg p-3 min-h-[60px] transition-colors ${
                               dragOverTarget?.sessionId === sess.id && dragOverTarget?.teamLabel === label
@@ -670,7 +700,7 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                       <circle cx="15" cy="19" r="1.5" />
                     </svg>
                   </div>
-                  <span className="w-6 h-6 bg-team-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="w-6 h-6 bg-team-100 text-team-700 text-xs font-medium rounded-full flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
                   <h3 className="text-sm font-semibold text-gray-900">
@@ -692,7 +722,7 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
 
               {/* 팀 배정 정보 */}
               {sess.teamAssignments.length > 0 && (
-                <div className="mt-3 ml-5 space-y-2">
+                <div className="mt-3 ml-8 space-y-2">
                   {Object.entries(
                     sess.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
                       if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
@@ -705,10 +735,8 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                   ).map(([label, members]) => (
                     <div key={label} className="bg-gray-50 rounded-lg p-2.5">
                       <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center flex-shrink-0">
-                          {label}
-                        </span>
-                        <span className="text-xs font-semibold text-gray-700">{members.length}명</span>
+                        <span className="text-xs font-semibold text-team-700">{label}</span>
+                        <span className="text-xs text-gray-500">({members.length}명)</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {members.map((m, i) => (
@@ -833,9 +861,16 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                   const teamMembers = newSessionTeamAssignments.filter((a) => a.teamLabel === label);
                   return (
                     <div key={label}>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                        {label}팀 ({teamMembers.length}명)
-                      </label>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <input
+                          type="text"
+                          value={teamNames[label] || `${label}팀`}
+                          onChange={(e) => setTeamNames({ ...teamNames, [label]: e.target.value })}
+                          placeholder={`${label}팀`}
+                          className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 hover:border-gray-300 focus:border-team-500 focus:bg-white focus:outline-none px-2 py-1 rounded max-w-[120px]"
+                        />
+                        <span className="text-xs text-gray-500">({teamMembers.length}명)</span>
+                      </div>
                       <div className="border border-gray-300 bg-team-50/40 rounded-lg p-3 min-h-[60px]">
                         <div className="flex flex-wrap gap-2">
                           {teamMembers.map((assignment) => {
@@ -909,7 +944,6 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
 
       {sessions.length === 0 && !showSessionForm && (
         <div className="text-center py-8">
-          <div className="text-3xl mb-2">⚽</div>
           <p className="text-sm text-gray-400">세션을 추가하여 팀을 분배하세요</p>
         </div>
       )}

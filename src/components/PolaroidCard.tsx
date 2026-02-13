@@ -15,18 +15,18 @@ interface Props {
 export default function PolaroidCard({ log, variant, onLikeToggle }: Props) {
   if (variant === "stack") {
     return (
-      <div className="w-36 h-44 bg-white rounded-sm p-1.5 pb-4" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}>
+      <div className="w-36 h-44 bg-white rounded-sm p-1.5 pb-4 border border-gray-100/50" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)' }}>
         {log.imageUrl ? (
-          <Image
-            src={log.imageUrl}
-            alt=""
-            width={144}
-            height={176}
-            className="w-full h-full object-cover rounded-sm"
-            sizes="144px"
-            quality={85}
-            priority={false}
-          />
+          <div className="w-full h-full relative rounded-sm overflow-hidden">
+            <Image
+              src={log.imageUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="144px"
+              unoptimized
+            />
+          </div>
         ) : (
           <div className="w-full h-full rounded-sm bg-team-50" />
         )}
@@ -37,19 +37,19 @@ export default function PolaroidCard({ log, variant, onLikeToggle }: Props) {
   // variant === "full" — large polaroid, tap to go to detail
   return (
     <Link href={`/log/${log.id}`} className="block">
-      <div className="w-64 bg-white rounded-sm p-2 pb-5" style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.13)' }}>
+      <div className="w-64 bg-white rounded-sm p-2 pb-5 border border-gray-100/50" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)' }}>
         {/* 사진 또는 컨디션 컬러 배경 */}
         {log.imageUrl ? (
-          <Image
-            src={log.imageUrl}
-            alt="운동 사진"
-            width={256}
-            height={342}
-            className="w-full aspect-[3/4] object-cover rounded-sm"
-            sizes="256px"
-            quality={85}
-            priority={false}
-          />
+          <div className="w-full aspect-[3/4] relative rounded-sm overflow-hidden">
+            <Image
+              src={log.imageUrl}
+              alt="운동 사진"
+              fill
+              className="object-cover"
+              sizes="256px"
+              unoptimized
+            />
+          </div>
         ) : (
           <div
             className={`w-full aspect-[3/4] rounded-sm flex flex-col items-center justify-center ${getConditionBgColor(log.condition)}`}

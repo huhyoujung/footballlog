@@ -1,8 +1,36 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PolaroidCard from "./PolaroidCard";
+import PostItNote from "./PostItNote";
 import type { TrainingLog } from "@/types/training";
+
+interface LockerNote {
+  id: string;
+  content: string;
+  color: string;
+  rotation: number;
+  positionX: number;
+  positionY: number;
+  tags: string[];
+  createdAt: string;
+  isAnonymous: boolean;
+  recipient: {
+    id: string;
+    name: string | null;
+  };
+  author: {
+    id: string;
+    name: string | null;
+  };
+  trainingLog?: {
+    trainingDate: string;
+  } | null;
+  trainingEvent?: {
+    date: string;
+  } | null;
+}
 
 interface Props {
   logs: TrainingLog[];
@@ -10,6 +38,10 @@ interface Props {
   displayDate: string;
   onClick: () => void;
   isExpanding?: boolean;
+  notes?: LockerNote[];
+  hideCount?: boolean; // 카운트 숨김 여부 (락커룸용)
+  disableNoteOpen?: boolean; // 쪽지 클릭 비활성화 (피드용)
+  currentUserId?: string; // From 표시용 (내가 쓴 쪽지만 표시)
 }
 
 // 날짜 문자열을 seed로 한 결정론적 난수 (같은 날짜 → 항상 같은 배치)
@@ -49,9 +81,14 @@ function generateStackConfigs(date: string) {
   ];
 }
 
-export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding }: Props) {
+export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding, notes = [], hideCount = false, disableNoteOpen = false, currentUserId }: Props) {
+  const router = useRouter();
   const visibleLogs = logs.slice(0, 3);
   const configs = useMemo(() => generateStackConfigs(date), [date]);
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
+
+  // MVP가 있는지 확인
+  const hasMvp = logs.some(log => log.isMvp);
 
   // 사진 1개일 때는 로그 ID 기반으로 고유한 회전 생성
   const getSingleCardRotation = (logId: string) => {
@@ -66,48 +103,210 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
     return i * spacing - center;
   };
 
+  // 쪽지를 왼쪽/오른쪽으로 분리 (최대 10개 - 각 사이드 5개씩)
+  const leftNotes = notes.filter((_, i) => i % 2 === 0).slice(0, 5);
+  const rightNotes = notes.filter((_, i) => i % 2 === 1).slice(0, 5);
+
   return (
     <button
-      onClick={onClick}
-      className="flex flex-col items-center group cursor-pointer"
+      onClick={logs.length > 0 ? onClick : undefined}
+      className={`flex flex-col items-center group ${logs.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      <div className="relative w-44 h-56">
-        {visibleLogs.map((log, i) => {
-          const config = configs[visibleLogs.length - 1 - i] || configs[0];
-          const rotation = visibleLogs.length === 1 ? getSingleCardRotation(log.id) : config.rotation;
-          const expandOffset = getExpandedOffset(i, visibleLogs.length);
-
-          return (
-            <div
-              key={log.id}
-              className="absolute stack-card"
-              style={isExpanding ? {
-                top: 10,
-                left: '50%',
-                marginLeft: -72 + expandOffset,
-                transform: 'rotate(0deg) scale(1.2)',
-                zIndex: i + 1,
-                opacity: 1,
-              } : {
-                top: config.top,
-                left: '50%',
-                marginLeft: -72 + config.left,
-                transform: `rotate(${rotation}deg)`,
-                zIndex: config.zIndex,
-              }}
-            >
-              <PolaroidCard log={log} variant="stack" />
+      {/* 폴라로이드 없고 포스트잇만 있을 때 - 가운데 정렬 */}
+      {logs.length === 0 && notes.length > 0 ? (
+        <div className="flex gap-3 flex-wrap justify-center max-w-md">
+          {notes.slice(0, 10).map((note) => (
+            <PostItNote
+              key={note.id}
+              content={note.content}
+              color={note.color}
+              rotation={note.rotation}
+              recipientId={note.recipient?.id || ""}
+              recipientName={note.recipient?.name || "팀원"}
+              tags={note.tags}
+              onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+              showRecipient={disableNoteOpen}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-start gap-4">
+          {/* 왼쪽 포스트잇 */}
+          {!isExpanding && leftNotes.length > 0 && (
+            <div className="flex flex-col gap-4 pt-8">
+              {leftNotes.map((note) => (
+                <PostItNote
+                  key={note.id}
+                  content={note.content}
+                  color={note.color}
+                  rotation={note.rotation}
+                  recipientId={note.recipient?.id || ""}
+                  recipientName={note.recipient?.name || "팀원"}
+                  tags={note.tags}
+                  onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+                  showRecipient={disableNoteOpen}
+                />
+              ))}
             </div>
-          );
-        })}
-      </div>
+          )}
+
+          {/* 중앙 폴라로이드 스택 (운동 기록이 있을 때만) */}
+          {logs.length > 0 && (
+          <div className="relative w-44 h-56">
+            {visibleLogs.map((log, i) => {
+              const config = configs[visibleLogs.length - 1 - i] || configs[0];
+              const rotation = visibleLogs.length === 1 ? getSingleCardRotation(log.id) : config.rotation;
+              const expandOffset = getExpandedOffset(i, visibleLogs.length);
+
+              return (
+                <div
+                  key={log.id}
+                  className="absolute stack-card"
+                  style={isExpanding ? {
+                    top: 10,
+                    left: '50%',
+                    marginLeft: -72 + expandOffset,
+                    transform: 'rotate(0deg) scale(1.2)',
+                    zIndex: i + 1,
+                    opacity: 1,
+                  } : {
+                    top: config.top,
+                    left: '50%',
+                    marginLeft: -72 + config.left,
+                    transform: `rotate(${rotation}deg)`,
+                    zIndex: config.zIndex,
+                  }}
+                >
+                  <PolaroidCard log={log} variant="stack" />
+                </div>
+              );
+            })}
+
+            {/* MVP 트로피 (스택 왼쪽 위) */}
+            {!isExpanding && hasMvp && (
+              <div
+                className="absolute"
+                style={{
+                  top: -5,
+                  left: -30,
+                  zIndex: 100,
+                }}
+              >
+                <div
+                  className="text-5xl animate-bounce"
+                  style={{
+                    filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
+                  }}
+                >
+                  🏆
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+          {/* 오른쪽 포스트잇 */}
+          {!isExpanding && rightNotes.length > 0 && (
+            <div className="flex flex-col gap-4 pt-8">
+              {rightNotes.map((note) => (
+                <PostItNote
+                  key={note.id}
+                  content={note.content}
+                  color={note.color}
+                  rotation={note.rotation}
+                  recipientId={note.recipient?.id || ""}
+                  recipientName={note.recipient?.name || "팀원"}
+                  tags={note.tags}
+                  onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+                  showRecipient={disableNoteOpen}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div
-        className="-mt-1 text-center stack-card"
+        className={`text-center stack-card ${logs.length === 0 && notes.length > 0 ? 'mt-4' : '-mt-1'}`}
         style={{ opacity: isExpanding ? 0 : 1 }}
       >
         <p className="text-sm font-semibold text-team-500">{displayDate}</p>
-        <p className="text-xs text-gray-400">{logs.length}명의 기록</p>
+        {!hideCount && logs.length > 0 && (
+          <p className="text-xs text-gray-400">{logs.length}명의 기록</p>
+        )}
       </div>
+
+      {/* 쪽지 확대 모달 */}
+      {expandedNoteId && (() => {
+        const note = notes.find((n) => n.id === expandedNoteId);
+        return (
+          <div
+            className="fixed inset-0 bg-black/50 flex flex-col items-center justify-center z-50 p-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpandedNoteId(null);
+            }}
+          >
+            {/* 포스트잇 */}
+            <div
+              className="relative w-full max-w-xs min-h-[280px] p-6 pb-10 shadow-xl flex flex-col"
+              style={{
+                backgroundColor: note?.color || "#FFF59D",
+                transform: `rotate(${(note?.rotation || 0) * 0.3}deg)`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* X 닫기 버튼 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedNoteId(null);
+                }}
+                className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+
+              {/* To: 받는 사람 */}
+              <p className="text-sm text-gray-500 mb-3">
+                To. {note?.recipient?.name || "팀원"}
+              </p>
+
+              {/* 내용 */}
+              <p className="text-gray-800 whitespace-pre-wrap break-words text-base flex-1">
+                {note?.content}
+              </p>
+
+              {/* 보낸 사람: currentUserId가 있으면 내가 쓴 것만, 없으면 익명 아닌 것 모두 */}
+              {currentUserId
+                ? note?.author?.id === currentUserId && (
+                    <p className="text-sm text-gray-500 text-center mt-4">
+                      From. {note?.author?.name}
+                    </p>
+                  )
+                : !note?.isAnonymous && note?.author?.name && (
+                    <p className="text-sm text-gray-500 text-center mt-4">
+                      From. {note.author.name}
+                    </p>
+                  )}
+            </div>
+
+            {/* 나도 쪽지 붙이러 가기 CTA */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedNoteId(null);
+                router.push("/compliment");
+              }}
+              className="mt-5 text-sm text-white/80 hover:text-white transition-colors underline underline-offset-4"
+            >
+              나도 누군가에게 쪽지 남기고 도망가기
+            </button>
+          </div>
+        );
+      })()}
     </button>
   );
 }

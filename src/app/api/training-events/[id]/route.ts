@@ -19,11 +19,23 @@ export async function GET(
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    // 기본 정보만 로드 (빠른 응답)
+    // includeSessions 파라미터 확인
+    const url = new URL(req.url);
+    const includeSessions = url.searchParams.get("includeSessions") === "true";
+
+    // 기본 정보만 로드 (빠른 응답) - sessions는 옵션
     const event = await prisma.trainingEvent.findUnique({
       where: { id },
       include: {
-        createdBy: { select: userSelect },
+        venue: {
+          select: {
+            id: true,
+            name: true,
+            mapUrl: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
         vestBringer: { select: userSelect },
         vestReceiver: { select: userSelect },
         rsvps: {
@@ -34,14 +46,55 @@ export async function GET(
           include: { user: { select: userSelect } },
           orderBy: { checkedInAt: "asc" },
         },
-        sessions: {
+        // 친선경기 관련
+        linkedEvent: {
+          select: {
+            id: true,
+            title: true,
+            teamId: true,
+            date: true,
+            location: true,
+            team: { select: { id: true, name: true, logoUrl: true } },
+          },
+        },
+        opponentTeam: {
+          select: { id: true, name: true, logoUrl: true, eloRating: true },
+        },
+        matchRules: true,
+        refereeAssignment: {
           include: {
-            teamAssignments: {
+            quarterReferees: {
               include: { user: { select: userSelect } },
+              orderBy: { quarter: "asc" },
             },
           },
-          orderBy: { orderIndex: "asc" },
         },
+        goalRecords: {
+          include: {
+            scorer: { select: userSelect },
+            assistant: { select: userSelect },
+            recordedBy: { select: userSelect },
+          },
+          orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+        },
+        playerSubstitutions: {
+          include: {
+            playerOut: { select: userSelect },
+            playerIn: { select: userSelect },
+            recordedBy: { select: userSelect },
+          },
+          orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+        },
+        ...(includeSessions && {
+          sessions: {
+            include: {
+              teamAssignments: {
+                include: { user: { select: userSelect } },
+              },
+            },
+            orderBy: { orderIndex: "asc" },
+          },
+        }),
       },
     });
 
@@ -58,12 +111,17 @@ export async function GET(
 
     return NextResponse.json({
       ...event,
+      sessions: (event as any).sessions || [], // includeSessions=true일 때만 포함
       myRsvp: myRsvp?.status || null,
       myCheckIn: myCheckIn?.checkedInAt || null,
     });
   } catch (error) {
     console.error("팀 운동 상세 조회 오류:", error);
-    return NextResponse.json({ error: "조회에 실패했습니다" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
+    return NextResponse.json(
+      { error: "조회에 실패했습니다", details: errorMessage },
+      { status: 500 }
+    );
   }
 }
 
@@ -89,6 +147,57 @@ export async function PUT(
     }
 
     const body = await req.json();
+
+    // 구장 처리
+    let venueId = event.venueId;
+    if (body.location) {
+      const locationName = body.location.trim();
+      let venue = await prisma.venue.findUnique({
+        where: {
+          teamId_name: {
+            teamId: event.teamId,
+            name: locationName,
+          },
+        },
+      });
+
+      if (!venue) {
+        // 새 구장 생성
+        venue = await prisma.venue.create({
+          data: {
+            teamId: event.teamId,
+            name: locationName,
+            address: body.venueData?.address || null,
+            mapUrl: body.venueData?.mapUrl || null,
+            latitude: body.venueData?.latitude || null,
+            longitude: body.venueData?.longitude || null,
+            recommendedShoes: Array.isArray(body.shoes) ? body.shoes : [],
+            usageCount: 1,
+          },
+        });
+      } else {
+        // 기존 구장: 지도 정보 업데이트 (venueData가 제공된 경우)
+        if (body.venueData) {
+          await prisma.venue.update({
+            where: { id: venue.id },
+            data: {
+              address: body.venueData.address || venue.address,
+              mapUrl: body.venueData.mapUrl || venue.mapUrl,
+              latitude: body.venueData.latitude || venue.latitude,
+              longitude: body.venueData.longitude || venue.longitude,
+            },
+          });
+        }
+        // location이 변경된 경우에만 usageCount 증가
+        if (locationName !== event.location) {
+          await prisma.venue.update({
+            where: { id: venue.id },
+            data: { usageCount: { increment: 1 } },
+          });
+        }
+      }
+      venueId = venue.id;
+    }
 
     // 조끼 당번 수정 시, 이후 운동에서 이미 설정되어 있으면 수정 불가
     if (body.vestBringerId !== undefined || body.vestReceiverId !== undefined) {
@@ -122,12 +231,35 @@ export async function PUT(
         ...(body.pomVotesPerPerson !== undefined && { pomVotesPerPerson: body.pomVotesPerPerson }),
         ...(body.date && { date: new Date(body.date) }),
         ...(body.location && { location: body.location }),
+        ...(venueId && { venueId }),
         ...(body.shoes !== undefined && { shoes: Array.isArray(body.shoes) ? body.shoes : [] }),
         ...(body.notes !== undefined && { notes: body.notes || null }),
         ...(body.uniform !== undefined && { uniform: body.uniform || null }),
         ...(body.vestBringerId !== undefined && { vestBringerId: body.vestBringerId || null }),
         ...(body.vestReceiverId !== undefined && { vestReceiverId: body.vestReceiverId || null }),
         ...(body.rsvpDeadline && { rsvpDeadline: new Date(body.rsvpDeadline) }),
+        // 날씨 정보 업데이트
+        ...(body.weatherData && {
+          weather: body.weatherData.weather || null,
+          weatherDescription: body.weatherData.weatherDescription || null,
+          temperature: body.weatherData.temperature || null,
+          minTempC: body.weatherData.minTempC || null,
+          maxTempC: body.weatherData.maxTempC || null,
+          feelsLikeC: body.weatherData.feelsLikeC || null,
+          precipMm: body.weatherData.precipMm || null,
+          chanceOfRain: body.weatherData.chanceOfRain || null,
+          windKph: body.weatherData.windKph || null,
+          uvIndex: body.weatherData.uvIndex || null,
+          airQualityIndex: body.weatherData.airQualityIndex || null,
+          pm25: body.weatherData.pm25 || null,
+          pm10: body.weatherData.pm10 || null,
+          sunrise: body.weatherData.sunrise || null,
+          sunset: body.weatherData.sunset || null,
+        }),
+        // 친선경기 정보 업데이트
+        ...(body.isFriendlyMatch !== undefined && { isFriendlyMatch: body.isFriendlyMatch }),
+        ...(body.minimumPlayers !== undefined && { minimumPlayers: body.minimumPlayers || null }),
+        ...(body.rsvpDeadlineOffset !== undefined && { rsvpDeadlineOffset: body.rsvpDeadlineOffset || null }),
       },
     });
 

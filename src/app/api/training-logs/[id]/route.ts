@@ -115,7 +115,7 @@ export async function PUT(
       return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
     }
 
-    const { trainingDate, condition, conditionReason, keyPoints, improvement } =
+    const { trainingDate, condition, conditionReason, keyPoints, improvement, notes } =
       await req.json();
 
     const updatedLog = await prisma.trainingLog.update({
@@ -126,6 +126,7 @@ export async function PUT(
         ...(conditionReason && { conditionReason: conditionReason.trim() }),
         ...(keyPoints && { keyPoints: keyPoints.trim() }),
         ...(improvement && { improvement: improvement.trim() }),
+        ...(notes !== undefined && { notes: notes?.trim() || null }),
       },
     });
 

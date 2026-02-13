@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import useSWR from "swr";
@@ -19,6 +20,7 @@ import { isCheckInPeriod } from "@/lib/timeUntil";
 import { fetcher } from "@/lib/fetcher";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
+import { getAirQualityGrade } from "@/lib/weather";
 
 interface Nudge {
   id: string;
@@ -42,7 +44,34 @@ interface RecentMvp {
   isYesterday: boolean;
 }
 
+interface LockerNote {
+  id: string;
+  content: string;
+  color: string;
+  rotation: number;
+  positionX: number;
+  positionY: number;
+  tags: string[];
+  createdAt: string;
+  isAnonymous: boolean;
+  recipient: {
+    id: string;
+    name: string | null;
+  };
+  author: {
+    id: string;
+    name: string | null;
+  };
+  trainingLog?: {
+    trainingDate: string;
+  } | null;
+  trainingEvent?: {
+    date: string;
+  } | null;
+}
+
 export default function Feed() {
+  const router = useRouter();
   const { data: session } = useSession();
   const { teamData, loading: teamLoading } = useTeam();
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -86,10 +115,17 @@ export default function Feed() {
     swrConfig
   );
 
+  const { data: recentNotesData } = useSWR<LockerNote[]>(
+    "/api/locker-notes",
+    fetcher,
+    swrConfig
+  );
+
   const logs = logsData?.logs || [];
   const nudges = nudgesData?.nudges || [];
   const nextEvents = eventsData?.events || [];
   const recentMvp = mvpData?.mvp || null;
+  const recentNotes = recentNotesData || [];
 
   // 로그인 후 알림 구독 요청
   useEffect(() => {
@@ -103,9 +139,15 @@ export default function Feed() {
     await Promise.all([mutateLogs(), mutateEvents()]);
   };
 
-  const handleExpand = useCallback((date: string) => {
+  const handleExpand = useCallback((date: string, logs: TrainingLog[]) => {
+    // 카드가 1개뿐이면 바로 운동일지로 이동
+    if (logs.length === 1) {
+      router.push(`/log/${logs[0].id}`);
+      return;
+    }
+    // 카드가 여러 개면 캐러셀로 펼침
     setExpandedDate(date);
-  }, []);
+  }, [router]);
 
   const handleCollapse = useCallback(() => {
     setExpandedDate(null);
@@ -185,7 +227,23 @@ export default function Feed() {
     return `${year}-${month}-${day}`;
   };
 
-  // 날짜별 그룹핑
+  // 날짜별 쪽지 그룹핑 (운동 날짜 기준, 없으면 생성 날짜)
+  const getNotesByDate = (date: string): LockerNote[] => {
+    return recentNotes.filter((note) => {
+      // 운동일지 날짜 우선, 없으면 팀 운동 날짜, 없으면 생성 날짜
+      let noteDate: string;
+      if (note.trainingLog?.trainingDate) {
+        noteDate = getLocalDateString(new Date(note.trainingLog.trainingDate));
+      } else if (note.trainingEvent?.date) {
+        noteDate = getLocalDateString(new Date(note.trainingEvent.date));
+      } else {
+        noteDate = getLocalDateString(new Date(note.createdAt));
+      }
+      return noteDate === date;
+    });
+  };
+
+  // 날짜별 그룹핑 (쪽지만 있는 날짜도 포함)
   const groupLogsByDate = (): GroupedLogs[] => {
     const today = getLocalDateString(new Date());
     const yesterday = getLocalDateString(new Date(Date.now() - 86400000));
@@ -195,6 +253,19 @@ export default function Feed() {
       const date = getLocalDateString(new Date(log.trainingDate));
       if (!grouped[date]) grouped[date] = [];
       grouped[date].push(log);
+    }
+
+    // 쪽지만 있는 날짜도 그룹에 추가
+    for (const note of recentNotes) {
+      let noteDate: string;
+      if (note.trainingLog?.trainingDate) {
+        noteDate = getLocalDateString(new Date(note.trainingLog.trainingDate));
+      } else if (note.trainingEvent?.date) {
+        noteDate = getLocalDateString(new Date(note.trainingEvent.date));
+      } else {
+        noteDate = getLocalDateString(new Date(note.createdAt));
+      }
+      if (!grouped[noteDate]) grouped[noteDate] = [];
     }
 
     return Object.entries(grouped)
@@ -250,9 +321,31 @@ export default function Feed() {
       const d = new Date(event.date);
       const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
       const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+      // 날씨 아이콘 매핑
+      let weatherIcon = "";
+      if (event.weather) {
+        if (event.weather === "Clear") weatherIcon = "☀️";
+        else if (event.weather === "Clouds") weatherIcon = "☁️";
+        else if (event.weather === "Rain") weatherIcon = "🌧️";
+        else if (event.weather === "Snow") weatherIcon = "❄️";
+      }
+
+      // 날씨 정보
+      let weatherInfo = "";
+      if (event.weather && event.temperature !== null) {
+        weatherInfo = ` · ${weatherIcon} ${event.temperature}°C`;
+      }
+
+      // 대기질 정보
+      if (event.airQualityIndex !== null) {
+        const aqGrade = getAirQualityGrade(event.airQualityIndex);
+        weatherInfo += ` · 대기질 ${aqGrade.emoji}`;
+      }
+
       messages.push({
         key: `event-${event.id}`,
-        text: `📢 ${event.title || "팀 운동"} · ${dateStr} ${timeStr} · ${event.location}`,
+        text: `📢 ${event.title || "팀 운동"} · ${dateStr} ${timeStr} · ${event.location}${weatherInfo}`,
         url: `/training/${event.id}`,
       });
     }
@@ -294,6 +387,16 @@ export default function Feed() {
       });
     }
 
+    // 쪽지 메시지 (24시간 이내)
+    for (const note of recentNotes) {
+      const recipientName = note.recipient.name || "팀원";
+      messages.push({
+        key: `note-${note.id}`,
+        text: `👀 누군가가 ${recipientName}님의 락커에 쪽지를 꼽아놓고 도망갔습니다`,
+        url: `/locker/${note.recipient.id}`,
+      });
+    }
+
     // 활동 메시지 (상시)
     const count = todayActiveUserIds().length;
     const total = teamMembers.length;
@@ -332,11 +435,13 @@ export default function Feed() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           {teamLogoUrl ? (
-            <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority />
+            <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority unoptimized />
           ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="1" width="18" height="22" rx="1" fill="#E8E0D8" stroke="#967B5D" strokeWidth="1" />
-              <circle cx="12" cy="11" r="4" fill="none" stroke="#967B5D" strokeWidth="1" />
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="15" fill="#967B5D" />
+              <circle cx="16" cy="16" r="7" fill="none" stroke="#F5F0EB" strokeWidth="1.5" />
+              <path d="M16 9 L16 23 M9 16 L23 16" stroke="#F5F0EB" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="16" cy="16" r="2.5" fill="#F5F0EB" />
             </svg>
           )}
           <Link href="/my" className="text-team-500 hover:text-team-600 transition-colors">
@@ -388,7 +493,7 @@ export default function Feed() {
       <main className={expandedDate ? "" : "max-w-2xl mx-auto"}>
         {isLoading ? (
           <LoadingSpinner />
-        ) : logs.length === 0 ? (
+        ) : logs.length === 0 && recentNotes.length === 0 ? (
           <div className="text-center py-20 px-6">
             <div className="text-6xl mb-4">⚽</div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -411,17 +516,22 @@ export default function Feed() {
               // 다른 날짜가 펼쳐진 경우 현재 스택 숨기기
               if (expandedDate && !isThisExpanded) return null;
 
+              const notesForDate = getNotesByDate(group.date);
+
               return (
-                <PolaroidDateGroup
-                  key={group.displayDate}
-                  logs={group.logs}
-                  date={group.date}
-                  displayDate={group.displayDate}
-                  isExpanded={isThisExpanded}
-                  onExpand={() => handleExpand(group.displayDate)}
-                  onCollapse={handleCollapse}
-                  onLikeToggle={handleLikeToggle}
-                />
+                <div key={group.displayDate}>
+                  <PolaroidDateGroup
+                    logs={group.logs}
+                    date={group.date}
+                    displayDate={group.displayDate}
+                    isExpanded={isThisExpanded}
+                    onExpand={() => handleExpand(group.displayDate, group.logs)}
+                    onCollapse={handleCollapse}
+                    onLikeToggle={handleLikeToggle}
+                    notes={notesForDate}
+                    disableNoteOpen
+                  />
+                </div>
               );
             })}
           </div>
@@ -433,7 +543,18 @@ export default function Feed() {
         <div className="fixed bottom-6 right-6 z-50">
           {/* 메뉴 (운영진만) */}
           {isAdmin && showFabMenu && (
-            <div className="absolute bottom-16 right-0 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[160px] mb-2">
+            <div className="absolute bottom-16 right-0 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[200px] mb-2">
+              <Link
+                href="/compliment"
+                onClick={() => setShowFabMenu(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <span>칭찬 쪽지 놓고오기</span>
+              </Link>
               <Link
                 href="/write"
                 onClick={() => setShowFabMenu(false)}
@@ -482,7 +603,7 @@ export default function Feed() {
             </button>
           ) : (
             <Link
-              href="/write"
+              href="/compliment"
               className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 transition-colors"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

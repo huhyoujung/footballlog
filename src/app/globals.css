@@ -1,6 +1,13 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Umdot';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-4@1.1/Umdot12.woff2') format('woff2');
+  font-weight: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light only;
   --background: #f9fafb;
@@ -23,6 +30,7 @@
   --color-foreground: var(--foreground);
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   --font-mono: "SF Mono", SFMono-Regular, Consolas, monospace;
+  --font-ticker: "Umdot", monospace;
 
   /* Team colors - :root에서 정의되고 동적으로 업데이트됨 */
   --color-team-50: var(--color-team-50);
@@ -57,8 +65,8 @@ body {
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  /* transform: translateZ(0); - 모달 fixed positioning 방해하므로 제거 */
+  /* backface-visibility: hidden; */
 }
 
 /* Form 요소 텍스트 색상 강제 설정 */
@@ -173,5 +181,51 @@ input:-webkit-autofill:active {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* Modal root - containing block 생성 방지 */
+#modal-root {
+  position: static;
+  pointer-events: none;
+}
+
+#modal-root > * {
+  pointer-events: auto;
+}
+
+/* Shake and fall animation for polaroids */
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-10px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(10px);
+  }
+}
+
+.animate-fall {
+  animation: fall 1s cubic-bezier(0.55, 0.09, 0.68, 0.53) both;
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(20px) rotate(5deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(60px) rotate(-10deg);
+    opacity: 0.3;
   }
 }

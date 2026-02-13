@@ -48,7 +48,7 @@ function WritePageContent() {
   const { teamData } = useTeam();
   const teamMembers = teamData?.members || [];
 
-  // SWR로 예정된 팀 운동 목록 캐싱
+  // SWR로 최근 팀 운동 목록 캐싱 (최근 30일)
   const { data: eventsData } = useSWR<{
     events: Array<{
       id: string;
@@ -56,11 +56,11 @@ function WritePageContent() {
       date: string;
       location: string;
     }>;
-  }>("/api/training-events/next?includeToday=true", fetcher, {
+  }>("/api/training-events?filter=recent", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 30000,
   });
-  const upcomingEvents = eventsData?.events || [];
+  const recentEvents = eventsData?.events || [];
   const [formData, setFormData] = useState<{
     logType: "team" | "personal";
     trainingEventId: string | null;
@@ -70,6 +70,7 @@ function WritePageContent() {
     conditionReason: string;
     keyPoints: string;
     improvement: string;
+    notes: string;
   }>({
     logType: "personal",
     trainingEventId: null,
@@ -79,6 +80,7 @@ function WritePageContent() {
     conditionReason: "",
     keyPoints: "",
     improvement: "",
+    notes: "",
   });
 
   // 편집 모드: 기존 데이터 로드
@@ -99,6 +101,7 @@ function WritePageContent() {
             conditionReason: data.conditionReason,
             keyPoints: data.keyPoints,
             improvement: data.improvement,
+            notes: data.notes || "",
           });
           if (data.imageUrl) {
             setImagePreview(data.imageUrl);
@@ -229,7 +232,7 @@ function WritePageContent() {
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton href={isEditMode ? `/log/${editId}` : "/"} />
+          <BackButton />
           <h1 className="text-base font-semibold text-gray-900">
             {isEditMode ? "운동 일지 수정" : "운동 일지 작성"}
           </h1>
@@ -269,7 +272,7 @@ function WritePageContent() {
                 type="button"
                 onClick={() => {
                   if (formData.logType !== "team") {
-                    const selectedEvent = upcomingEvents[0];
+                    const selectedEvent = recentEvents[0];
                     setFormData({
                       ...formData,
                       logType: "team",
@@ -292,15 +295,15 @@ function WritePageContent() {
             </div>
           </div>
 
-          {formData.logType === "team" && upcomingEvents.length > 0 ? (
-            <div>
+          {formData.logType === "team" && recentEvents.length > 0 ? (
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 팀 운동 선택
               </label>
               <select
                 value={formData.trainingEventId || ""}
                 onChange={(e) => {
-                  const selectedEvent = upcomingEvents.find((ev) => ev.id === e.target.value);
+                  const selectedEvent = recentEvents.find((ev) => ev.id === e.target.value);
                   setFormData({
                     ...formData,
                     trainingEventId: e.target.value || null,
@@ -311,7 +314,7 @@ function WritePageContent() {
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
               >
-                {upcomingEvents.map((event) => (
+                {recentEvents.map((event) => (
                   <option key={event.id} value={event.id}>
                     {new Date(event.date).toLocaleDateString("ko-KR", {
                       month: "short",
@@ -328,9 +331,9 @@ function WritePageContent() {
               </select>
             </div>
           ) : formData.logType === "team" ? (
-            <p className="text-sm text-gray-500">예정된 팀 운동이 없습니다</p>
+            <p className="text-sm text-gray-500 mt-4">최근 팀 운동이 없습니다</p>
           ) : (
-            <div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 제목
               </label>
@@ -369,10 +372,12 @@ function WritePageContent() {
         <button
           type="button"
           onClick={() => setShowConditionPicker(true)}
-          className="w-full px-4 py-5 text-left"
+          className={`w-full px-4 py-5 text-left transition-colors ${
+            !condSelected ? "bg-red-50 hover:bg-red-100" : ""
+          }`}
         >
           {condSelected ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 ml-2">
               <span
                 className="text-2xl font-extrabold"
                 style={{ color: condColor }}
@@ -389,12 +394,9 @@ function WritePageContent() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
+            <div>
+              <span className="text-sm font-medium text-red-700">
                 컨디션
-              </span>
-              <span className="text-sm text-gray-400">
-                탭하여 선택
               </span>
             </div>
           )}
@@ -452,12 +454,25 @@ function WritePageContent() {
           />
         </div>
 
+        {/* 기타 메모 (선택) */}
+        <div className="px-4 py-5">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            기타 메모 <span className="text-xs text-gray-400">(선택)</span>
+          </label>
+          <textarea
+            value={formData.notes}
+            onChange={(e) =>
+              setFormData({ ...formData, notes: e.target.value })
+            }
+            placeholder="그 외에 기록하고 싶은 내용을 자유롭게 적어주세요."
+            rows={3}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent resize-none"
+          />
+        </div>
+
         {/* 이미지 첨부 - 신규 작성 시에만 */}
         {!isEditMode && (
-          <div className="px-4 py-5 flex flex-col items-center">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              사진
-            </label>
+          <div className="px-4 pt-0 pb-5 flex flex-col items-center !border-t-0">
             <button
               type="button"
               onClick={() => !imagePreview && fileInputRef.current?.click()}
@@ -504,10 +519,7 @@ function WritePageContent() {
 
         {/* 수정 모드에서 기존 이미지 표시 */}
         {isEditMode && imagePreview && (
-          <div className="px-4 py-5 flex flex-col items-center">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              사진
-            </label>
+          <div className="px-4 pt-0 pb-5 flex flex-col items-center !border-t-0">
             <div
               className="w-32 bg-white rounded-sm p-2 pb-4"
               style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
@@ -527,11 +539,11 @@ function WritePageContent() {
       {/* 하단 제출 CTA */}
       {isFormComplete && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-10">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto flex justify-center">
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+              className="w-full max-w-xs py-3.5 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
             >
               {loading ? "저장 중..." : isEditMode ? "수정 완료" : "일지 올리기"}
             </button>

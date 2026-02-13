@@ -94,10 +94,10 @@ export default function ConditionPicker({ value, onConfirm, onClose }: Props) {
       </div>
 
       {/* 하단 슬라이더 */}
-      <div className="px-6 pb-16 pt-8">
+      <div className="px-6 pb-[max(4rem,env(safe-area-inset-bottom,4rem))] pt-8">
         <div
           ref={barRef}
-          className="relative h-4 rounded-full bg-gray-200 cursor-pointer touch-none"
+          className="relative h-5 rounded-full bg-gray-200 cursor-pointer touch-none"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
         >

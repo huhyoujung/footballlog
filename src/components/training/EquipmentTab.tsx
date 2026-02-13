@@ -44,9 +44,9 @@ export default function EquipmentTab({ eventId }: Props) {
     eventId ? `/api/training-events/${eventId}/equipment` : null,
     fetcher,
     {
-      revalidateOnFocus: true, // 탭 전환 시 데이터 갱신
-      revalidateIfStale: true,
-      dedupingInterval: 5000, // 5초 캐시
+      revalidateOnFocus: false, // 탭 전환 시 재검증 방지 (성능 개선)
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
       keepPreviousData: true,
       onSuccess: (data) => {
         // 초기 배정 상태 설정
@@ -297,15 +297,16 @@ export default function EquipmentTab({ eventId }: Props) {
         );
       })}
 
-      <div className="space-y-3">
+      {/* 저장 버튼 */}
+      <div className="bg-white rounded-xl p-4">
         <button
           onClick={saveEquipmentAssignments}
           disabled={savingEquipment}
-          className="w-full py-2 bg-team-500 text-white rounded-lg text-sm font-medium hover:bg-team-600 disabled:opacity-50"
+          className="w-full py-3 bg-team-500 text-white rounded-lg text-sm font-semibold hover:bg-team-600 disabled:opacity-50 transition-colors"
         >
-          {savingEquipment ? "저장 중..." : "저장"}
+          {savingEquipment ? "저장 중..." : "장비 배정 저장"}
         </button>
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-xs text-gray-500 text-center mt-3">
           이 페이지에서 편집한 장비 배정은 다른 운동에도 동일하게 적용됩니다
         </p>
       </div>

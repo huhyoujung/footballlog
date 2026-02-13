@@ -28,7 +28,7 @@ export default function TrainingInviteCard({ event }: Props) {
       href={`/training/${event.id}`}
       className="block flex-shrink-0 w-[280px]"
     >
-      <div className="bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-4 shadow-lg">
+      <div className="bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-4 shadow-xl">
         <div className="flex items-center gap-2 mb-3">
           <h3 className="text-lg font-bold text-white flex-1">{event.title}</h3>
           <span className="px-2.5 py-1 bg-white/20 text-white text-xs font-medium rounded-full flex-shrink-0">

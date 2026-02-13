@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface BackButtonProps {
   href?: string;
@@ -9,15 +8,13 @@ interface BackButtonProps {
 }
 
 export default function BackButton({ href, onClick }: BackButtonProps) {
-  const router = useRouter();
-
   const handleClick = (e: React.MouseEvent) => {
     if (onClick) {
       e.preventDefault();
       onClick();
     } else if (!href) {
       e.preventDefault();
-      router.back();
+      window.history.back();
     }
   };
 

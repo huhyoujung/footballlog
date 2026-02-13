@@ -7,6 +7,7 @@ import BackButton from "@/components/BackButton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
 const POSITIONS = [
+  "감독",
   "GK", "CB", "LB", "RB",
   "CDM", "CM", "CAM",
   "LM", "RM",
