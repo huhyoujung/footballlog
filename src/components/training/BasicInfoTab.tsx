@@ -224,7 +224,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             rel="noopener noreferrer"
             onClick={(e) => {
               e.stopPropagation();
-              console.log("Map link clicked:", event.venue.mapUrl);
+              console.log("Map link clicked:", event.venue?.mapUrl);
             }}
             className="flex items-center gap-2 text-sm text-gray-600 hover:text-team-600 transition-colors cursor-pointer"
           >
