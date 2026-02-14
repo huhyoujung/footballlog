@@ -15,6 +15,7 @@ import PolaroidCard from "@/components/PolaroidCard";
 import type { TrainingLog, GroupedLogs } from "@/types/training";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { withEulReul } from "@/lib/korean";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface LockerNote {
   id: string;
@@ -102,6 +103,7 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, update } = useSession();
+  const { teamData } = useTeam(); // TeamContext 사용
   const { toast, showToast, hideToast } = useToast();
   const [userId, setUserId] = useState<string>("");
   const [user, setUser] = useState<User | null>(null);
@@ -151,28 +153,34 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
     }
   }, [searchParams, userId, session?.user?.id]);
 
-  // 사용자 정보 가져오기
+  // 사용자 정보 가져오기 (TeamContext에서)
   useEffect(() => {
-    if (!userId || !session?.user?.teamId) return;
+    if (!userId || !teamData?.members) return;
 
-    fetch(`/api/teams/${session.user.teamId}/members`)
-      .then((res) => res.json())
-      .then((members: User[]) => {
-        const targetUser = members.find((m) => m.id === userId);
-        if (targetUser) {
-          setUser(targetUser);
-        }
-      });
-  }, [userId, session]);
+    const targetUser = teamData.members.find((m) => m.id === userId);
+    if (targetUser) {
+      setUser(targetUser);
+    }
+  }, [userId, teamData]);
 
   const { data: allNotes, mutate } = useSWR<LockerNote[]>(
     userId ? `/api/locker-notes/user/${userId}` : null,
-    fetcher
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000, // 1분 캐시
+      keepPreviousData: true,
+    }
   );
 
   const { data: logsData } = useSWR<{ logs: TrainingLog[] }>(
-    userId ? `/api/training-logs?userId=${userId}&limit=100` : null,
-    fetcher
+    userId ? `/api/training-logs?userId=${userId}&limit=20` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 120000, // 2분 캐시
+      keepPreviousData: true,
+    }
   );
 
   const logs = logsData?.logs || [];
@@ -182,7 +190,12 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
     activities: Array<{ id: string; title: string; date: string; type: "event" | "log" }>;
   }>(
     userId && session?.user?.teamId ? `/api/locker-notes/user/${userId}/recent-activities` : null,
-    fetcher
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 120000, // 2분 캐시
+      keepPreviousData: true,
+    }
   );
 
   const recentActivities = activitiesData?.activities || [];
@@ -374,7 +387,7 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
       });
 
       if (res.ok) {
-        showToast(`${user.name}님${withEulReul(user.name || "팀원")} 닦달했어요! 🔥`);
+        showToast(`${withEulReul(user.name || "팀원")} 닦달했어요! 🔥`);
         setNudgedToday((prev) => new Set(prev).add(userId));
       } else {
         showToast("닦달에 실패했습니다");
@@ -1006,7 +1019,7 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
             <div className="text-center mb-5">
               <div className="text-4xl mb-3">⚡</div>
               <p className="text-base font-semibold text-gray-900">
-                {user.name}님{withEulReul(user.name || "팀원")} 닦달할까요?
+                {withEulReul(user.name || "팀원")} 닦달할까요?
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 하루에 한 번만 보낼 수 있어요

@@ -74,7 +74,7 @@ interface LockerNote {
 const swrConfig = {
   revalidateOnFocus: false,
   revalidateIfStale: false,
-  dedupingInterval: 300000, // 5분 캐시
+  dedupingInterval: 120000, // 2분 캐시 (피드는 실시간성이 중요)
   keepPreviousData: true,
 };
 
@@ -109,9 +109,9 @@ export default function Feed() {
   const teamMembers: TeamMember[] = teamData?.members || [];
   const teamLogoUrl = teamData?.logoUrl || null;
 
-  // SWR로 데이터 페칭
+  // SWR로 데이터 페칭 - 최신 20개만 먼저 로드 (속도 개선)
   const { data: logsData, mutate: mutateLogs } = useSWR<{ logs: TrainingLog[] }>(
-    "/api/training-logs",
+    "/api/training-logs?limit=20",
     fetcher,
     swrConfig
   );

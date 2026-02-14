@@ -102,7 +102,8 @@ export default function MyPage() {
       fallbackData: { image: session?.user?.image || null },
       revalidateOnFocus: false,
       revalidateIfStale: false,
-      dedupingInterval: 300000, // 5분 캐시
+      dedupingInterval: 30000, // 30초 캐시 (마이페이지는 자주 변경)
+      keepPreviousData: true,
     }
   );
 
@@ -112,9 +113,8 @@ export default function MyPage() {
     signOut({ callbackUrl: "/login" });
   };
 
-  const isLoading = profileLoading || teamLoading;
-
-  if (isLoading) {
+  // 로딩 상태: TeamContext만 체크 (profile은 fallback 있음)
+  if (teamLoading) {
     return <LoadingSpinner />;
   }
 
@@ -137,6 +137,7 @@ export default function MyPage() {
             <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
               <Link
                 href="/my/training-events"
+                prefetch={true}
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
               >
                 <span className="text-gray-900">팀 운동</span>
@@ -144,6 +145,7 @@ export default function MyPage() {
               </Link>
               <Link
                 href={`/locker/${session?.user?.id}`}
+                prefetch={true}
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
               >
                 <span className="text-gray-900">내 락커</span>
@@ -152,6 +154,7 @@ export default function MyPage() {
               {isAdmin && (
                 <Link
                   href="/my/team-admin"
+                  prefetch={true}
                   className="flex items-center justify-between p-4 hover:bg-gray-50"
                 >
                   <span className="text-gray-900">팀 관리</span>
