@@ -92,7 +92,7 @@ export default function TrainingCheckInCard({
       <button
         onClick={handleCheckIn}
         disabled={submitting}
-        className="w-full bg-white text-team-600 font-bold py-3.5 px-4 rounded-xl hover:bg-white/95 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+        className="w-full bg-white text-team-600 font-bold py-3.5 px-4 rounded-xl hover:bg-white/95 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm touch-manipulation"
       >
         {submitting ? (
           <div className="flex items-center justify-center gap-2">

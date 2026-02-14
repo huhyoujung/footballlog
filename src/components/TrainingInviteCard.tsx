@@ -27,7 +27,7 @@ export default function TrainingInviteCard({ event }: Props) {
     <Link
       href={`/training/${event.id}`}
       prefetch={true}
-      className="block flex-shrink-0 w-[280px]"
+      className="block flex-shrink-0 w-[280px] touch-manipulation active:scale-[0.98] transition-transform"
     >
       <div className="bg-gradient-to-br from-team-500 to-team-600 rounded-2xl p-4 shadow-xl">
         <div className="flex items-center gap-2 mb-3">
