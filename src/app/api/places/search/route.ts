@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       name: item.title.replace(/<[^>]*>/g, ""), // HTML 태그 제거
       address: item.address || item.roadAddress || "",
       roadAddress: item.roadAddress || "",
-      mapUrl: item.link || "",
+      mapUrl: item.link || `https://map.naver.com/v5/search/${encodeURIComponent(item.title.replace(/<[^>]*>/g, ""))}`,
       latitude: item.mapy ? parseFloat(item.mapy) / 10000000 : null,
       longitude: item.mapx ? parseFloat(item.mapx) / 10000000 : null,
       category: item.category || "",

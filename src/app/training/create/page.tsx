@@ -75,7 +75,6 @@ export default function TrainingCreatePage() {
   // 친선경기 관련
   const [isFriendlyMatch, setIsFriendlyMatch] = useState(false);
   const [minimumPlayers, setMinimumPlayers] = useState(6);
-  const [rsvpDeadlineOffset, setRsvpDeadlineOffset] = useState(-3);
 
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [showVenueList, setShowVenueList] = useState(false);
@@ -240,16 +239,6 @@ export default function TrainingCreatePage() {
     }
   }, [date]);
 
-  // 친선경기 모드: RSVP 마감 자동 계산
-  useEffect(() => {
-    if (isFriendlyMatch && date && rsvpDeadlineOffset) {
-      const trainingDate = new Date(date);
-      const deadline = new Date(trainingDate);
-      deadline.setDate(deadline.getDate() + rsvpDeadlineOffset); // -3이면 3일 전
-
-      setRsvpDeadlineDate(deadline.toISOString().split('T')[0]);
-    }
-  }, [isFriendlyMatch, date, rsvpDeadlineOffset]);
 
   const isFormComplete = title && date && time && location && rsvpDeadlineDate && rsvpDeadlineTime;
 
@@ -321,7 +310,6 @@ export default function TrainingCreatePage() {
           // 친선경기 정보
           isFriendlyMatch,
           minimumPlayers: isFriendlyMatch ? minimumPlayers : null,
-          rsvpDeadlineOffset: isFriendlyMatch ? rsvpDeadlineOffset : null,
         }),
       });
 
@@ -409,19 +397,6 @@ export default function TrainingCreatePage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">친선경기 진행을 위한 최소 인원입니다</p>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">RSVP 마감 시점</label>
-                <select
-                  value={rsvpDeadlineOffset}
-                  onChange={(e) => setRsvpDeadlineOffset(parseInt(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                >
-                  <option value={-7}>경기 7일 전</option>
-                  <option value={-5}>경기 5일 전</option>
-                  <option value={-3}>경기 3일 전</option>
-                  <option value={-1}>경기 1일 전</option>
-                </select>
-              </div>
             </div>
           )}
 
@@ -445,20 +420,26 @@ export default function TrainingCreatePage() {
 
         {/* 운동 날짜/시간 */}
         <div className="bg-white rounded-xl p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">운동 날짜</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-          />
-          <label className="block text-sm font-medium text-gray-700 mt-3 mb-2">시간</label>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">날짜</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">시간</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              />
+            </div>
+          </div>
         </div>
 
         {/* 장소 + 신발 */}
@@ -623,25 +604,24 @@ export default function TrainingCreatePage() {
           )}
         </div>
 
-        {/* 응답 마감 (정기운동 모드에서만 수동 입력) */}
-        {!isFriendlyMatch && (
-          <div className="bg-white rounded-xl p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">RSVP 마감</label>
+        {/* 응답 마감 */}
+        <div className="bg-white rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">RSVP 마감</label>
+          <div className="grid grid-cols-2 gap-3">
             <input
               type="date"
               value={rsvpDeadlineDate}
               onChange={(e) => setRsvpDeadlineDate(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
-            <label className="block text-sm font-medium text-gray-700 mt-3 mb-2">마감 시간</label>
             <input
               type="time"
               value={rsvpDeadlineTime}
               onChange={(e) => setRsvpDeadlineTime(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
           </div>
-        )}
+        </div>
 
         {/* MVP 투표 */}
         <div className="bg-white rounded-xl p-4">
@@ -666,19 +646,14 @@ export default function TrainingCreatePage() {
           {enablePomVoting && (
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">투표 마감 날짜 (선택)</label>
-                <input
-                  type="date"
-                  value={pomVotingDeadlineDate}
-                  onChange={(e) => setPomVotingDeadlineDate(e.target.value)}
-                  placeholder="비워두면 운동 2시간 후"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-400 mt-1">비워두면 운동 시작 2시간 후로 자동 설정됩니다</p>
-              </div>
-              {pomVotingDeadlineDate && (
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">투표 마감 시간</label>
+                <label className="block text-xs text-gray-500 mb-1">투표 마감 (선택)</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={pomVotingDeadlineDate}
+                    onChange={(e) => setPomVotingDeadlineDate(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                  />
                   <input
                     type="time"
                     value={pomVotingDeadlineTime}
@@ -686,7 +661,8 @@ export default function TrainingCreatePage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                   />
                 </div>
-              )}
+                <p className="text-xs text-gray-400 mt-1">비워두면 운동 시작 2시간 후로 자동 설정됩니다</p>
+              </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">1인당 투표 가능 인원</label>
                 <input

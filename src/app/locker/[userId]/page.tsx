@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -458,49 +458,42 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
     }
   };
 
-  // 날짜별 쪽지 그룹핑
-  const getNotesByDate = (date: string): LockerNote[] => {
-    if (!notes) return [];
-    return notes.filter((note) => {
-      const noteDate = getLocalDateString(new Date(note.createdAt));
-      return noteDate === date;
-    });
-  };
+  // 쪽지를 날짜별로 미리 그룹핑 (O(n) 1회)
+  const notesByDate = useMemo(() => {
+    const map: Record<string, LockerNote[]> = {};
+    for (const note of notes) {
+      const date = getLocalDateString(new Date(note.createdAt));
+      if (!map[date]) map[date] = [];
+      map[date].push(note);
+    }
+    return map;
+  }, [notes]);
 
   // 날짜별 그룹핑 (로그 + 쪽지 날짜 병합)
-  const groupLogsByDate = (): GroupedLogs[] => {
+  const groupedLogs = useMemo((): GroupedLogs[] => {
     const today = getLocalDateString(new Date());
     const yesterday = getLocalDateString(new Date(Date.now() - 86400000));
 
     const grouped: Record<string, TrainingLog[]> = {};
 
-    // 운동 기록 날짜별 그룹핑
     for (const log of logs) {
       const date = getLocalDateString(new Date(log.trainingDate));
       if (!grouped[date]) grouped[date] = [];
       grouped[date].push(log);
     }
 
-    // 쪽지 날짜 추가 (운동 기록이 없는 날짜도 포함)
-    if (notes) {
-      for (const note of notes) {
-        const date = getLocalDateString(new Date(note.createdAt));
-        if (!grouped[date]) {
-          grouped[date] = []; // 운동 기록이 없어도 날짜 그룹 생성
-        }
-      }
+    // 쪽지만 있는 날짜도 추가
+    for (const date of Object.keys(notesByDate)) {
+      if (!grouped[date]) grouped[date] = [];
     }
 
     return Object.entries(grouped)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([date, dateLogs]) => {
-        // 정렬 로직: 오늘은 최신순, 과거는 오래된 순
         const sortedLogs = [...dateLogs].sort((a, b) => {
           if (date === today) {
-            // 오늘: 최신순
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
           } else {
-            // 과거: 오래된 순
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           }
         });
@@ -519,44 +512,36 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
           logs: sortedLogs,
         };
       });
-  };
+  }, [logs, notesByDate]);
 
-  const handleExpand = (date: string, logs: TrainingLog[]) => {
-    // 카드가 1개뿐이면 바로 운동일지로 이동
+  const handleExpand = useCallback((date: string, logs: TrainingLog[]) => {
     if (logs.length === 1) {
       router.push(`/log/${logs[0].id}`);
       return;
     }
-    // 카드가 여러 개면 캐러셀로 펼침
     setExpandedDate(date);
-  };
+  }, [router]);
 
-  const handleCollapse = () => {
+  const handleCollapse = useCallback(() => {
     setExpandedDate(null);
-  };
+  }, []);
 
-  const handleLikeToggle = async (logId: string) => {
+  const handleLikeToggle = useCallback(async (logId: string) => {
     // 좋아요 기능은 나중에 구현
-  };
-
-  const groupedLogs = groupLogsByDate();
+  }, []);
 
   // 스탯 집계 (태그별 카운트)
-  const aggregateStats = () => {
-    if (!notes) return {};
-    const stats: Record<string, number> = {};
-    notes.forEach((note) => {
-      note.tags.forEach((tag) => {
-        stats[tag] = (stats[tag] || 0) + 1;
-      });
-    });
-    return stats;
-  };
-
-  const stats = aggregateStats();
-  const statEntries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
-  const maxStatValue = Math.max(...Object.values(stats), 0);
-  const hasEnoughNotes = notes && notes.length >= 5;
+  const { stats, statEntries, maxStatValue, hasEnoughNotes } = useMemo(() => {
+    const s: Record<string, number> = {};
+    for (const note of notes) {
+      for (const tag of note.tags) {
+        s[tag] = (s[tag] || 0) + 1;
+      }
+    }
+    const entries = Object.entries(s).sort((a, b) => b[1] - a[1]);
+    const maxVal = Math.max(...Object.values(s), 0);
+    return { stats: s, statEntries: entries, maxStatValue: maxVal, hasEnoughNotes: notes.length >= 5 };
+  }, [notes]);
 
   if (!notes || !user) {
     return <LoadingSpinner />;
@@ -683,7 +668,7 @@ export default function LockerPage({ params }: { params: Promise<{ userId: strin
                   const isThisExpanded = expandedDate === group.displayDate;
                   if (expandedDate && !isThisExpanded) return null;
 
-                  const notesForDate = getNotesByDate(group.date);
+                  const notesForDate = notesByDate[group.date] || [];
 
                   return (
                     <div key={group.displayDate}>
