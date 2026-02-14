@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       orderBy: {
         createdAt: "desc",
       },
-      take: 10, // 최대 10개
+      take: 50, // 팀 행사 시 쪽지가 많을 수 있으므로 넉넉하게
     });
 
     return NextResponse.json(recentNotes);

@@ -103,9 +103,12 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
     return i * spacing - center;
   };
 
-  // 쪽지를 왼쪽/오른쪽으로 분리 (최대 10개 - 각 사이드 5개씩)
-  const leftNotes = notes.filter((_, i) => i % 2 === 0).slice(0, 5);
-  const rightNotes = notes.filter((_, i) => i % 2 === 1).slice(0, 5);
+  // 폴라로이드 양옆에 표시할 쪽지 (각 사이드 최대 5개)
+  const sideLeftNotes = notes.filter((_, i) => i % 2 === 0).slice(0, 5);
+  const sideRightNotes = notes.filter((_, i) => i % 2 === 1).slice(0, 5);
+  // 양옆에 안 들어간 나머지 쪽지 → 아래쪽에 흩뿌리기
+  const sideCount = sideLeftNotes.length + sideRightNotes.length;
+  const overflowNotes = notes.slice(sideCount);
 
   return (
     <button
@@ -115,7 +118,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
       {/* 폴라로이드 없고 포스트잇만 있을 때 - 가운데 정렬 */}
       {logs.length === 0 && notes.length > 0 ? (
         <div className="flex gap-3 flex-wrap justify-center max-w-md">
-          {notes.slice(0, 10).map((note) => (
+          {notes.map((note) => (
             <PostItNote
               key={note.id}
               content={note.content}
@@ -132,9 +135,9 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
       ) : (
         <div className="flex items-start gap-4">
           {/* 왼쪽 포스트잇 */}
-          {!isExpanding && leftNotes.length > 0 && (
+          {!isExpanding && sideLeftNotes.length > 0 && (
             <div className="flex flex-col gap-4 pt-8">
-              {leftNotes.map((note) => (
+              {sideLeftNotes.map((note) => (
                 <PostItNote
                   key={note.id}
                   content={note.content}
@@ -206,9 +209,9 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
         )}
 
           {/* 오른쪽 포스트잇 */}
-          {!isExpanding && rightNotes.length > 0 && (
+          {!isExpanding && sideRightNotes.length > 0 && (
             <div className="flex flex-col gap-4 pt-8">
-              {rightNotes.map((note) => (
+              {sideRightNotes.map((note) => (
                 <PostItNote
                   key={note.id}
                   content={note.content}
@@ -223,6 +226,25 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 양옆에 다 안 들어간 쪽지 — 아래쪽에 흩뿌리기 */}
+      {!isExpanding && overflowNotes.length > 0 && logs.length > 0 && (
+        <div className="flex gap-3 flex-wrap justify-center max-w-sm mt-2">
+          {overflowNotes.map((note) => (
+            <PostItNote
+              key={note.id}
+              content={note.content}
+              color={note.color}
+              rotation={note.rotation}
+              recipientId={note.recipient?.id || ""}
+              recipientName={note.recipient?.name || "팀원"}
+              tags={note.tags}
+              onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+              showRecipient={disableNoteOpen}
+            />
+          ))}
         </div>
       )}
       <div

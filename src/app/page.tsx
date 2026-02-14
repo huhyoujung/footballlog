@@ -1,19 +1,24 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Feed from "@/components/Feed";
 
-export default async function HomePage() {
-  const session = await getServerSession(authOptions);
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  if (!session) {
-    redirect("/login");
-  }
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    } else if (status === "authenticated" && !session?.user?.teamId) {
+      router.replace("/onboarding");
+    }
+  }, [session, status, router]);
 
-  // 팀이 없으면 온보딩으로
-  if (!session.user.teamId) {
-    redirect("/onboarding");
-  }
+  // 세션 로딩 중이거나 미인증이면 빈 화면 (미들웨어가 리다이렉트 처리)
+  if (status !== "authenticated") return null;
 
   return <Feed />;
 }

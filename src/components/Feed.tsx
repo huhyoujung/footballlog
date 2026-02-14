@@ -71,10 +71,11 @@ interface LockerNote {
 }
 
 // SWR 설정 (컴포넌트 밖으로 이동 — 매 렌더마다 재생성 방지)
+// 글로벌 SWRProvider의 5분 캐시와 동일 — 뒤로가기 시 캐시에서 즉시 표시
 const swrConfig = {
   revalidateOnFocus: false,
   revalidateIfStale: false,
-  dedupingInterval: 120000, // 2분 캐시 (피드는 실시간성이 중요)
+  dedupingInterval: 300000, // 5분 — 글로벌 캐시와 동일
   keepPreviousData: true,
 };
 
