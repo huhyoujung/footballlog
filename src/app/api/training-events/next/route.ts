@@ -19,6 +19,9 @@ export async function GET(req: Request) {
     let whereCondition: any;
     let orderBy: any;
 
+    // 운동 시작 후 4시간까지는 "예정된 운동"으로 표시
+    const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+
     if (includeToday) {
       // 일지 작성용: 오늘 0시 ~ 현재 시간 (과거 운동만)
       const todayStart = new Date();
@@ -29,10 +32,10 @@ export async function GET(req: Request) {
       };
       orderBy = { date: "desc" }; // 최신순
     } else {
-      // 피드 배너용: 현재 시간 이후 (미래 운동)
+      // 피드 배너용: 시작 후 4시간 이내 운동도 포함
       whereCondition = {
         teamId: session.user.teamId,
-        date: { gte: now },
+        date: { gte: fourHoursAgo },
       };
       orderBy = { date: "asc" }; // 오래된 순
     }

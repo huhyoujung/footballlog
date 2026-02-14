@@ -474,23 +474,23 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
 
         {/* 운동 날짜/시간 */}
         <div className="bg-white rounded-xl p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">날짜</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                className="w-full min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
               />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">시간</label>
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                className="w-full min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -651,18 +651,18 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
         {/* 응답 마감 */}
         <div className="bg-white rounded-xl p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">RSVP 마감</label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <input
               type="date"
               value={rsvpDeadlineDate}
               onChange={(e) => setRsvpDeadlineDate(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
             <input
               type="time"
               value={rsvpDeadlineTime}
               onChange={(e) => setRsvpDeadlineTime(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+              className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -690,31 +690,43 @@ export default function TrainingEditPage({ params }: { params: Promise<{ id: str
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">투표 마감</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <input
                     type="date"
                     value={pomVotingDeadlineDate}
                     onChange={(e) => setPomVotingDeadlineDate(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                    className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                   />
                   <input
                     type="time"
                     value={pomVotingDeadlineTime}
                     onChange={(e) => setPomVotingDeadlineTime(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                    className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
                   />
                 </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">1인당 투표 가능 인원</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={pomVotesPerPerson}
-                  onChange={(e) => setPomVotesPerPerson(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-team-500 focus:border-transparent"
-                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPomVotesPerPerson(Math.max(1, pomVotesPerPerson - 1))}
+                    disabled={pomVotesPerPerson <= 1}
+                    className="w-10 h-10 rounded-lg border-2 border-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center transition-colors hover:border-team-500 hover:text-team-500 disabled:opacity-30 disabled:hover:border-gray-300 disabled:hover:text-gray-700"
+                  >
+                    -
+                  </button>
+                  <span className="text-lg font-semibold text-gray-900 w-8 text-center">{pomVotesPerPerson}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPomVotesPerPerson(Math.min(10, pomVotesPerPerson + 1))}
+                    disabled={pomVotesPerPerson >= 10}
+                    className="w-10 h-10 rounded-lg border-2 border-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center transition-colors hover:border-team-500 hover:text-team-500 disabled:opacity-30 disabled:hover:border-gray-300 disabled:hover:text-gray-700"
+                  >
+                    +
+                  </button>
+                  <span className="text-xs text-gray-400">명</span>
+                </div>
               </div>
             </div>
           )}

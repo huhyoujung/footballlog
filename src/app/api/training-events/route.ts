@@ -32,14 +32,17 @@ export async function GET(req: Request) {
 
     let whereCondition: any = { teamId: session.user.teamId };
 
+    // 운동 시작 후 4시간까지는 "예정된 운동"으로 표시
+    const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+
     if (filter === "upcoming") {
-      whereCondition.date = { gte: now };
+      whereCondition.date = { gte: fourHoursAgo };
     } else if (filter === "recent") {
-      // 최근 30일 이내 또는 현재 시각 이전
-      whereCondition.date = { gte: thirtyDaysAgo, lte: now };
+      // 최근 30일 이내 또는 4시간 이상 지난 운동
+      whereCondition.date = { gte: thirtyDaysAgo, lt: fourHoursAgo };
     } else {
-      // past: 현재 시각 이전
-      whereCondition.date = { lt: now };
+      // past: 4시간 이상 지난 운동
+      whereCondition.date = { lt: fourHoursAgo };
     }
 
     console.log("🔍 [Training Events Query]", {
