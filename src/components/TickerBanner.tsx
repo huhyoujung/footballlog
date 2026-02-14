@@ -36,8 +36,8 @@ export default function TickerBanner({ messages }: Props) {
       setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % messages.length);
         setIsAnimating(false);
-      }, 500);
-    }, 4000);
+      }, 800);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [messages.length]);
@@ -97,26 +97,50 @@ export default function TickerBanner({ messages }: Props) {
         className="absolute bottom-0 left-0 right-0 h-px bg-black/50"
       />
 
-      <div className="max-w-2xl mx-auto px-4 h-full flex items-center relative z-10">
-        <p
+      <div className="max-w-2xl mx-auto px-4 h-full flex items-center relative z-10 overflow-hidden">
+        <div
           key={current.key}
-          className={`text-xs font-semibold tracking-wide truncate transition-all duration-500 ease-in-out ${
-            isInitial
-              ? "translate-y-full opacity-0"
-              : isAnimating
-                ? "-translate-y-full opacity-0"
-                : "translate-y-0 opacity-100"
-          }`}
           style={{
-            fontFamily: '"Umdot", monospace',
-            color: '#ffffff',
-            textShadow: '0 0 16px rgba(150, 123, 93, 1), 0 0 8px rgba(150, 123, 93, 0.8), 0 0 4px rgba(150, 123, 93, 0.6), 0 1px 2px rgba(0, 0, 0, 0.8)',
-            filter: 'brightness(1)',
+            transition: 'all 800ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
+          className={`w-full ${
+            isInitial
+              ? "translate-x-full opacity-0"
+              : isAnimating
+                ? "-translate-x-full opacity-0"
+                : "translate-x-0 opacity-100"
+          }`}
         >
-          {current.text}
-        </p>
+          <p
+            className="text-xs font-semibold tracking-wide whitespace-nowrap ticker-text"
+            style={{
+              fontFamily: '"Umdot", monospace',
+              color: '#ffffff',
+              textShadow: '0 0 16px rgba(150, 123, 93, 1), 0 0 8px rgba(150, 123, 93, 0.8), 0 0 4px rgba(150, 123, 93, 0.6), 0 1px 2px rgba(0, 0, 0, 0.8)',
+              filter: 'brightness(1)',
+              animation: current.text.length > 50 ? 'ticker-scroll 15s linear infinite' : 'none',
+            }}
+          >
+            {current.text}
+            {current.text.length > 50 && <span className="ml-16">{current.text}</span>}
+          </p>
+        </div>
       </div>
+
+      <style jsx>{`
+        @keyframes ticker-scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        .ticker-text:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
     </div>
   );
 }

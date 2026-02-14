@@ -107,7 +107,7 @@ export default function KebabMenu({
       <div className="relative" ref={menuRef}>
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation"
         >
           <svg
             width="20"
@@ -130,7 +130,7 @@ export default function KebabMenu({
           <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-[100]">
             <button
               onClick={handleShare}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
             >
               공유하기
             </button>
@@ -139,7 +139,7 @@ export default function KebabMenu({
                 setShowMenu(false);
                 router.push(`/training/${eventId}/edit`);
               }}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors border-t border-gray-100 touch-manipulation"
             >
               기본 정보 수정
             </button>
@@ -148,7 +148,7 @@ export default function KebabMenu({
                 setShowMenu(false);
                 setShowDeleteModal(true);
               }}
-              className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
+              className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors border-t border-gray-100 touch-manipulation"
             >
               팀 운동 삭제
             </button>

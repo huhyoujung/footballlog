@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -70,6 +70,32 @@ interface LockerNote {
   } | null;
 }
 
+// SWR 설정 (컴포넌트 밖으로 이동 — 매 렌더마다 재생성 방지)
+const swrConfig = {
+  revalidateOnFocus: false,
+  revalidateIfStale: false,
+  dedupingInterval: 300000, // 5분 캐시
+  keepPreviousData: true,
+};
+
+// 로컬 timezone 기준 날짜 문자열 생성 (순수함수, 컴포넌트 밖)
+const getLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// 쪽지의 날짜 추출 (순수함수, 컴포넌트 밖)
+const getNoteDateString = (note: LockerNote): string => {
+  if (note.trainingLog?.trainingDate) {
+    return getLocalDateString(new Date(note.trainingLog.trainingDate));
+  } else if (note.trainingEvent?.date) {
+    return getLocalDateString(new Date(note.trainingEvent.date));
+  }
+  return getLocalDateString(new Date(note.createdAt));
+};
+
 export default function Feed() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -83,14 +109,7 @@ export default function Feed() {
   const teamMembers: TeamMember[] = teamData?.members || [];
   const teamLogoUrl = teamData?.logoUrl || null;
 
-  // SWR로 데이터 페칭 (5분 캐시, 포커스 시 재검증 비활성화)
-  const swrConfig = {
-    revalidateOnFocus: false,
-    revalidateIfStale: false,
-    dedupingInterval: 300000, // 5분 캐시
-    keepPreviousData: true,
-  };
-
+  // SWR로 데이터 페칭
   const { data: logsData, mutate: mutateLogs } = useSWR<{ logs: TrainingLog[] }>(
     "/api/training-logs",
     fetcher,
@@ -134,18 +153,15 @@ export default function Feed() {
     }
   }, [session, isSupported, isSubscribed, subscribe]);
 
-  const fetchData = async () => {
-    // SWR mutate로 데이터 새로고침
+  const fetchData = useCallback(async () => {
     await Promise.all([mutateLogs(), mutateEvents()]);
-  };
+  }, [mutateLogs, mutateEvents]);
 
   const handleExpand = useCallback((date: string, logs: TrainingLog[]) => {
-    // 카드가 1개뿐이면 바로 운동일지로 이동
     if (logs.length === 1) {
       router.push(`/log/${logs[0].id}`);
       return;
     }
-    // 카드가 여러 개면 캐러셀로 펼침
     setExpandedDate(date);
   }, [router]);
 
@@ -153,15 +169,13 @@ export default function Feed() {
     setExpandedDate(null);
   }, []);
 
-  const handleLikeToggle = async (logId: string) => {
-    // 낙관적 업데이트
+  const handleLikeToggle = useCallback(async (logId: string) => {
     const target = logs.find((l) => l.id === logId);
     if (!target) return;
 
     const wasLiked = target.isLiked;
     const prevCount = target._count.likes;
 
-    // SWR mutate로 낙관적 업데이트
     mutateLogs(
       (current) => {
         if (!current) return current;
@@ -178,7 +192,7 @@ export default function Feed() {
           ),
         };
       },
-      false // revalidate하지 않음 (낙관적 업데이트만)
+      false
     );
 
     try {
@@ -188,7 +202,6 @@ export default function Feed() {
 
       if (res.ok) {
         const data = await res.json();
-        // 서버 응답으로 최종 업데이트
         mutateLogs(
           (current) => {
             if (!current) return current;
@@ -209,42 +222,27 @@ export default function Feed() {
         );
         showToast(data.liked ? "좋아요를 눌렀어요" : "좋아요를 취소했어요");
       } else {
-        // 실패 시 롤백
         mutateLogs();
       }
     } catch (error) {
       console.error("좋아요 실패:", error);
-      // 실패 시 롤백
       mutateLogs();
     }
-  };
+  }, [logs, mutateLogs, showToast]);
 
-  // 로컬 timezone 기준 날짜 문자열 생성
-  const getLocalDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // 날짜별 쪽지 그룹핑 (운동 날짜 기준, 없으면 생성 날짜)
-  const getNotesByDate = (date: string): LockerNote[] => {
-    return recentNotes.filter((note) => {
-      // 운동일지 날짜 우선, 없으면 팀 운동 날짜, 없으면 생성 날짜
-      let noteDate: string;
-      if (note.trainingLog?.trainingDate) {
-        noteDate = getLocalDateString(new Date(note.trainingLog.trainingDate));
-      } else if (note.trainingEvent?.date) {
-        noteDate = getLocalDateString(new Date(note.trainingEvent.date));
-      } else {
-        noteDate = getLocalDateString(new Date(note.createdAt));
-      }
-      return noteDate === date;
-    });
-  };
+  // 쪽지를 날짜별로 미리 그룹핑 (O(n) 1회만)
+  const notesByDate = useMemo(() => {
+    const map: Record<string, LockerNote[]> = {};
+    for (const note of recentNotes) {
+      const date = getNoteDateString(note);
+      if (!map[date]) map[date] = [];
+      map[date].push(note);
+    }
+    return map;
+  }, [recentNotes]);
 
   // 날짜별 그룹핑 (쪽지만 있는 날짜도 포함)
-  const groupLogsByDate = (): GroupedLogs[] => {
+  const groupedLogs = useMemo((): GroupedLogs[] => {
     const today = getLocalDateString(new Date());
     const yesterday = getLocalDateString(new Date(Date.now() - 86400000));
 
@@ -256,34 +254,23 @@ export default function Feed() {
     }
 
     // 쪽지만 있는 날짜도 그룹에 추가
-    for (const note of recentNotes) {
-      let noteDate: string;
-      if (note.trainingLog?.trainingDate) {
-        noteDate = getLocalDateString(new Date(note.trainingLog.trainingDate));
-      } else if (note.trainingEvent?.date) {
-        noteDate = getLocalDateString(new Date(note.trainingEvent.date));
-      } else {
-        noteDate = getLocalDateString(new Date(note.createdAt));
-      }
-      if (!grouped[noteDate]) grouped[noteDate] = [];
+    for (const date of Object.keys(notesByDate)) {
+      if (!grouped[date]) grouped[date] = [];
     }
 
     return Object.entries(grouped)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([date, dateLogs]) => {
-        // 정렬 로직: 오늘은 최신순, 과거는 오래된 순
         const sortedLogs = [...dateLogs].sort((a, b) => {
           if (date === today) {
-            // 오늘: 최신순 (사람들이 신규 글을 많이 보게 하기 위함)
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
           } else {
-            // 과거: 오래된 순 (먼저 올리는 경쟁을 가속시키도록)
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           }
         });
 
         return {
-          date, // 실제 날짜 (YYYY-MM-DD) 추가
+          date,
           displayDate:
             date === today
               ? "오늘"
@@ -296,24 +283,10 @@ export default function Feed() {
           logs: sortedLogs,
         };
       });
-  };
+  }, [logs, notesByDate]);
 
-  // 오늘 운동한 사용자 ID 목록
-  const todayActiveUserIds = (): string[] => {
-    const today = getLocalDateString(new Date());
-    return [
-      ...new Set(
-        logs
-          .filter(
-            (log) =>
-              getLocalDateString(new Date(log.trainingDate)) === today
-          )
-          .map((log) => log.user.id)
-      ),
-    ];
-  };
-
-  const getTickerMessages = () => {
+  // 전광판 메시지
+  const tickerMessages = useMemo(() => {
     const messages: { key: string; text: string; url?: string }[] = [];
 
     // 팀 운동 (최우선)
@@ -322,7 +295,6 @@ export default function Feed() {
       const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
       const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-      // 날씨 아이콘 매핑
       let weatherIcon = "";
       if (event.weather) {
         if (event.weather === "Clear") weatherIcon = "☀️";
@@ -331,13 +303,11 @@ export default function Feed() {
         else if (event.weather === "Snow") weatherIcon = "❄️";
       }
 
-      // 날씨 정보
       let weatherInfo = "";
       if (event.weather && event.temperature !== null) {
         weatherInfo = ` · ${weatherIcon} ${event.temperature}°C`;
       }
 
-      // 대기질 정보
       if (event.airQualityIndex !== null) {
         const aqGrade = getAirQualityGrade(event.airQualityIndex);
         weatherInfo += ` · 대기질 ${aqGrade.emoji}`;
@@ -360,7 +330,7 @@ export default function Feed() {
       });
     }
 
-    // 오늘 1등 메시지 (오늘 로그가 정확히 1개일 때만)
+    // 오늘 1등 메시지
     const today = getLocalDateString(new Date());
     const todayLogs = logs.filter(log => getLocalDateString(new Date(log.trainingDate)) === today);
     if (todayLogs.length === 1) {
@@ -377,7 +347,7 @@ export default function Feed() {
       });
     }
 
-    // 닦달 메시지 (최신순, API에서 이미 2시간 필터링)
+    // 닦달 메시지
     for (const nudge of nudges) {
       const sender = nudge.sender.name || "팀원";
       const recipient = nudge.recipient.name || "팀원";
@@ -387,7 +357,7 @@ export default function Feed() {
       });
     }
 
-    // 쪽지 메시지 (24시간 이내)
+    // 쪽지 메시지
     for (const note of recentNotes) {
       const recipientName = note.recipient.name || "팀원";
       messages.push({
@@ -397,36 +367,43 @@ export default function Feed() {
       });
     }
 
-    // 활동 메시지 (상시)
-    const count = todayActiveUserIds().length;
+    // 활동 메시지
+    const activeCount = new Set(
+      logs
+        .filter(log => getLocalDateString(new Date(log.trainingDate)) === today)
+        .map(log => log.user.id)
+    ).size;
     const total = teamMembers.length;
-    if (count === 0) {
+    if (activeCount === 0) {
       messages.push({ key: "activity", text: "라커룸이 조용하네요 오늘의 첫 기록을 남겨보세요!" });
-    } else if (count >= total && total > 0) {
-      messages.push({ key: "activity", text: `전원 출석! ${count}명 운동 완료 🎉` });
+    } else if (activeCount >= total && total > 0) {
+      messages.push({ key: "activity", text: `전원 출석! ${activeCount}명 운동 완료 🎉` });
     } else {
-      messages.push({ key: "activity", text: `오늘 ${count}명 운동 완료! 🔥` });
+      messages.push({ key: "activity", text: `오늘 ${activeCount}명 운동 완료! 🔥` });
     }
 
     return messages;
-  };
+  }, [nextEvents, recentMvp, logs, nudges, recentNotes, teamMembers.length]);
 
-  const groupedLogs = groupLogsByDate();
-
-  // 미투표 초대장 목록 (마감 시간 전까지만)
-  const pendingInvites = nextEvents.filter(
-    (event) => !event.myRsvp && new Date() < new Date(event.rsvpDeadline)
+  // 미투표 초대장 목록
+  const pendingInvites = useMemo(() =>
+    nextEvents.filter(
+      (event) => !event.myRsvp && new Date() < new Date(event.rsvpDeadline)
+    ),
+    [nextEvents]
   );
 
-  // 체크인 대기 목록 (RSVP 참석/늦참 + 미체크인 + 시간 범위 내)
-  const checkInEvents = nextEvents.filter(
-    (event) =>
-      (event.myRsvp === "ATTEND" || event.myRsvp === "LATE") &&
-      !event.myCheckIn &&
-      isCheckInPeriod(event.date)
+  // 체크인 대기 목록
+  const checkInEvents = useMemo(() =>
+    nextEvents.filter(
+      (event) =>
+        (event.myRsvp === "ATTEND" || event.myRsvp === "LATE") &&
+        !event.myCheckIn &&
+        isCheckInPeriod(event.date)
+    ),
+    [nextEvents]
   );
 
-  // 초기 로딩 상태 (데이터가 아직 로드되지 않음)
   const isLoading = !logsData || teamLoading;
 
   return (
@@ -455,36 +432,40 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* 전광판 (상단 고정) - header와 붙임 */}
+      {/* 전광판 */}
       {!isLoading && (
         <div className="sticky top-[46px] z-10">
-          <TickerBanner messages={getTickerMessages()} />
+          <TickerBanner messages={tickerMessages} />
         </div>
       )}
 
-      {/* 체크인 유도 카드 (우선 표시) */}
+      {/* 체크인 유도 카드 */}
       {!isLoading && checkInEvents.length > 0 && (
-        <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
-          <div className={`flex gap-3 ${checkInEvents.length === 1 ? '' : 'w-max'}`}>
-            {checkInEvents.map((event) => (
-              <TrainingCheckInCard
-                key={event.id}
-                event={event}
-                onCheckInSuccess={fetchData}
-                onShowToast={showToast}
-              />
-            ))}
+        <div className={`pt-8 pb-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
+          <div className={`overflow-x-auto scrollbar-hide px-4 ${checkInEvents.length === 1 ? '' : ''}`}>
+            <div className={`flex gap-3 ${checkInEvents.length === 1 ? '' : 'w-max'}`}>
+              {checkInEvents.map((event) => (
+                <TrainingCheckInCard
+                  key={event.id}
+                  event={event}
+                  onCheckInSuccess={fetchData}
+                  onShowToast={showToast}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {/* 미투표 초대장들 */}
       {!isLoading && pendingInvites.length > 0 && (
-        <div className={`overflow-x-auto scrollbar-hide px-4 py-3 ${pendingInvites.length === 1 ? 'flex justify-center' : ''}`}>
-          <div className={`flex gap-3 ${pendingInvites.length === 1 ? '' : 'w-max'}`}>
-            {pendingInvites.map((event) => (
-              <TrainingInviteCard key={event.id} event={event} />
-            ))}
+        <div className={`pt-3 pb-3 ${pendingInvites.length === 1 ? 'flex justify-center' : ''}`}>
+          <div className={`overflow-x-auto scrollbar-hide px-4 ${pendingInvites.length === 1 ? '' : ''}`}>
+            <div className={`flex gap-3 ${pendingInvites.length === 1 ? '' : 'w-max'}`}>
+              {pendingInvites.map((event) => (
+                <TrainingInviteCard key={event.id} event={event} />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -513,10 +494,7 @@ export default function Feed() {
           <div className={expandedDate ? "" : "flex flex-col items-center gap-12 px-4 py-8"}>
             {groupedLogs.map((group) => {
               const isThisExpanded = expandedDate === group.displayDate;
-              // 다른 날짜가 펼쳐진 경우 현재 스택 숨기기
               if (expandedDate && !isThisExpanded) return null;
-
-              const notesForDate = getNotesByDate(group.date);
 
               return (
                 <div key={group.displayDate}>
@@ -528,7 +506,7 @@ export default function Feed() {
                     onExpand={() => handleExpand(group.displayDate, group.logs)}
                     onCollapse={handleCollapse}
                     onLikeToggle={handleLikeToggle}
-                    notes={notesForDate}
+                    notes={notesByDate[group.date] || []}
                     disableNoteOpen
                   />
                 </div>
@@ -547,7 +525,7 @@ export default function Feed() {
               <Link
                 href="/compliment"
                 onClick={() => setShowFabMenu(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -558,7 +536,7 @@ export default function Feed() {
               <Link
                 href="/write"
                 onClick={() => setShowFabMenu(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 20h9" />
@@ -569,7 +547,7 @@ export default function Feed() {
               <Link
                 href="/training/create"
                 onClick={() => setShowFabMenu(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />

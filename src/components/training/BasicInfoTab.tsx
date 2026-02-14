@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/training-event";
 import type { Session } from "next-auth";
 import PomVoting from "@/components/PomVoting";
@@ -74,14 +74,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     sunset: event.sunset,
   };
 
-  console.log('[Weather Debug]', {
-    eventDate: event.date,
-    isFuture: new Date(event.date) > new Date(),
-    hasWeather: !!displayWeather.weather,
-    displayWeather,
-    liveWeather,
-    savedWeather: event.weather,
-  });
   const [showAttendees, setShowAttendees] = useState(true);
   const [showAbsentees, setShowAbsentees] = useState(true);
   const [showLateComers, setShowLateComers] = useState(true);
@@ -106,37 +98,46 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
   const isDeadlinePassed = new Date() > new Date(event.rsvpDeadline);
 
   // 체크인 가능 시간: 운동 시작 2시간 전 ~ 운동 시작 2시간 후까지
-  const now = new Date();
-  const eventDate = new Date(event.date);
-  const twoHoursBefore = new Date(eventDate.getTime() - 2 * 60 * 60 * 1000);
-  const twoHoursAfter = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000);
-  const canCheckIn = now >= twoHoursBefore && now <= twoHoursAfter;
+  const canCheckIn = useMemo(() => {
+    const now = Date.now();
+    const eventTime = new Date(event.date).getTime();
+    return now >= eventTime - 7200000 && now <= eventTime + 7200000;
+  }, [event.date]);
 
-  const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const deadlineStr = new Date(event.rsvpDeadline).toLocaleDateString("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const dateStr = useMemo(() =>
+    new Date(event.date).toLocaleDateString("ko-KR", {
+      year: "numeric", month: "long", day: "numeric", weekday: "long", hour: "2-digit", minute: "2-digit",
+    }), [event.date]);
 
-  // RSVP 분류
-  const attendees = event.rsvps.filter((r: RsvpEntry) => r.status === "ATTEND");
-  const absentees = event.rsvps.filter((r: RsvpEntry) => r.status === "ABSENT");
-  const lateComers = event.rsvps.filter((r: RsvpEntry) => r.status === "LATE");
+  const deadlineStr = useMemo(() =>
+    new Date(event.rsvpDeadline).toLocaleDateString("ko-KR", {
+      month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+    }), [event.rsvpDeadline]);
 
-  // 미응답자 계산 (전체 팀원 - 응답자)
-  const respondedUserIds = new Set(event.rsvps.map((r: RsvpEntry) => r.userId));
-  const noResponse = teamData?.members.filter((m) => !respondedUserIds.has(m.id)) || [];
+  // RSVP 분류 + 미응답자 (한번에 계산)
+  const { attendees, absentees, lateComers, noResponse } = useMemo(() => {
+    const attend: RsvpEntry[] = [];
+    const absent: RsvpEntry[] = [];
+    const late: RsvpEntry[] = [];
+    const respondedIds = new Set<string>();
+    for (const r of event.rsvps) {
+      respondedIds.add(r.userId);
+      if (r.status === "ATTEND") attend.push(r);
+      else if (r.status === "ABSENT") absent.push(r);
+      else if (r.status === "LATE") late.push(r);
+    }
+    const noResp = teamData?.members.filter((m) => !respondedIds.has(m.id)) || [];
+    return { attendees: attend, absentees: absent, lateComers: late, noResponse: noResp };
+  }, [event.rsvps, teamData?.members]);
 
-  const handleRsvp = async (status: RsvpStatus) => {
+  // 체크인 맵 (O(n) → O(1) 조회)
+  const checkInsMap = useMemo(() => {
+    const map = new Map<string, (typeof event.checkIns)[number]>();
+    for (const c of event.checkIns) map.set(c.userId, c);
+    return map;
+  }, [event.checkIns]);
+
+  const handleRsvp = useCallback(async (status: RsvpStatus) => {
     if ((status === "ABSENT" || status === "LATE") && !reason.trim()) {
       return;
     }
@@ -156,9 +157,9 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [event.id, reason, onRefresh]);
 
-  const handleCheckIn = async () => {
+  const handleCheckIn = useCallback(async () => {
     setSubmitting(true);
     try {
       const res = await fetch(`/api/training-events/${event.id}/check-in`, {
@@ -175,9 +176,9 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [event.id, onRefresh, showToast]);
 
-  const handleCancelCheckIn = async () => {
+  const handleCancelCheckIn = useCallback(async () => {
     if (!confirm("체크인을 취소하시겠습니까?")) return;
     setSubmitting(true);
     try {
@@ -195,7 +196,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [event.id, onRefresh, showToast]);
 
 
   return (
@@ -217,26 +218,28 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           </div>
         </div>
         {/* 장소 */}
-        {event.venue?.mapUrl && event.venue.mapUrl.trim() !== "" ? (
-          <a
-            href={event.venue.mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log("Map link clicked:", event.venue?.mapUrl);
-            }}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-team-600 transition-colors cursor-pointer"
-          >
-            <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
-            <span className="underline underline-offset-2">{event.location}</span>
-          </a>
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
-            <span>{event.location}</span>
-          </div>
-        )}
+        {(() => {
+          const mapUrl = event.venue?.mapUrl?.trim()
+            || (event.venue?.latitude && event.venue?.longitude
+              ? `https://map.naver.com/v5/search/${encodeURIComponent(event.location)}`
+              : null);
+          return mapUrl ? (
+            <a
+              href={mapUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-team-600 active:text-team-700 transition-colors cursor-pointer touch-manipulation"
+            >
+              <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+              <span className="underline underline-offset-2">{event.location}</span>
+            </a>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
+              <span>{event.location}</span>
+            </div>
+          );
+        })()}
 
         {/* 신발/유니폼 (2열 그리드) */}
         {(event.shoes.length > 0 || event.uniform) && (
@@ -563,7 +566,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             <div className="pb-3 space-y-2">
               {attendees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
-                const checkIn = event.checkIns.find((c) => c.userId === r.userId);
+                const checkIn = checkInsMap.get(r.userId);
                 return (
                   <div key={r.id}>
                     <div className="flex items-center gap-3 py-1.5">
@@ -816,7 +819,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             <div className="pb-3 space-y-2">
               {lateComers.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
-                const checkIn = event.checkIns.find((c) => c.userId === r.userId);
+                const checkIn = checkInsMap.get(r.userId);
                 return (
                   <div key={r.id}>
                     <div className="flex items-center gap-3 py-1.5">
