@@ -2,22 +2,24 @@
 import LoadingSpinner from "@/components/LoadingSpinner";
 import BackButton from "@/components/BackButton";
 import BasicInfoTab from "@/components/training/BasicInfoTab";
-import LateFeeTab from "@/components/training/LateFeeTab";
-import SessionTab from "@/components/training/SessionTab";
-import EquipmentTab from "@/components/training/EquipmentTab";
 import KebabMenu from "@/components/training/KebabMenu";
 import Toast from "@/components/Toast";
 import TrainingLogsSection from "@/components/training/TrainingLogsSection";
 import CommentsSection from "@/components/training/CommentsSection";
 import { Share2 } from "lucide-react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { fetcher } from "@/lib/fetcher";
 import useSWR from "swr";
 import type { TrainingEventDetail } from "@/types/training-event";
 import { useToast } from "@/lib/useToast";
+
+// 큰 탭 컴포넌트들은 Lazy Loading (초기 번들 크기 감소)
+const LateFeeTab = lazy(() => import("@/components/training/LateFeeTab"));
+const SessionTab = lazy(() => import("@/components/training/SessionTab"));
+const EquipmentTab = lazy(() => import("@/components/training/EquipmentTab"));
 
 type AdminTab = "info" | "latefee" | "session" | "equipment";
 
@@ -257,27 +259,33 @@ export default function TrainingDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {isAdmin && activeTab === "session" && (
-          <SessionTab
-            eventId={eventId}
-            sessions={event.sessions}
-            rsvps={event.rsvps}
-            onRefresh={() => mutate()}
-          />
+          <Suspense fallback={<LoadingSpinner />}>
+            <SessionTab
+              eventId={eventId}
+              sessions={event.sessions}
+              rsvps={event.rsvps}
+              onRefresh={() => mutate()}
+            />
+          </Suspense>
         )}
 
         {isAdmin && activeTab === "latefee" && (
-          <LateFeeTab
-            eventId={eventId}
-            eventDate={event.date}
-            rsvps={event.rsvps}
-            checkIns={event.checkIns}
-            lateFees={event.lateFees || []}
-            onRefresh={() => mutate()}
-          />
+          <Suspense fallback={<LoadingSpinner />}>
+            <LateFeeTab
+              eventId={eventId}
+              eventDate={event.date}
+              rsvps={event.rsvps}
+              checkIns={event.checkIns}
+              lateFees={event.lateFees || []}
+              onRefresh={() => mutate()}
+            />
+          </Suspense>
         )}
 
         {isAdmin && activeTab === "equipment" && (
-          <EquipmentTab eventId={eventId} />
+          <Suspense fallback={<LoadingSpinner />}>
+            <EquipmentTab eventId={eventId} />
+          </Suspense>
         )}
       </main>
 

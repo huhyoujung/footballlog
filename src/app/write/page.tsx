@@ -1,17 +1,19 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense, lazy } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import useSWR from "swr";
 import { useTeam } from "@/contexts/TeamContext";
-import ConditionPicker from "@/components/ConditionPicker";
 import MentionTextarea from "@/components/MentionTextarea";
 import BackButton from "@/components/BackButton";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
 import { getConditionLevel, getConditionColor } from "@/lib/condition";
+
+// 모달은 Lazy Loading (필요할 때만 로드)
+const ConditionPicker = lazy(() => import("@/components/ConditionPicker"));
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -552,14 +554,16 @@ function WritePageContent() {
       )}
 
       {showConditionPicker && (
-        <ConditionPicker
-          value={formData.condition ?? 5}
-          onConfirm={(val) => {
-            setFormData({ ...formData, condition: val });
-            setShowConditionPicker(false);
-          }}
-          onClose={() => setShowConditionPicker(false)}
-        />
+        <Suspense fallback={null}>
+          <ConditionPicker
+            value={formData.condition ?? 5}
+            onConfirm={(val) => {
+              setFormData({ ...formData, condition: val });
+              setShowConditionPicker(false);
+            }}
+            onClose={() => setShowConditionPicker(false)}
+          />
+        </Suspense>
       )}
 
       {/* 토스트 */}

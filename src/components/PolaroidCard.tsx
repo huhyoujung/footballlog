@@ -36,7 +36,7 @@ export default function PolaroidCard({ log, variant, onLikeToggle }: Props) {
 
   // variant === "full" — large polaroid, tap to go to detail
   return (
-    <Link href={`/log/${log.id}`} className="block">
+    <Link href={`/log/${log.id}`} prefetch={true} className="block">
       <div className="w-64 bg-white rounded-sm p-2 pb-5 border border-gray-100/50" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)' }}>
         {/* 사진 또는 컨디션 컬러 배경 */}
         {log.imageUrl ? (

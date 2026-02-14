@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getTimeUntilEvent } from "@/lib/timeUntil";
 import { useSound } from "@/lib/useSound";
@@ -28,6 +28,11 @@ export default function TrainingCheckInCard({
   const { playSound } = useSound();
 
   const { message, isPast } = getTimeUntilEvent(event.date);
+
+  // Prefetch training detail page for faster navigation
+  useEffect(() => {
+    router.prefetch(`/training/${event.id}`);
+  }, [router, event.id]);
   const eventDate = new Date(event.date);
   const dateStr = `${eventDate.getMonth() + 1}/${eventDate.getDate()}(${
     ["일", "월", "화", "수", "목", "금", "토"][eventDate.getDay()]
