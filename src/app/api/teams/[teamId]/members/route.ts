@@ -16,6 +16,26 @@ export async function GET(
 
     const { teamId } = await params;
 
+    // 같은 팀 소속인지 확인 (친선경기 상대팀 조회 허용)
+    if (session.user.teamId !== teamId) {
+      const linkedEvent = await prisma.trainingEvent.findFirst({
+        where: {
+          OR: [
+            { teamId: session.user.teamId!, opponentTeamId: teamId },
+            { teamId: teamId, opponentTeamId: session.user.teamId! },
+          ],
+          matchStatus: { in: ["PENDING", "CONFIRMED"] },
+        },
+      });
+
+      if (!linkedEvent) {
+        return NextResponse.json(
+          { error: "You are not a member of this team" },
+          { status: 403 }
+        );
+      }
+    }
+
     const members = await prisma.user.findMany({
       where: {
         teamId,

@@ -17,6 +17,7 @@ interface Props {
   currentUserId?: string;
   onMemberClick: (member: TeamMember) => void;
   showSelfBadge?: boolean; // "나" 뱃지 표시 여부
+  headerAction?: React.ReactNode;
 }
 
 export default function TeamMemberList({
@@ -24,12 +25,16 @@ export default function TeamMemberList({
   currentUserId,
   onMemberClick,
   showSelfBadge = true,
+  headerAction,
 }: Props) {
   return (
     <div className="bg-white rounded-xl py-6">
-      <p className="text-xs text-gray-400 mb-3 px-4">
-        우리 팀원 {members.length}명
-      </p>
+      <div className="flex items-center justify-between px-4 mb-3">
+        <h2 className="text-sm font-semibold text-gray-800">
+          우리 팀원 <span className="text-gray-400 font-normal">{members.length}명</span>
+        </h2>
+        {headerAction}
+      </div>
       <div className="space-y-2 px-4">
         {members.map((member) => {
           const isCurrentUser = member.id === currentUserId;

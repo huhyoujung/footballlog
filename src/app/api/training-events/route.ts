@@ -45,13 +45,6 @@ export async function GET(req: Request) {
       whereCondition.date = { lt: fourHoursAgo };
     }
 
-    console.log("🔍 [Training Events Query]", {
-      filter,
-      teamId: session.user.teamId,
-      now: now.toISOString(),
-      whereCondition,
-    });
-
     const events = await prisma.trainingEvent.findMany({
       where: whereCondition,
       include: {
@@ -81,13 +74,6 @@ export async function GET(req: Request) {
       orderBy: { date: filter === "upcoming" ? "asc" : "desc" },
       take: 20,
     });
-
-    console.log(`✅ Found ${events.length} events:`, events.map(e => ({
-      id: e.id,
-      title: e.title,
-      date: e.date.toISOString(),
-      teamId: e.teamId,
-    })));
 
     const result = events.map((e) => ({
       ...e,
@@ -133,6 +119,7 @@ export async function POST(req: Request) {
       isFriendlyMatch,
       minimumPlayers,
       rsvpDeadlineOffset,
+      opponentTeam,
     } = await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
@@ -218,6 +205,7 @@ export async function POST(req: Request) {
         isFriendlyMatch: isFriendlyMatch ?? false,
         minimumPlayers: minimumPlayers || null,
         rsvpDeadlineOffset: rsvpDeadlineOffset || null,
+        opponentTeamName: isFriendlyMatch ? (opponentTeam || null) : null,
       },
     });
 

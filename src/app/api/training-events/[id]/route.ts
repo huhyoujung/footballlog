@@ -260,6 +260,7 @@ export async function PUT(
         ...(body.isFriendlyMatch !== undefined && { isFriendlyMatch: body.isFriendlyMatch }),
         ...(body.minimumPlayers !== undefined && { minimumPlayers: body.minimumPlayers || null }),
         ...(body.rsvpDeadlineOffset !== undefined && { rsvpDeadlineOffset: body.rsvpDeadlineOffset || null }),
+        ...(body.opponentTeam !== undefined && { opponentTeamName: body.isFriendlyMatch ? (body.opponentTeam || null) : null }),
       },
     });
 

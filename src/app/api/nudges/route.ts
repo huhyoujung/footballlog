@@ -60,19 +60,16 @@ export async function POST(req: Request) {
 
     // 대상에게 푸시 알림
     try {
-      console.log(`[NUDGE] Sending push to user ${recipientId}`);
       const pushBody = message
         ? `${session.user.name || "팀원"}: ${message}`
         : `${session.user.name || "팀원"}님이 운동하래요! 일지 올려주세요~`;
 
-      const results = await sendPushToUsers([recipientId], {
+      await sendPushToUsers([recipientId], {
         title: "💪 닦달!",
         body: pushBody,
         url: "/write",
       });
-      console.log(`[NUDGE] Push sent, results:`, results);
-    } catch (error) {
-      console.error('[NUDGE] Push notification failed:', error);
+    } catch {
       // 푸시 실패해도 닦달은 생성됨
     }
 

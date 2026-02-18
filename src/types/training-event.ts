@@ -36,6 +36,8 @@ export interface TrainingEventDetail {
   title: string;
   isRegular: boolean;
   isFriendlyMatch: boolean;
+  opponentTeamName: string | null;
+  minimumPlayers: number | null;
   enablePomVoting: boolean;
   pomVotingDeadline: string | null;
   pomVotesPerPerson: number;
@@ -76,6 +78,9 @@ export interface TrainingEventDetail {
   // 관리 페이지(?includeManagement=true)에서만 포함
   lateFees?: LateFeeEntry[];
   equipmentAssignments?: EquipmentAssignmentEntry[];
+  // 친선경기 관련
+  matchRules?: MatchRulesEntry | null;
+  refereeAssignment?: RefereeAssignmentEntry | null;
   myRsvp: RsvpStatus | null;
   myCheckIn: string | null; // checkedInAt ISO string
 }
@@ -111,6 +116,8 @@ export interface SessionEntry {
   memo: string | null;
   requiresTeams: boolean;
   orderIndex: number;
+  formation: string | null;
+  positions: Record<string, { x: number; y: number; role: string }> | null;
   teamAssignments: {
     id: string;
     userId: string;
@@ -123,6 +130,37 @@ export interface SessionEntry {
       number: number | null;
     };
   }[];
+}
+
+export interface QuarterRefereeEntry {
+  id: string;
+  quarter: number;
+  userId: string;
+  teamSide: "TEAM_A" | "TEAM_B";
+  timerStatus: "IDLE" | "RUNNING" | "PAUSED" | "ENDED";
+  elapsedSeconds: number;
+  lastResumedAt: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  user: { id: string; name: string | null; image: string | null };
+}
+
+export interface RefereeAssignmentEntry {
+  id: string;
+  status: "DRAFT" | "PENDING_APPROVAL" | "CONFIRMED";
+  quarterReferees: QuarterRefereeEntry[];
+}
+
+export interface MatchRulesEntry {
+  id: string;
+  template: "FUTSAL" | "ELEVEN_HALVES" | "CUSTOM";
+  quarterCount: number;
+  quarterMinutes: number;
+  quarterBreak: number;
+  halftime: number;
+  playersPerSide: number;
+  allowBackpass: boolean;
+  allowOffside: boolean;
 }
 
 export interface EquipmentAssignmentEntry {

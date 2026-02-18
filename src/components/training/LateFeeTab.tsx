@@ -382,9 +382,15 @@ export default function LateFeeTab({ eventId, eventDate, rsvps, checkIns, lateFe
                   </div>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      value={amount}
-                      onChange={(e) => setLateFeeAmounts((prev) => ({ ...prev, [userId]: parseInt(e.target.value) || 0 }))}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={amount === 0 ? "" : amount}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        setLateFeeAmounts((prev) => ({ ...prev, [userId]: val === "" ? 0 : parseInt(val) }));
+                      }}
+                      placeholder="0"
                       className={`w-24 px-2 py-1.5 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-team-300 ${amount === 0 ? "text-gray-400" : ""}`}
                     />
                     <span className={`text-sm ${amount === 0 ? "text-gray-400 line-through" : "text-gray-500"}`}>원</span>

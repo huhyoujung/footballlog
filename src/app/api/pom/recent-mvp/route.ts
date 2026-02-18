@@ -17,14 +17,14 @@ export async function GET() {
     }
 
     const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-    // 최근 24시간 내 마감된 운동 중 POM 투표가 있는 이벤트 찾기
+    // 최근 48시간 내 마감된 운동 중 POM 투표가 있는 이벤트 찾기
     const recentEvents = await prisma.trainingEvent.findMany({
       where: {
         teamId: session.user.teamId,
         pomVotingDeadline: {
-          gte: yesterday,
+          gte: twoDaysAgo,
           lte: now,
         },
       },

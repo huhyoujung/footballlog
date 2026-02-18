@@ -20,13 +20,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No team found" }, { status: 404 });
     }
 
-    // 24시간 이내의 쪽지 조회 (같은 팀 멤버가 받은 쪽지)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // 최근 7일 이내의 쪽지 조회 (같은 팀 멤버가 받은 쪽지)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const recentNotes = await prisma.lockerNote.findMany({
       where: {
         createdAt: {
-          gte: twentyFourHoursAgo,
+          gte: sevenDaysAgo,
         },
         recipient: {
           teamId: user.teamId,
@@ -90,7 +90,6 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    console.log("📝 Locker note POST body:", JSON.stringify(body, null, 2));
 
     const {
       recipientId,
@@ -105,13 +104,18 @@ export async function POST(req: NextRequest) {
       tags,
     } = body;
 
-    console.log("📝 Extracted values:", { recipientId, content, color, rotation, positionX, positionY, isAnonymous, trainingEventId, trainingLogId, tags });
-
     // 유효성 검사
     if (!recipientId || !content || !color) {
-      console.log("❌ Validation failed: missing required fields");
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // 쪽지 내용 길이 제한 (500자)
+    if (content.length > 500) {
+      return NextResponse.json(
+        { error: "쪽지는 500자 이내로 작성해주세요" },
         { status: 400 }
       );
     }
@@ -151,20 +155,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 쪽지 생성
-    console.log("📝 Creating locker note with data:", {
-      content,
-      color,
-      rotation: rotation || 0,
-      positionX: positionX || 0,
-      positionY: positionY || 0,
-      isAnonymous: isAnonymous || false,
-      tags: tags || [],
-      authorId: session.user.id,
-      recipientId,
-      trainingEventId: trainingEventId || null,
-      trainingLogId: trainingLogId || null,
-    });
-
     const note = await prisma.lockerNote.create({
       data: {
         content,
@@ -189,15 +179,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log("✅ Locker note created successfully:", note.id);
     return NextResponse.json(note, { status: 201 });
   } catch (error) {
-    console.error("❌ Failed to create locker note:", error);
-    console.error("Error details:", {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error("Failed to create locker note:", error);
     return NextResponse.json(
       { error: "Failed to create locker note" },
       { status: 500 }

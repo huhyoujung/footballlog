@@ -22,45 +22,43 @@ export default function AIInsightModal({
 
   useEffect(() => {
     if (!isOpen) {
-      // 모달 닫힐 때 상태 초기화
       setInsight(null);
       setError(null);
       setCached(false);
       return;
     }
 
-    // 모달이 열릴 때 인사이트 생성/조회
-    const fetchInsight = async () => {
-      setLoading(true);
-      setError(null);
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
 
-      try {
-        const endpoint = type === "unified"
-          ? "/api/insights/unified"
-          : type === "personal"
-            ? "/api/insights/personal"
-            : "/api/insights/team";
+    const endpoint = type === "unified"
+      ? "/api/insights/unified"
+      : type === "personal"
+        ? "/api/insights/personal"
+        : "/api/insights/team";
 
-        const res = await fetch(endpoint, {
-          method: "POST",
-        });
-
+    fetch(endpoint, { method: "POST", signal: controller.signal })
+      .then(async (res) => {
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || "인사이트를 불러올 수 없습니다");
         }
-
-        const data = await res.json();
+        return res.json();
+      })
+      .then((data) => {
         setInsight(data.insight.content);
         setCached(data.cached);
-      } catch (err) {
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "오류가 발생했습니다");
-      } finally {
-        setLoading(false);
-      }
-    };
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
 
-    fetchInsight();
+    return () => controller.abort();
   }, [isOpen, type]);
 
   if (!isOpen) return null;

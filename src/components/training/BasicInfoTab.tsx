@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import type { TrainingEventDetail, RsvpEntry, RsvpStatus } from "@/types/training-event";
 import type { Session } from "next-auth";
 import PomVoting from "@/components/PomVoting";
@@ -11,6 +12,8 @@ import Image from "next/image";
 import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users, Cloud, Sun, Moon, CloudRain, CloudDrizzle, Snowflake, CloudLightning, CloudFog, Wind } from "lucide-react";
 import useSWR from "swr";
 import { getAirQualityGrade, getWeatherRecommendations, getWeatherInKorean, getWeatherCardStyle, getWeatherIcon, getTimeOfDay, getUvGrade } from "@/lib/weather";
+
+const RefereeTimer = dynamic(() => import("@/components/match/RefereeTimer"), { ssr: false });
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -217,6 +220,14 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             )}
           </div>
         </div>
+        {/* 상대팀 (친선경기) */}
+        {event.isFriendlyMatch && event.opponentTeamName && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Users className="w-4 h-4 text-blue-500 flex-shrink-0" strokeWidth={1.5} />
+            <span>vs <strong className="text-gray-900">{event.opponentTeamName}</strong></span>
+          </div>
+        )}
+
         {/* 장소 */}
         {(() => {
           const mapUrl = event.venue?.mapUrl?.trim()
@@ -257,7 +268,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 <Shirt
                   className="w-4 h-4 flex-shrink-0"
                   strokeWidth={1.5}
-                  style={{ color: uniformColor || "#9ca3af" }}
+                  style={{ fill: uniformColor || "transparent", stroke: uniformColor ? "#9CA3AF" : "currentColor" }}
                 />
                 <span>{event.uniform}</span>
               </div>
@@ -416,6 +427,14 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
       );
     })()}
 
+      {/* 심판 타이머 (친선경기 + 심판배정 있을 때) */}
+      {event.isFriendlyMatch && event.refereeAssignment && event.refereeAssignment.quarterReferees.length > 0 && (
+        <RefereeTimerSection
+          refereeAssignment={event.refereeAssignment}
+          quarterMinutes={event.matchRules?.quarterMinutes || 12}
+        />
+      )}
+
       {/* 체크인 (운동 2시간 전부터) */}
       {canCheckIn && (
         <div className="bg-white rounded-xl p-5">
@@ -475,6 +494,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 eventId={event.id}
                 eventDate={event.date}
                 pomVotingDeadline={event.pomVotingDeadline}
+                pomVotesPerPerson={event.pomVotesPerPerson}
                 checkIns={event.checkIns}
               />
             </div>
@@ -1101,6 +1121,51 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
       {/* Toast */}
       <Toast message={toast?.message || ""} visible={!!toast} onHide={hideToast} />
+    </div>
+  );
+}
+
+// 심판 타이머 쿼터 탭 + 타이머 래퍼
+function RefereeTimerSection({
+  refereeAssignment,
+  quarterMinutes,
+}: {
+  refereeAssignment: NonNullable<TrainingEventDetail["refereeAssignment"]>;
+  quarterMinutes: number;
+}) {
+  const quarters = refereeAssignment.quarterReferees
+    .map((qr) => qr.quarter)
+    .sort((a, b) => a - b);
+  const [selectedQuarter, setSelectedQuarter] = useState(quarters[0] || 1);
+
+  return (
+    <div className="bg-white rounded-xl p-5 space-y-3">
+      <h3 className="text-sm font-semibold text-gray-900">경기 타이머</h3>
+
+      {/* 쿼터 탭 */}
+      {quarters.length > 1 && (
+        <div className="flex gap-1.5">
+          {quarters.map((q) => (
+            <button
+              key={q}
+              onClick={() => setSelectedQuarter(q)}
+              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
+                selectedQuarter === q
+                  ? "bg-team-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {q}쿼터
+            </button>
+          ))}
+        </div>
+      )}
+
+      <RefereeTimer
+        assignmentId={refereeAssignment.id}
+        quarter={selectedQuarter}
+        quarterDuration={quarterMinutes * 60}
+      />
     </div>
   );
 }

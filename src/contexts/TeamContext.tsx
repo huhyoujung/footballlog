@@ -20,6 +20,7 @@ interface TeamData {
   name: string;
   inviteCode: string;
   logoUrl: string | null;
+  vestOrder: string[];
   members: TeamMember[];
 }
 

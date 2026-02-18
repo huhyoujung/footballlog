@@ -340,6 +340,7 @@ model TrainingEvent {
   rsvpDeadlineOffset  Int?             // RSVP 마감 오프셋 (예: -7, -5, -3, -1일 전)
   linkedEventId       String?          @unique // 상대팀 TrainingEvent ID
   opponentTeamId      String?          // 상대팀 ID
+  opponentTeamName    String?          // 상대팀 이름 (자유 입력)
   matchStatus         MatchStatus      @default(DRAFT)
   cancelled           Boolean          @default(false)
   cancellationReason  CancellationReason?
@@ -511,7 +512,7 @@ model PomVote {
   voter         User          @relation("PomVoter", fields: [voterId], references: [id], onDelete: Cascade)
   nominee       User          @relation("PomNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
 
-  @@unique([trainingEventId, voterId]) // 한 이벤트당 1인 1표
+  @@unique([trainingEventId, voterId, nomineeId]) // 한 이벤트당 같은 사람에게 중복 투표 방지
   @@index([trainingEventId])
   @@index([nomineeId])
 }
@@ -551,6 +552,13 @@ enum AssignmentStatus {
   CONFIRMED         // 양팀 합의 완료
 }
 
+enum TimerStatus {
+  IDLE     // 시작 전
+  RUNNING  // 진행 중
+  PAUSED   // 일시정지
+  ENDED    // 종료
+}
+
 model RefereeAssignment {
   id              String           @id @default(cuid())
   trainingEventId String           @unique
@@ -567,14 +575,17 @@ model RefereeAssignment {
 }
 
 model QuarterReferee {
-  id           String    @id @default(cuid())
-  assignmentId String
-  quarter      Int       // 1, 2, 3, 4
-  userId       String
-  teamSide     TeamSide  // 심판이 속한 팀
-  startedAt    DateTime?
-  endedAt      DateTime?
-  createdAt    DateTime  @default(now())
+  id             String      @id @default(cuid())
+  assignmentId   String
+  quarter        Int         // 1, 2, 3, 4
+  userId         String
+  teamSide       TeamSide    // 심판이 속한 팀
+  startedAt      DateTime?
+  endedAt        DateTime?
+  timerStatus    TimerStatus @default(IDLE)
+  elapsedSeconds Int         @default(0)  // 누적 경과 시간 (초)
+  lastResumedAt  DateTime?               // 마지막 시작/재개 시각
+  createdAt      DateTime    @default(now())
 
   assignment RefereeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)

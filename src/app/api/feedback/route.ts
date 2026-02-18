@@ -10,6 +10,14 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "로그인이 필요합니다" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { type, title, content } = body;
 
@@ -20,15 +28,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 내용 길이 제한
+    if (title.length > 200 || content.length > 5000) {
+      return NextResponse.json(
+        { error: "제목은 200자, 내용은 5000자 이내로 작성해주세요" },
+        { status: 400 }
+      );
+    }
+
+    // 10분 내 중복 피드백 방지
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const recentFeedback = await prisma.feedback.findFirst({
+      where: {
+        userId: session.user.id,
+        createdAt: { gte: tenMinutesAgo },
+      },
+    });
+
+    if (recentFeedback) {
+      return NextResponse.json(
+        { error: "10분 후에 다시 피드백을 남겨주세요" },
+        { status: 429 }
+      );
+    }
+
     // 피드백 저장
     const feedback = await prisma.feedback.create({
       data: {
         type,
         title,
         content,
-        userId: session?.user?.id || null,
-        userEmail: session?.user?.email || null,
-        userName: session?.user?.name || null,
+        userId: session.user.id,
+        userEmail: session.user.email || null,
+        userName: session.user.name || null,
       },
       include: {
         user: {

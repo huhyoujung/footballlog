@@ -18,7 +18,7 @@ export default function PolaroidCarousel({
   return (
     <div className="w-full py-8">
       {/* 헤더 */}
-      <div className="flex items-center gap-2 px-4 py-2 max-w-2xl mx-auto">
+      <div className="flex items-center gap-2 px-4 py-1 max-w-2xl mx-auto">
         <button
           onClick={onCollapse}
           className="text-gray-400 hover:text-gray-600 p-2 -ml-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center"

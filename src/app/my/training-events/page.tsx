@@ -1,165 +1,54 @@
-"use client";
+// 팀 운동 목록 - 서버 인증 및 데이터 프리페치
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import TrainingEventsClient from "./TrainingEventsClient";
 
-import { useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import useSWR from "swr";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import BackButton from "@/components/BackButton";
+export default async function TrainingEventsPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+  if (!session.user.teamId) redirect("/login");
 
-interface TrainingEvent {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  isRegular: boolean;
-  _count: {
-    rsvps: number;
-  };
-}
+  const teamId = session.user.teamId;
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const eventSelect = {
+    id: true,
+    title: true,
+    date: true,
+    location: true,
+    isRegular: true,
+    isFriendlyMatch: true,
+    cancelled: true,
+    opponentTeamName: true,
+    _count: { select: { rsvps: true } },
+  } as const;
 
-export default function TrainingEventsPage() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  const [upcoming, past] = await Promise.all([
+    prisma.trainingEvent.findMany({
+      where: { teamId, date: { gte: fourHoursAgo } },
+      select: eventSelect,
+      orderBy: { date: "asc" },
+      take: 20,
+    }),
+    prisma.trainingEvent.findMany({
+      where: { teamId, date: { lt: fourHoursAgo } },
+      select: eventSelect,
+      orderBy: { date: "desc" },
+      take: 20,
+    }),
+  ]);
 
-  const isAdmin = session?.user?.role === "ADMIN";
-
-  // SWR로 데이터 페칭 (자동 캐싱) - 현재 탭만 로드
-  const { data: upcomingData, isLoading: upcomingLoading } = useSWR<{ events: TrainingEvent[] }>(
-    session && tab === "upcoming" ? "/api/training-events?filter=upcoming" : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 300000, // 5분 캐시
-    }
-  );
-
-  const { data: pastData, isLoading: pastLoading } = useSWR<{ events: TrainingEvent[] }>(
-    session && tab === "past" ? "/api/training-events?filter=past" : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 300000, // 5분 캐시
-    }
-  );
-
-  const upcomingEvents = upcomingData?.events || [];
-  const pastEvents = pastData?.events || [];
-  const loading = (tab === "upcoming" && upcomingLoading) || (tab === "past" && pastLoading);
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      month: "long",
-      day: "numeric",
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const events = tab === "upcoming" ? upcomingEvents : pastEvents;
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  // Date → string 직렬화
+  const serialize = (events: typeof upcoming) =>
+    events.map((e) => ({ ...e, date: e.date.toISOString() }));
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton />
-          <h1 className="text-base font-semibold text-gray-900">팀 운동</h1>
-          {isAdmin ? (
-            <Link href="/training/create" className="text-team-500 text-sm font-medium">
-              + 생성
-            </Link>
-          ) : (
-            <div className="w-12" />
-          )}
-        </div>
-      </header>
-
-      {/* 탭 */}
-      <div className="bg-white border-b border-gray-200 sticky top-[46px] z-10">
-        <div className="max-w-2xl mx-auto px-4 flex">
-          <button
-            onClick={() => setTab("upcoming")}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === "upcoming"
-                ? "border-team-500 text-team-500"
-                : "border-transparent text-gray-500"
-            }`}
-          >
-            예정된 운동
-          </button>
-          <button
-            onClick={() => setTab("past")}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === "past"
-                ? "border-team-500 text-team-500"
-                : "border-transparent text-gray-500"
-            }`}
-          >
-            지난 운동
-          </button>
-        </div>
-      </div>
-
-      <main className="max-w-2xl mx-auto p-4">
-        {events.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-3">⚽</div>
-            <p className="text-gray-500">
-              {tab === "upcoming" ? "예정된 운동이 없습니다" : "지난 운동이 없습니다"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {events.map((event) => (
-              <Link
-                key={event.id}
-                href={`/training/${event.id}`}
-                className="block bg-white rounded-xl p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-gray-900">
-                      {event.title}
-                    </h3>
-                    {event.isRegular && (
-                      <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">
-                        정기
-                      </span>
-                    )}
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                  <span>📅</span>
-                  <span>{formatDate(event.date)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                  <span>📍</span>
-                  <span>{event.location}</span>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <span>응답 {event._count.rsvps}명</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+    <TrainingEventsClient
+      initialUpcoming={serialize(upcoming)}
+      initialPast={serialize(past)}
+      isAdmin={session.user.role === "ADMIN"}
+    />
   );
 }

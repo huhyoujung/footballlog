@@ -10,7 +10,32 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // 해당 이벤트가 사용자의 팀 소속인지 확인
+    const event = await prisma.trainingEvent.findUnique({
+      where: { id },
+      select: { teamId: true },
+    });
+
+    if (!event) {
+      return NextResponse.json(
+        { error: "Training event not found" },
+        { status: 404 }
+      );
+    }
+
+    if (event.teamId !== session.user.teamId) {
+      return NextResponse.json(
+        { error: "You are not a member of this team" },
+        { status: 403 }
+      );
+    }
 
     const comments = await prisma.trainingEventComment.findMany({
       where: {
@@ -26,7 +51,7 @@ export async function GET(
         },
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: "asc",
       },
     });
 

@@ -19,8 +19,8 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10")));
     const userId = searchParams.get("userId");
     const skip = (page - 1) * limit;
 
@@ -81,11 +81,73 @@ export async function GET(req: Request) {
       }),
     ]);
 
-    const logsWithLikeStatus = logs.map((log) => ({
-      ...log,
-      isLiked: log.likes.length > 0,
-      likes: undefined,
-    }));
+    // MVP 판별: trainingEventId 직접 연결 + 날짜 기반 자동 매칭
+    const directEventIds = [...new Set(logs.map((l) => l.trainingEventId).filter(Boolean))] as string[];
+
+    // trainingEventId가 없는 로그 → 날짜로 이벤트 자동 매칭
+    const logsWithoutEvent = logs.filter((l) => !l.trainingEventId);
+    const dateToEventId: Record<string, string> = {};
+
+    if (logsWithoutEvent.length > 0) {
+      const uniqueDates = [...new Set(logsWithoutEvent.map((l) => {
+        const d = new Date(l.trainingDate);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      }))];
+
+      for (const dateStr of uniqueDates) {
+        const dayStart = new Date(dateStr + "T00:00:00.000Z");
+        const dayEnd = new Date(dateStr + "T23:59:59.999Z");
+        const event = await prisma.trainingEvent.findFirst({
+          where: {
+            teamId: session.user.teamId!,
+            date: { gte: dayStart, lte: dayEnd },
+          },
+          select: { id: true },
+        });
+        if (event) dateToEventId[dateStr] = event.id;
+      }
+    }
+
+    // 날짜 매칭으로 찾은 이벤트 ID도 합산
+    const allEventIds = [...new Set([...directEventIds, ...Object.values(dateToEventId)])];
+    const mvpUserIdByEvent: Record<string, string> = {};
+
+    if (allEventIds.length > 0) {
+      const pomVotes = await prisma.pomVote.findMany({
+        where: { trainingEventId: { in: allEventIds } },
+        select: { trainingEventId: true, nomineeId: true },
+      });
+
+      // 이벤트별 최다 득표자 계산
+      const countMap: Record<string, Record<string, number>> = {};
+      for (const v of pomVotes) {
+        if (!countMap[v.trainingEventId]) countMap[v.trainingEventId] = {};
+        countMap[v.trainingEventId][v.nomineeId] = (countMap[v.trainingEventId][v.nomineeId] || 0) + 1;
+      }
+      for (const [eventId, nominees] of Object.entries(countMap)) {
+        const sorted = Object.entries(nominees).sort((a, b) => b[1] - a[1]);
+        if (sorted.length > 0) mvpUserIdByEvent[eventId] = sorted[0][0];
+      }
+    }
+
+    // 로그별 매칭된 이벤트 ID 결정 (직접 연결 우선, 없으면 날짜 매칭)
+    const getEventIdForLog = (log: typeof logs[0]) => {
+      if (log.trainingEventId) return log.trainingEventId;
+      const d = new Date(log.trainingDate);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return dateToEventId[dateStr] || null;
+    };
+
+    const logsWithLikeStatus = logs.map((log) => {
+      const matchedEventId = getEventIdForLog(log);
+      return {
+        ...log,
+        isLiked: log.likes.length > 0,
+        isMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId] === log.userId),
+        eventHasMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId]),
+        likes: undefined,
+      };
+    });
 
     return NextResponse.json({
       logs: logsWithLikeStatus,
@@ -160,8 +222,8 @@ export async function POST(req: Request) {
       select: { id: true, name: true },
     });
 
-    // @멘션 파싱
-    const combinedText = `${keyPoints} ${improvement}`;
+    // @멘션 파싱 (컨디션이유, 메모, 핵심포인트, 개선점 모두 포함)
+    const combinedText = `${conditionReason} ${notes || ""} ${keyPoints} ${improvement}`;
     const taggedUserIds = parseMentions(combinedText, teamMembers);
 
     const log = await prisma.trainingLog.create({

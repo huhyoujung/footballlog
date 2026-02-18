@@ -21,7 +21,8 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center py-3 px-6 ${
+              prefetch={true}
+              className={`flex flex-col items-center py-3 px-6 transition-transform active:scale-90 touch-manipulation ${
                 isActive ? "text-team-500" : "text-gray-500"
               }`}
             >

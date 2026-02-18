@@ -1,90 +1,14 @@
-"use client";
+// 팀 관리 페이지 서버 컴포넌트 (인증 + 관리자 권한 확인)
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import TeamAdminClient from "./TeamAdminClient";
 
-import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import BackButton from "@/components/BackButton";
-import LoadingSpinner from "@/components/LoadingSpinner";
+export default async function TeamAdminPage() {
+  const session = await getServerSession(authOptions);
 
-export default function TeamAdminPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  if (!session?.user?.id) redirect("/login");
+  if (session.user.role !== "ADMIN") redirect("/");
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated" && session?.user?.role !== "ADMIN") {
-      router.push("/");
-    }
-  }, [status, session, router]);
-
-  if (status === "loading" || !session) {
-    return <LoadingSpinner />;
-  }
-
-  if (session.user.role !== "ADMIN") {
-    return <LoadingSpinner />;
-  }
-
-  return (
-    <div className="min-h-screen bg-white">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-1 flex items-center justify-between">
-          <BackButton href="/my" />
-          <h1 className="text-base font-semibold text-gray-900">팀 관리</h1>
-          <div className="w-6" />
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 py-4">
-        <div className="bg-white rounded-xl overflow-hidden divide-y divide-gray-100">
-          <Link
-            href="/my/team-settings"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-gray-900">팀 프로필</span>
-              <span className="text-xs text-gray-400">팀 이름, 로고 등</span>
-            </div>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-
-          <Link
-            href="/my/team-admin/admins"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-gray-900">운영진 관리</span>
-              <span className="text-xs text-gray-400">운영진 지정/해제</span>
-            </div>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-
-          <Link
-            href="/my/team-admin/vest"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-gray-900">조끼 빨래 당번</span>
-              <span className="text-xs text-gray-400">당번 순서 관리</span>
-            </div>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-
-          <Link
-            href="/my/team-equipment"
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-gray-900">장비 관리</span>
-              <span className="text-xs text-gray-400">팀 장비 및 관리자 관리</span>
-            </div>
-            <span className="text-gray-400">&rsaquo;</span>
-          </Link>
-        </div>
-      </main>
-    </div>
-  );
+  return <TeamAdminClient />;
 }

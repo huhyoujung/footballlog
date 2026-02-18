@@ -1,0 +1,117 @@
+// 팀 운동 관리 (ADMIN) - 클라이언트 컴포넌트 (운동 목록 표시)
+"use client";
+
+import Link from "next/link";
+import useSWR from "swr";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import BackButton from "@/components/BackButton";
+import PageHeader from "@/components/PageHeader";
+
+interface TrainingEventItem {
+  id: string;
+  title: string;
+  isRegular: boolean;
+  date: string;
+  location: string;
+  _count: { rsvps: number };
+}
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export default function MyTrainingClient() {
+  // SWR로 데이터 페칭
+  const { data: eventsData, isLoading } = useSWR<{ events: TrainingEventItem[] }>(
+    "/api/training-events",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 300000, // 5분 캐시
+    }
+  );
+
+  const trainingEvents = eventsData?.events || [];
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <PageHeader
+        title="팀 운동"
+        left={<BackButton href="/my" />}
+        right={
+          <Link href="/training/create" className="text-team-500 font-medium">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </Link>
+        }
+      />
+
+      <main className="max-w-2xl mx-auto p-4">
+        {trainingEvents.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center">
+            <p className="text-gray-400 mb-4">예정된 운동이 없습니다</p>
+            <Link
+              href="/training/create"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-team-500 text-white rounded-lg hover:bg-team-600 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              새 운동 만들기
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {trainingEvents.map((ev) => {
+              const d = new Date(ev.date);
+              const dateStr = d.toLocaleDateString("ko-KR", {
+                month: "numeric",
+                day: "numeric",
+                weekday: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <Link
+                  key={ev.id}
+                  href={`/training/${ev.id}/manage`}
+                  className="block bg-white rounded-xl p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base font-semibold text-gray-900 truncate">
+                          {ev.title}
+                        </span>
+                        {ev.isRegular && (
+                          <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full flex-shrink-0">
+                            정기
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <span>{dateStr}</span>
+                        <span>·</span>
+                        <span className="truncate">{ev.location}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-400">
+                        {ev._count.rsvps}명 응답
+                      </div>
+                    </div>
+                    <span className="text-gray-300 ml-3">&rsaquo;</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

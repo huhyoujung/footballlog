@@ -13,6 +13,14 @@ export default function LoadingSpinner() {
     return () => clearInterval(interval);
   }, []);
 
+  // 스피너 표시 중 배경 스크롤 방지 (로딩 완료 시 layout shift 방지)
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
       <Image

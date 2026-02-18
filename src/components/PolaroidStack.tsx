@@ -87,8 +87,8 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
   const configs = useMemo(() => generateStackConfigs(date), [date]);
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
 
-  // MVP가 있는지 확인
-  const hasMvp = logs.some(log => log.isMvp);
+  // MVP가 있는지 확인 (본인이 MVP이거나, 해당 이벤트에 MVP가 선출된 경우)
+  const hasMvp = logs.some(log => log.isMvp || log.eventHasMvp);
 
   // 사진 1개일 때는 로그 ID 기반으로 고유한 회전 생성
   const getSingleCardRotation = (logId: string) => {
@@ -115,9 +115,9 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
       onClick={logs.length > 0 ? onClick : undefined}
       className={`flex flex-col items-center group ${logs.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      {/* 폴라로이드 없고 포스트잇만 있을 때 - 가운데 정렬 */}
+      {/* 폴라로이드 없고 포스트잇만 있을 때 - 3열 그리드 (3/2 배열) */}
       {logs.length === 0 && notes.length > 0 ? (
-        <div className="flex gap-3 flex-wrap justify-center max-w-md">
+        <div className="grid grid-cols-3 gap-3 justify-items-center" style={{ maxWidth: 228 }}>
           {notes.map((note) => (
             <PostItNote
               key={note.id}
@@ -129,6 +129,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               tags={note.tags}
               onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
               showRecipient={disableNoteOpen}
+              isMine={!!currentUserId && note.author?.id === currentUserId}
             />
           ))}
         </div>
@@ -148,6 +149,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                   tags={note.tags}
                   onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
                   showRecipient={disableNoteOpen}
+                  isMine={!!currentUserId && note.author?.id === currentUserId}
                 />
               ))}
             </div>
@@ -222,6 +224,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                   tags={note.tags}
                   onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
                   showRecipient={disableNoteOpen}
+                  isMine={!!currentUserId && note.author?.id === currentUserId}
                 />
               ))}
             </div>
@@ -243,6 +246,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               tags={note.tags}
               onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
               showRecipient={disableNoteOpen}
+              isMine={!!currentUserId && note.author?.id === currentUserId}
             />
           ))}
         </div>

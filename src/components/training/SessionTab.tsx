@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { getPositionGroup } from "@/lib/position";
 import { assignBalanced, assignGrouped } from "@/lib/random-team";
+import type { FormationKey, PositionsMap } from "@/lib/formations";
 
 // 모달은 필요할 때만 로드
 const AttendanceRateModal = dynamic(() => import("@/components/AttendanceRateModal"), {
@@ -11,6 +12,10 @@ const AttendanceRateModal = dynamic(() => import("@/components/AttendanceRateMod
 });
 
 const AutoAssignSheet = dynamic(() => import("@/components/AutoAssignSheet"), {
+  ssr: false,
+});
+
+const TacticsBoard = dynamic(() => import("@/components/training/TacticsBoard"), {
   ssr: false,
 });
 
@@ -36,6 +41,8 @@ interface SessionEntry {
   memo: string | null;
   requiresTeams: boolean;
   orderIndex: number;
+  formation: string | null;
+  positions: Record<string, { x: number; y: number; role: string }> | null;
   teamAssignments: {
     id: string;
     userId: string;
@@ -65,6 +72,8 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
   const [editTitle, setEditTitle] = useState("");
   const [editRequiresTeams, setEditRequiresTeams] = useState(false);
   const [editTeamCount, setEditTeamCount] = useState(2);
+  const [editFormation, setEditFormation] = useState<FormationKey | null>(null);
+  const [editPositions, setEditPositions] = useState<PositionsMap | null>(null);
 
   // 팀 배정 상태
   const [teamAssignments, setTeamAssignments] = useState<Record<string, { userId: string; teamLabel: string }[]>>({});
@@ -174,6 +183,10 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
       existingTeamNames[label] = label;
     });
     setTeamNames(existingTeamNames);
+
+    // 포메이션/포지션 로드
+    setEditFormation((sess.formation as FormationKey) || null);
+    setEditPositions(sess.positions || null);
   }, []);
 
   // 편집 취소
@@ -183,6 +196,8 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
     setEditRequiresTeams(false);
     setEditTeamCount(2);
     setShowAutoAssignSheet(false);
+    setEditFormation(null);
+    setEditPositions(null);
   };
 
   // 자동배정 실행
@@ -213,11 +228,15 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
   const saveSession = async (sessionId: string) => {
     setSubmitting(true);
     try {
-      // 제목 저장
+      // 제목 + 포메이션 저장
       await fetch(`/api/training-events/${eventId}/sessions/${sessionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle }),
+        body: JSON.stringify({
+          title: editTitle,
+          formation: editFormation,
+          positions: editPositions,
+        }),
       });
 
       // 팀 배정 저장 (팀 나누기가 활성화된 경우에만)
@@ -660,6 +679,30 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                 </>
               )}
 
+              {/* 작전판 (포메이션 + 선수 배치) */}
+              {editRequiresTeams && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">작전판</label>
+                  <TacticsBoard
+                    mode="edit"
+                    formation={editFormation}
+                    positions={editPositions}
+                    players={
+                      (teamAssignments[sess.id] || []).map((a) => {
+                        const user = attendees.find((r) => r.userId === a.userId);
+                        return {
+                          userId: a.userId,
+                          name: user?.user.name || "이름 없음",
+                          position: user?.user.position || null,
+                        };
+                      })
+                    }
+                    onFormationChange={setEditFormation}
+                    onPositionsChange={setEditPositions}
+                  />
+                </div>
+              )}
+
               {/* 버튼 영역 */}
               <div className="flex gap-2 pt-2">
                 <button
@@ -749,6 +792,24 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* 작전판 (읽기 전용) */}
+              {sess.formation && (
+                <div className="mt-3 ml-8">
+                  <TacticsBoard
+                    mode="readonly"
+                    formation={sess.formation as FormationKey}
+                    positions={sess.positions as PositionsMap | null}
+                    players={
+                      sess.teamAssignments.map((a) => ({
+                        userId: a.userId,
+                        name: a.user.name || "이름 없음",
+                        position: a.user.position || null,
+                      }))
+                    }
+                  />
                 </div>
               )}
             </div>

@@ -166,10 +166,10 @@ export default function CommentsSection({ eventId }: Props) {
       {comments && comments.length > 0 ? (
         <div className="space-y-4">
           {comments.map((comment) => (
-            <div key={comment.id} className="flex gap-3">
-              {comment.author.image && (
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+            <div key={comment.id} className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+                  {comment.author.image ? (
                     <Image
                       src={comment.author.image}
                       alt={comment.author.name || "사용자"}
@@ -178,30 +178,32 @@ export default function CommentsSection({ eventId }: Props) {
                       className="w-full h-full object-cover"
                       unoptimized
                     />
-                  </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500">
+                      {(comment.author.name || "?")[0]}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="bg-gray-50 rounded-lg px-4 py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-gray-900">
-                      {comment.author.name || "알 수 없음"}
-                    </span>
-                    {(session?.user?.id === comment.authorId || isAdmin) && (
-                      <button
-                        onClick={() => handleDelete(comment.id)}
-                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        삭제
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                    {comment.content}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-900">
+                    {comment.author.name || "알 수 없음"}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {getRelativeTime(comment.createdAt)}
+                  </span>
+                  {(session?.user?.id === comment.authorId || isAdmin) && (
+                    <button
+                      onClick={() => handleDelete(comment.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-auto"
+                    >
+                      삭제
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1 ml-4">
-                  {getRelativeTime(comment.createdAt)}
+                <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap break-words">
+                  {comment.content}
                 </p>
               </div>
             </div>

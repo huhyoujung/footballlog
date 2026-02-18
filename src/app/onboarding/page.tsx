@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import BackButton from "@/components/BackButton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 
@@ -228,7 +229,7 @@ export default function OnboardingPage() {
                       className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {team.logoUrl ? (
-                        <img src={team.logoUrl} alt={team.name} className="w-12 h-12 rounded-full object-cover" />
+                        <Image src={team.logoUrl} alt={team.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                           <span className="text-green-600 font-semibold">{team.name[0]}</span>
@@ -246,7 +247,7 @@ export default function OnboardingPage() {
               <form onSubmit={handleJoinTeam} className="space-y-4">
                 <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
                   {selectedTeam.logoUrl ? (
-                    <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="w-12 h-12 rounded-full object-cover" />
+                    <Image src={selectedTeam.logoUrl} alt={selectedTeam.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                       <span className="text-green-600 font-semibold">{selectedTeam.name[0]}</span>
@@ -368,12 +369,13 @@ export default function OnboardingPage() {
                   등번호 (선택)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
                   value={number}
-                  onChange={(e) => setNumber(e.target.value)}
+                  onChange={(e) => setNumber(e.target.value.replace(/[^0-9]/g, ""))}
                   placeholder="예: 10"
-                  min="0"
-                  max="99"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>

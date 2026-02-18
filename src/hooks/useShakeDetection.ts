@@ -1,8 +1,10 @@
+// 핸드폰 흔들기 감지 훅 (DeviceMotionEvent)
 import { useEffect, useRef, useState } from 'react';
 
 interface ShakeDetectionOptions {
   threshold?: number; // 흔들기 강도 임계값 (기본: 15)
   timeout?: number; // 연속 흔들기 방지 timeout (기본: 1000ms)
+  enabled?: boolean; // false면 리스너 해제 (기본: true)
   onShake: () => void; // 흔들기 감지 시 콜백
 }
 
@@ -13,6 +15,7 @@ interface ShakeDetectionOptions {
 export function useShakeDetection({
   threshold = 15,
   timeout = 1000,
+  enabled = true,
   onShake,
 }: ShakeDetectionOptions) {
   const [isSupported, setIsSupported] = useState(false);
@@ -23,6 +26,10 @@ export function useShakeDetection({
     // DeviceMotionEvent 지원 여부 확인
     if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
       setIsSupported(true);
+      // Android/구형 iOS: 권한 API 없으면 자동 허용 (새로고침 후에도 바로 동작)
+      if (typeof (DeviceMotionEvent as any).requestPermission !== 'function') {
+        setPermissionGranted(true);
+      }
     }
   }, []);
 
@@ -48,7 +55,7 @@ export function useShakeDetection({
   };
 
   useEffect(() => {
-    if (!isSupported || !permissionGranted) return;
+    if (!isSupported || !permissionGranted || !enabled) return;
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const { accelerationIncludingGravity } = event;
@@ -75,7 +82,7 @@ export function useShakeDetection({
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [isSupported, permissionGranted, threshold, timeout, onShake]);
+  }, [isSupported, permissionGranted, enabled, threshold, timeout, onShake]);
 
   return {
     isSupported,

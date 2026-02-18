@@ -20,12 +20,19 @@ export async function GET() {
       select: { vestOrder: true },
     });
 
-    // 팀원 명단 (이름순)
-    const members = await prisma.user.findMany({
+    // 팀원 명단 (vestOrder 설정 시 해당 멤버만, 아니면 전체)
+    const allMembers = await prisma.user.findMany({
       where: { teamId: session.user.teamId },
       select: { id: true, name: true, image: true },
       orderBy: { name: "asc" },
     });
+
+    const vestOrder = team?.vestOrder || [];
+    const members = vestOrder.length > 0
+      ? vestOrder
+          .map((id) => allMembers.find((m) => m.id === id))
+          .filter((m): m is NonNullable<typeof m> => m != null)
+      : allMembers;
 
     if (members.length === 0) {
       return NextResponse.json({ bringer: null, receiver: null, members });
