@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { openai } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
 
 // 동일 유저 동시 생성 방지 (프로세스 단위 잠금, 크로스 인스턴스는 P2002로 처리)
 const generatingUsers = new Set<string>();
@@ -257,7 +257,7 @@ ${eventsText || "없음"}
 위 데이터를 바탕으로 이 선수에게 개인화된 AI 코치 인사이트를 작성해줘.`;
 
     // 6. OpenAI 호출
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
