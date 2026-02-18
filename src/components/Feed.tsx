@@ -5,15 +5,18 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import useSWR from "swr";
+import PageHeader from "./PageHeader";
 import PolaroidDateGroup from "./PolaroidDateGroup";
 import TickerBanner from "./TickerBanner";
 import TrainingInviteCard from "./TrainingInviteCard";
 import TrainingCheckInCard from "./TrainingCheckInCard";
 import Toast from "./Toast";
-import LoadingSpinner from "./LoadingSpinner";
+import FeedSkeleton from "./FeedSkeleton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
+import { useShakeDetection } from "@/hooks/useShakeDetection";
 import { useTeam } from "@/contexts/TeamContext";
 import { timeAgo } from "@/lib/timeAgo";
 import { isCheckInPeriod } from "@/lib/timeUntil";
@@ -21,6 +24,8 @@ import { fetcher } from "@/lib/fetcher";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
 import { getAirQualityGrade } from "@/lib/weather";
+
+const AIInsightModal = dynamic(() => import("./AIInsightModal"), { ssr: false });
 
 interface Nudge {
   id: string;
@@ -103,6 +108,7 @@ export default function Feed() {
   const { teamData, loading: teamLoading } = useTeam();
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
+  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
 
@@ -138,8 +144,54 @@ export default function Feed() {
   const { data: recentNotesData } = useSWR<LockerNote[]>(
     "/api/locker-notes",
     fetcher,
-    swrConfig
+    {
+      ...swrConfig,
+      revalidateOnFocus: true, // 다른 페이지에서 쪽지 작성 후 돌아올 때 갱신
+      dedupingInterval: 30000, // 30초 — 쪽지는 자주 변하므로 짧게
+    }
   );
+
+  // AI 인사이트 상태
+  const { mutate: mutateInsightStatus } = useSWR<{
+    hasNewData: boolean;
+    hasLogs: boolean;
+    lastInsight: string | null;
+  }>(
+    session?.user?.id ? "/api/insights/status" : null,
+    fetcher,
+    { ...swrConfig, dedupingInterval: 60000 }
+  );
+
+  // 흔들기 감지 (AI 코치 이스터에그)
+  const handleShake = useCallback(() => {
+    if (isInsightModalOpen) return;
+    setIsInsightModalOpen(true);
+  }, [isInsightModalOpen]);
+
+  const {
+    requestPermission: requestShakePermission,
+  } = useShakeDetection({
+    threshold: 15,
+    timeout: 2000,
+    enabled: !isInsightModalOpen,
+    onShake: handleShake,
+  });
+
+  // 첫 훈련 일지 작성 후 흔들기 힌트 (1회만)
+  useEffect(() => {
+    if (!logsData?.logs?.length) return;
+    const HINT_KEY = "shakeHintShown";
+    if (localStorage.getItem(HINT_KEY)) return;
+
+    // 사용자의 첫 번째 일지가 있을 때 힌트 표시
+    if (logsData.logs.some((log) => log.user.id === session?.user?.id)) {
+      localStorage.setItem(HINT_KEY, "1");
+      setTimeout(() => {
+        showToast("📱 폰을 흔들면 AI 코치가 나타납니다!");
+        requestShakePermission();
+      }, 1500);
+    }
+  }, [logsData, session?.user?.id, showToast, requestShakePermission]);
 
   const logs = logsData?.logs || [];
   const nudges = nudgesData?.nudges || [];
@@ -405,24 +457,25 @@ export default function Feed() {
     [nextEvents]
   );
 
-  const isLoading = !logsData || teamLoading;
+  const isLoading = !logsData || !recentNotesData || teamLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
-          {teamLogoUrl ? (
-            <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority unoptimized />
-          ) : (
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="15" fill="#967B5D" />
-              <circle cx="16" cy="16" r="7" fill="none" stroke="#F5F0EB" strokeWidth="1.5" />
-              <path d="M16 9 L16 23 M9 16 L23 16" stroke="#F5F0EB" strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="16" cy="16" r="2.5" fill="#F5F0EB" />
-            </svg>
-          )}
-          <Link href="/my" className="text-team-500 hover:text-team-600 transition-colors">
+      <PageHeader
+        left={teamLoading ? (
+          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+        ) : teamLogoUrl ? (
+          <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority unoptimized />
+        ) : (
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" fill="#967B5D" />
+            <circle cx="16" cy="16" r="7" fill="none" stroke="#F5F0EB" strokeWidth="1.5" />
+            <path d="M16 9 L16 23 M9 16 L23 16" stroke="#F5F0EB" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="16" cy="16" r="2.5" fill="#F5F0EB" />
+          </svg>
+        )}
+        right={
+          <Link href="/my" className="w-10 h-10 flex items-center justify-center text-team-500 hover:text-team-600 transition-colors">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
@@ -430,12 +483,12 @@ export default function Feed() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </Link>
-        </div>
-      </header>
+        }
+      />
 
       {/* 전광판 */}
       {!isLoading && (
-        <div className="sticky top-[46px] z-10">
+        <div className="sticky top-[41px] z-10">
           <TickerBanner messages={tickerMessages} />
         </div>
       )}
@@ -474,7 +527,7 @@ export default function Feed() {
       {/* 피드 */}
       <main className={expandedDate ? "" : "max-w-2xl mx-auto"}>
         {isLoading ? (
-          <LoadingSpinner />
+          <FeedSkeleton />
         ) : logs.length === 0 && recentNotes.length === 0 ? (
           <div className="text-center py-20 px-6">
             <div className="text-6xl mb-4">⚽</div>
@@ -509,6 +562,7 @@ export default function Feed() {
                     onLikeToggle={handleLikeToggle}
                     notes={notesByDate[group.date] || []}
                     disableNoteOpen
+                    currentUserId={session?.user?.id}
                   />
                 </div>
               );
@@ -532,7 +586,7 @@ export default function Feed() {
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                   <polyline points="22,6 12,13 2,6" />
                 </svg>
-                <span>칭찬 쪽지 놓고오기</span>
+                <span>칭찬 쪽지 놓고 오기</span>
               </Link>
               <Link
                 href="/write"
@@ -593,6 +647,16 @@ export default function Feed() {
           )}
         </div>
       )}
+
+      {/* AI 인사이트 모달 */}
+      <AIInsightModal
+        isOpen={isInsightModalOpen}
+        onClose={() => {
+          setIsInsightModalOpen(false);
+          mutateInsightStatus();
+        }}
+        type="unified"
+      />
 
       {/* 토스트 */}
       <Toast
