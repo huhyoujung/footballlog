@@ -175,7 +175,7 @@ export default function Feed() {
     permissionGranted: shakePermissionGranted,
     requestPermission: requestShakePermission,
   } = useShakeDetection({
-    threshold: 12,
+    threshold: 8,
     timeout: 2000,
     enabled: !isInsightModalOpen,
     onShake: handleShake,

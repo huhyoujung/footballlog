@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface ShakeDetectionOptions {
-  threshold?: number; // 흔들기 강도 임계값 — 연속 프레임 간 변화량 (기본: 12)
+  threshold?: number; // 흔들기 강도 임계값 — 연속 프레임 간 변화량 (기본: 8)
   timeout?: number; // 연속 흔들기 방지 timeout (기본: 1000ms)
   enabled?: boolean; // false면 리스너 해제 (기본: true)
   onShake: () => void; // 흔들기 감지 시 콜백
@@ -13,7 +13,7 @@ interface ShakeDetectionOptions {
  * DeviceMotionEvent를 사용하여 가속도 변화를 감지
  */
 export function useShakeDetection({
-  threshold = 12,
+  threshold = 8,
   timeout = 1000,
   enabled = true,
   onShake,
