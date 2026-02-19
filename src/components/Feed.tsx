@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import dynamic from "next/dynamic";
 import useSWR from "swr";
 import PageHeader from "./PageHeader";
 import PolaroidDateGroup from "./PolaroidDateGroup";
@@ -16,7 +15,6 @@ import Toast from "./Toast";
 import FeedSkeleton from "./FeedSkeleton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
-import { useShakeDetection } from "@/hooks/useShakeDetection";
 import { useTeam } from "@/contexts/TeamContext";
 import { timeAgo } from "@/lib/timeAgo";
 import { isCheckInPeriod } from "@/lib/timeUntil";
@@ -24,8 +22,6 @@ import { fetcher } from "@/lib/fetcher";
 import type { TrainingLog, TeamMember, GroupedLogs } from "@/types/training";
 import type { TrainingEventSummary } from "@/types/training-event";
 import { getAirQualityGrade } from "@/lib/weather";
-
-const AIInsightModal = dynamic(() => import("./AIInsightModal"), { ssr: false });
 
 interface Nudge {
   id: string;
@@ -109,7 +105,6 @@ export default function Feed() {
   const { teamData, loading: teamLoading } = useTeam();
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
-  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
 
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
@@ -153,43 +148,7 @@ export default function Feed() {
     }
   );
 
-  // AI 인사이트 상태
-  const { mutate: mutateInsightStatus } = useSWR<{
-    hasNewData: boolean;
-    hasLogs: boolean;
-    lastInsight: string | null;
-  }>(
-    session?.user?.id ? "/api/insights/status" : null,
-    fetcher,
-    { ...swrConfig, dedupingInterval: 60000 }
-  );
 
-  // 흔들기 감지 (AI 코치 이스터에그)
-  const handleShake = useCallback(() => {
-    if (isInsightModalOpen) return;
-    setIsInsightModalOpen(true);
-  }, [isInsightModalOpen]);
-
-  const {
-    isSupported: shakeSupported,
-    permissionGranted: shakePermissionGranted,
-    requestPermission: requestShakePermission,
-    debugDelta,
-  } = useShakeDetection({
-    threshold: 8,
-    timeout: 2000,
-    enabled: !isInsightModalOpen,
-    onShake: handleShake,
-  });
-
-  // 흔들기 활성화 버튼 핸들러 (사용자 제스처 컨텍스트 → iOS 권한 요청)
-  const handleEnableShake = useCallback(async () => {
-    const granted = await requestShakePermission();
-    if (granted) {
-      showToast("AI 코치가 활성화되었습니다! 흔들어보세요");
-      localStorage.setItem("shakeEnabled", "1");
-    }
-  }, [requestShakePermission, showToast]);
 
   const logs = logsData?.logs || [];
   const nudges = nudgesData?.nudges || [];
@@ -503,26 +462,6 @@ export default function Feed() {
         </div>
       )}
 
-      {/* AI 코치 흔들기 활성화 프롬프트 — 한 번도 활성화한 적 없을 때만 표시 */}
-      {!isLoading && shakeSupported && !shakePermissionGranted &&
-        localStorage.getItem("shakeEnabled") !== "1" &&
-        logs.some(log => log.user.id === session?.user?.id) && (
-        <div className="mx-4 mt-3">
-          <div className="bg-team-50 border border-team-100 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-team-700">
-              <span>📱</span>
-              <span>폰을 흔들면 AI 코치가 나타나요</span>
-            </div>
-            <button
-              onClick={handleEnableShake}
-              className="text-xs font-semibold text-white bg-team-500 px-3 py-1.5 rounded-full"
-            >
-              활성화
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 체크인 유도 카드 */}
       {!isLoading && checkInEvents.length > 0 && (
         <div className={`pt-8 pb-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
@@ -676,25 +615,6 @@ export default function Feed() {
               </svg>
             </Link>
           )}
-        </div>
-      )}
-
-      {/* AI 인사이트 모달 */}
-      <AIInsightModal
-        isOpen={isInsightModalOpen}
-        onClose={() => {
-          setIsInsightModalOpen(false);
-          mutateInsightStatus();
-        }}
-        type="unified"
-        userName={session?.user?.name || undefined}
-      />
-
-      {/* 디버그 오버레이 — 테스트 후 제거 */}
-      {session?.user?.role === "ADMIN" && (
-        <div className="fixed top-12 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-[9999] font-mono">
-          <div>shake: {shakeSupported ? "Y" : "N"} | perm: {shakePermissionGranted ? "Y" : "N"}</div>
-          <div>delta: <span className={debugDelta > 8 ? "text-red-400 font-bold" : ""}>{debugDelta}</span> (threshold: 8)</div>
         </div>
       )}
 
