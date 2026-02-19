@@ -55,18 +55,26 @@ export function useShakeDetection({
     }
   };
 
+  // 리스너는 permissionGranted와 무관하게 항상 등록
+  // iOS Safari: 같은 세션 내에서 권한이 유지되므로, 페이지 새로고침 후에도 이벤트가 발생함
+  // 권한 없으면 이벤트가 안 오거나 null 데이터 → handler가 무시 → 성능 영향 없음
   useEffect(() => {
-    if (!isSupported || !permissionGranted || !enabled) return;
+    if (!isSupported || !enabled) return;
 
     lastAccel.current = null;
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const accel = event.accelerationIncludingGravity;
-      if (!accel) return;
+      if (!accel || (accel.x == null && accel.y == null && accel.z == null)) return;
 
       const x = accel.x || 0;
       const y = accel.y || 0;
       const z = accel.z || 0;
+
+      // 실제 모션 데이터가 오면 권한이 부여된 것 → 상태 동기화
+      if (!permissionGranted) {
+        setPermissionGranted(true);
+      }
 
       // 첫 프레임은 기준값 저장만
       if (!lastAccel.current) {
@@ -94,7 +102,7 @@ export function useShakeDetection({
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [isSupported, permissionGranted, enabled, threshold, timeout, onShake]);
+  }, [isSupported, enabled, threshold, timeout, onShake, permissionGranted]);
 
   return {
     isSupported,
