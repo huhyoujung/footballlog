@@ -109,6 +109,7 @@ export default function Feed() {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+  const [shakePromptDismissed, setShakePromptDismissed] = useState(false);
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
 
@@ -169,6 +170,8 @@ export default function Feed() {
   }, [isInsightModalOpen]);
 
   const {
+    isSupported: shakeSupported,
+    permissionGranted: shakePermissionGranted,
     requestPermission: requestShakePermission,
   } = useShakeDetection({
     threshold: 15,
@@ -177,21 +180,22 @@ export default function Feed() {
     onShake: handleShake,
   });
 
-  // 첫 훈련 일지 작성 후 흔들기 힌트 (1회만)
+  // shakePromptDismissed 초기화 (localStorage)
   useEffect(() => {
-    if (!logsData?.logs?.length) return;
-    const HINT_KEY = "shakeHintShown";
-    if (localStorage.getItem(HINT_KEY)) return;
-
-    // 사용자의 첫 번째 일지가 있을 때 힌트 표시
-    if (logsData.logs.some((log) => log.user.id === session?.user?.id)) {
-      localStorage.setItem(HINT_KEY, "1");
-      setTimeout(() => {
-        showToast("📱 폰을 흔들면 AI 코치가 나타납니다!");
-        requestShakePermission();
-      }, 1500);
+    if (localStorage.getItem("shakePromptDismissed") === "1") {
+      setShakePromptDismissed(true);
     }
-  }, [logsData, session?.user?.id, showToast, requestShakePermission]);
+  }, []);
+
+  // 흔들기 활성화 버튼 핸들러 (사용자 제스처 컨텍스트 → iOS 권한 요청)
+  const handleEnableShake = useCallback(async () => {
+    const granted = await requestShakePermission();
+    if (granted) {
+      showToast("AI 코치가 활성화되었습니다! 흔들어보세요");
+    }
+    setShakePromptDismissed(true);
+    localStorage.setItem("shakePromptDismissed", "1");
+  }, [requestShakePermission, showToast]);
 
   const logs = logsData?.logs || [];
   const nudges = nudgesData?.nudges || [];
@@ -199,9 +203,9 @@ export default function Feed() {
   const recentMvp = mvpData?.mvp || null;
   const recentNotes = recentNotesData || [];
 
-  // 로그인 후 알림 구독 요청
+  // 로그인 후 알림 구독 요청 (사용자가 수동으로 끈 경우 제외)
   useEffect(() => {
-    if (session && isSupported && !isSubscribed) {
+    if (session && isSupported && !isSubscribed && !localStorage.getItem("pushManuallyDisabled")) {
       subscribe();
     }
   }, [session, isSupported, isSubscribed, subscribe]);
@@ -490,6 +494,39 @@ export default function Feed() {
       {!isLoading && (
         <div className="sticky top-[41px] z-10">
           <TickerBanner messages={tickerMessages} />
+        </div>
+      )}
+
+      {/* AI 코치 흔들기 활성화 프롬프트 (iOS 권한 미부여 시) */}
+      {!isLoading && shakeSupported && !shakePermissionGranted && !shakePromptDismissed &&
+        logs.some(log => log.user.id === session?.user?.id) && (
+        <div className="mx-4 mt-3">
+          <div className="bg-team-50 border border-team-100 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-team-700">
+              <span>📱</span>
+              <span>폰을 흔들면 AI 코치가 나타나요</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleEnableShake}
+                className="text-xs font-semibold text-white bg-team-500 px-3 py-1.5 rounded-full"
+              >
+                활성화
+              </button>
+              <button
+                onClick={() => {
+                  setShakePromptDismissed(true);
+                  localStorage.setItem("shakePromptDismissed", "1");
+                }}
+                className="text-team-300 p-0.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

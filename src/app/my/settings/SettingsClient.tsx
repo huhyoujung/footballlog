@@ -178,6 +178,7 @@ export default function SettingsClient() {
       if (isSubscribed) {
         const result = await unsubscribe();
         if (result) {
+          localStorage.setItem("pushManuallyDisabled", "1");
           setSuccess("알림이 비활성화되었습니다");
         } else {
           setError("알림 해제에 실패했습니다");
@@ -185,6 +186,7 @@ export default function SettingsClient() {
       } else {
         const result = await subscribe();
         if (result.success) {
+          localStorage.removeItem("pushManuallyDisabled");
           setSuccess("알림이 활성화되었습니다");
         } else {
           // 구체적인 에러 메시지 표시

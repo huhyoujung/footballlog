@@ -258,6 +258,8 @@ function WritePageContent() {
           throw new Error(data.error || "작성에 실패했습니다");
         }
 
+        // 첫 일지 작성 후 흔들기 힌트용 플래그
+        sessionStorage.setItem("justSubmittedLog", "1");
         // 성공 토스트 표시 후 네비게이션
         showToast("일지가 작성되었습니다");
         setTimeout(() => router.replace("/"), 500);
