@@ -37,61 +37,78 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     }
   }, [searchParams]);
 
-  // SWR로 event 데이터 페칭 - session 탭일 때만 sessions 포함
-  const shouldIncludeSessions = activeTab === "session";
-  const apiUrl = `/api/training-events/${eventId}${shouldIncludeSessions ? "?includeSessions=true" : ""}`;
+  // SWR로 event 데이터 페칭 - sessions 항상 포함
+  const apiUrl = `/api/training-events/${eventId}?includeSessions=true`;
 
   const { data: event, isLoading, mutate } = useSWR<TrainingEventDetail>(
     apiUrl,
     fetcher,
     {
       revalidateOnFocus: false,
-      revalidateIfStale: false,
       dedupingInterval: 60000,
-      keepPreviousData: true,
     }
   );
-
-  // 세션 탭으로 전환 시 데이터 갱신
-  useEffect(() => {
-    if (activeTab === "session") {
-      mutate();
-    }
-  }, [activeTab, mutate]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [eventId]);
 
+  // loading.tsx와 동일한 스켈레톤 (이중 전환 방지)
   if (isLoading && !event) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="animate-pulse flex items-center gap-3 max-w-2xl mx-auto">
-            <div className="w-8 h-8 bg-gray-200 rounded" />
-            <div className="flex-1 h-5 bg-gray-200 rounded" />
-          </div>
-        </div>
-        <div className="max-w-2xl mx-auto p-4 space-y-4">
-          <div className="animate-pulse bg-white rounded-xl p-5 space-y-3">
-            <div className="h-5 bg-gray-200 rounded w-1/3" />
-            <div className="h-4 bg-gray-200 rounded w-2/3" />
-            <div className="h-4 bg-gray-200 rounded w-1/2" />
-          </div>
-          <div className="animate-pulse bg-white rounded-xl p-5 space-y-3">
-            <div className="h-5 bg-gray-200 rounded w-1/4" />
-            <div className="flex gap-2">
-              {Array.from({length: 4}).map((_,i) => <div key={i} className="h-8 bg-gray-200 rounded-lg flex-1" />)}
+      <div className="min-h-screen bg-white pb-8">
+        <PageHeader
+          left={<div className="w-5 h-5 bg-gray-100 rounded animate-pulse" />}
+          right={<div className="w-5 h-5 bg-gray-100 rounded animate-pulse" />}
+          sticky={false}
+        />
+        <main className="max-w-2xl mx-auto p-4 space-y-3 animate-pulse">
+          <div className="bg-white rounded-xl p-5 border border-gray-100 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gray-100 rounded" />
+              <div className="h-4 bg-gray-200 rounded w-40" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gray-100 rounded" />
+              <div className="h-4 bg-gray-200 rounded w-28" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gray-100 rounded" />
+              <div className="h-4 bg-gray-200 rounded w-20" />
             </div>
           </div>
-        </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-100 space-y-3">
+            <div className="h-4 bg-gray-200 rounded w-20" />
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-8 bg-gray-100 rounded-lg w-16" />
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 h-12 bg-team-50 rounded-xl" />
+            <div className="flex-1 h-12 bg-gray-50 rounded-xl" />
+            <div className="flex-1 h-12 bg-gray-50 rounded-xl" />
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-100 space-y-3">
+            <div className="h-4 bg-gray-200 rounded w-20" />
+            <div className="space-y-2">
+              <div className="h-3.5 bg-gray-100 rounded w-full" />
+              <div className="h-3.5 bg-gray-100 rounded w-2/3" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-100 space-y-3">
+            <div className="h-4 bg-gray-200 rounded w-16" />
+            <div className="h-3.5 bg-gray-50 rounded w-40 mx-auto" />
+          </div>
+        </main>
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <p className="text-gray-500">운동을 찾을 수 없습니다</p>
       </div>
     );

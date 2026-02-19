@@ -1,11 +1,8 @@
 // 운동 일지 작성/수정 클라이언트 컴포넌트
 "use client";
 
-import LoadingSpinner from "@/components/LoadingSpinner";
-
 import { useState, useRef, useEffect, Suspense, lazy } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import useSWR from "swr";
 import { useTeam } from "@/contexts/TeamContext";
 import MentionTextarea from "@/components/MentionTextarea";
@@ -23,15 +20,62 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function WriteClient() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500"></div>
-        </div>
-      }
-    >
+    <Suspense fallback={<WritePageSkeleton />}>
       <WritePageContent />
     </Suspense>
+  );
+}
+
+// loading.tsx와 동일한 스켈레톤 (이중 전환 방지)
+function WritePageSkeleton() {
+  return (
+    <div className="min-h-screen bg-white pb-24">
+      <PageHeader title="운동 일지 작성" left={<div className="w-5 h-5 bg-gray-100 rounded animate-pulse" />} sticky={false} />
+      <div className="max-w-2xl mx-auto divide-y divide-gray-100 animate-pulse">
+        <div className="px-4 py-5">
+          <div className="flex items-center justify-between">
+            <div className="h-3.5 w-16 bg-gray-200 rounded" />
+            <div className="inline-flex bg-gray-200 rounded-full p-0.5">
+              <div className="px-3 py-1.5 bg-white rounded-full"><div className="h-3 w-6 bg-gray-200 rounded" /></div>
+              <div className="px-3 py-1.5"><div className="h-3 w-4 bg-gray-300 rounded" /></div>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="h-3.5 w-8 bg-gray-200 rounded" />
+            <div className="h-[46px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="h-3.5 w-16 bg-gray-200 rounded" />
+            <div className="h-[46px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+          </div>
+        </div>
+        <div className="px-4 py-5"><div className="h-3.5 w-12 bg-gray-200 rounded" /></div>
+        <div className="px-4 py-5 space-y-2">
+          <div className="h-3.5 w-20 bg-gray-200 rounded" />
+          <div className="h-[82px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+        </div>
+        <div className="px-4 py-5 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="h-3.5 w-16 bg-gray-200 rounded" />
+            <div className="h-3 w-8 bg-gray-100 rounded" />
+          </div>
+          <div className="h-[82px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+        </div>
+        <div className="px-4 py-5 space-y-2">
+          <div className="h-3.5 w-20 bg-gray-200 rounded" />
+          <div className="h-[122px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+        </div>
+        <div className="px-4 py-5 space-y-2">
+          <div className="h-3.5 w-32 bg-gray-200 rounded" />
+          <div className="h-[102px] w-full bg-gray-50 border border-gray-200 rounded-lg" />
+        </div>
+        <div className="px-4 pt-0 pb-5 flex flex-col items-center !border-t-0">
+          <div className="w-32 bg-white rounded-sm p-2 pb-4" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}>
+            <div className="w-full aspect-[3/4] bg-team-50 rounded-sm" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

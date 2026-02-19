@@ -554,31 +554,69 @@ export default function LockerClient({ userId }: { userId: string }) {
     return { stats: s, statEntries: entries, maxStatValue: maxVal, hasEnoughNotes: notes.length >= 5 };
   }, [notes]);
 
+  // loading.tsx와 동일한 스켈레톤 (이중 전환 방지)
   if (!notes || !user) {
     return (
       <div className="min-h-screen bg-white">
+        {/* 뒤로가기 버튼 (fixed) */}
         <div className="fixed top-4 left-4 z-30">
           <div className="w-9 h-9 bg-gray-100 rounded-full animate-pulse" />
         </div>
-        <div className="pt-16 pb-2 flex flex-col items-center animate-pulse">
+
+        {/* 이름표 영역 */}
+        <div className="pt-16 pb-2 flex flex-col items-center">
           <div
             className="relative p-2 rounded"
             style={{ background: "linear-gradient(135deg, #9CA3AF 0%, #6B7280 50%, #9CA3AF 100%)" }}
           >
             <div className="bg-white px-6 py-3">
               <div className="flex items-center justify-center gap-2">
-                <div className="h-3 w-8 bg-gray-200 rounded" />
-                <div className="h-4 w-14 bg-gray-200 rounded" />
+                <div className="animate-pulse h-3 w-8 bg-gray-200 rounded" />
+                <div className="animate-pulse h-4 w-14 bg-gray-200 rounded" />
               </div>
             </div>
           </div>
+
+          {/* 액션 버튼 2개 */}
           <div className="flex gap-2.5 mt-4 w-64">
-            <div className="flex-1 h-[38px] bg-team-50 rounded-xl" />
-            <div className="flex-1 h-[38px] bg-team-50 rounded-xl" />
+            <div className="flex-1 py-2.5 bg-team-50 rounded-xl animate-pulse h-[38px]" />
+            <div className="flex-1 py-2.5 bg-team-50 rounded-xl animate-pulse h-[38px]" />
           </div>
         </div>
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-team-400" />
+
+        {/* 폴라로이드 타임라인 스켈레톤 */}
+        <div className="max-w-2xl mx-auto">
+          <div className="flex flex-col items-center gap-12 py-6 px-4 animate-pulse">
+            {[
+              [{ top: 18, left: -8, rotation: -10 }, { top: 8, left: 10, rotation: 6 }, { top: 2, left: 0, rotation: -2 }],
+              [{ top: 14, left: -6, rotation: -6 }, { top: 6, left: 12, rotation: 8 }, { top: 0, left: 2, rotation: -4 }],
+            ].map((group, gi) => (
+              <div key={gi} className="flex flex-col items-center">
+                <div className="relative w-44 h-56">
+                  {group.map((config, i) => (
+                    <div
+                      key={i}
+                      className="absolute"
+                      style={{
+                        top: config.top,
+                        left: "50%",
+                        marginLeft: -72 + config.left,
+                        transform: `rotate(${config.rotation}deg)`,
+                        zIndex: i + 1,
+                      }}
+                    >
+                      <div className="w-36 bg-white rounded-sm p-1.5 pb-6 shadow-md">
+                        <div className="bg-team-50 rounded-sm w-full aspect-[4/3]" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="-mt-1 text-center">
+                  <div className="h-4 bg-gray-200 rounded w-10 mx-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
