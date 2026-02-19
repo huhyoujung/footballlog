@@ -214,7 +214,32 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
     setShowAutoAssignSheet(false);
   };
 
-  // 유저를 팀으로 이동
+  // 새 세션: 유저를 팀으로 이동
+  const moveUserNewSession = (userId: string, toTeam: string) => {
+    if (toTeam === "unassigned") {
+      setNewSessionTeamAssignments((prev) => prev.filter((a) => a.userId !== userId));
+    } else {
+      setNewSessionTeamAssignments((prev) => {
+        const filtered = prev.filter((a) => a.userId !== userId);
+        return [...filtered, { userId, teamLabel: toTeam }];
+      });
+    }
+  };
+
+  // 새 세션: 드롭 핸들러
+  const handleNewSessionDrop = (e: React.DragEvent, toTeam: string) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("bg-team-100");
+    try {
+      const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+      moveUserNewSession(data.userId, toTeam);
+    } catch {
+      if (draggedUser) moveUserNewSession(draggedUser.userId, toTeam);
+    }
+    setDraggedUser(null);
+  };
+
+  // 유저를 팀으로 이동 (기존 세션)
   const moveUserToTeam = (sessionId: string, userId: string, toTeam: string) => {
     setTeamAssignments((prev) => {
       const current = prev[sessionId] || [];
@@ -385,7 +410,9 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
       return;
     }
 
-    if (touchDragUser.sessionId === dragOverTarget.sessionId) {
+    if (touchDragUser.sessionId === "__new__" && dragOverTarget.sessionId === "__new__") {
+      moveUserNewSession(touchDragUser.userId, dragOverTarget.teamLabel);
+    } else if (touchDragUser.sessionId === dragOverTarget.sessionId) {
       moveUserToTeam(touchDragUser.sessionId, touchDragUser.userId, dragOverTarget.teamLabel);
     }
 
@@ -898,14 +925,29 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                     자동배정
                   </button>
                 </div>
-                <div className="border border-dashed border-gray-300 rounded-lg p-3 min-h-[60px]">
+                <div
+                  className="border border-dashed border-gray-300 rounded-lg p-3 min-h-[60px]"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleNewSessionDrop(e, "unassigned")}
+                  data-drop-target="true"
+                  data-session-id="__new__"
+                  data-team-label="unassigned"
+                >
                   <div className="flex flex-wrap gap-2">
                     {attendees
                       .filter((r) => !newSessionTeamAssignments.some((a) => a.userId === r.userId))
                       .map((r) => (
                         <span
                           key={r.userId}
-                          className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium"
+                          draggable
+                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, r.userId, r.user.name || "이름 없음", "unassigned"); }}
+                          onTouchStart={(e) => { e.stopPropagation(); handleUserTouchStart(r.userId, r.user.name || "이름 없음", "unassigned", "__new__"); }}
+                          onTouchMove={handleUserTouchMove}
+                          onTouchEnd={handleUserTouchEnd}
+                          className={`px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-gray-200 transition-colors touch-none ${
+                            touchDragUser?.userId === r.userId ? 'opacity-50' : ''
+                          }`}
                         >
                           {r.user.name || "이름 없음"}
                           {r.user.position && <span className="ml-1 text-[10px] text-gray-400">{getPositionGroup(r.user.position)}</span>}
@@ -932,45 +974,43 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                         />
                         <span className="text-xs text-gray-500">({teamMembers.length}명)</span>
                       </div>
-                      <div className="border border-gray-300 bg-team-50/40 rounded-lg p-3 min-h-[60px]">
+                      <div
+                        className={`border border-gray-300 rounded-lg p-3 min-h-[60px] transition-colors ${
+                          dragOverTarget?.sessionId === "__new__" && dragOverTarget?.teamLabel === label
+                            ? 'bg-team-100'
+                            : 'bg-team-50/40'
+                        }`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleNewSessionDrop(e, label)}
+                        data-drop-target="true"
+                        data-session-id="__new__"
+                        data-team-label={label}
+                      >
                         <div className="flex flex-wrap gap-2">
                           {teamMembers.map((assignment) => {
                             const user = attendees.find((r) => r.userId === assignment.userId)?.user;
                             return (
                               <span
                                 key={assignment.userId}
-                                className="px-2.5 py-1.5 bg-white text-team-700 rounded-md text-xs font-medium border border-team-200 cursor-pointer hover:bg-team-50"
-                                onClick={() => {
-                                  // 클릭하면 미배정으로 이동
-                                  setNewSessionTeamAssignments((prev) => prev.filter((a) => a.userId !== assignment.userId));
-                                }}
+                                draggable
+                                onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, assignment.userId, user?.name || "이름 없음", label); }}
+                                onTouchStart={(e) => { e.stopPropagation(); handleUserTouchStart(assignment.userId, user?.name || "이름 없음", label, "__new__"); }}
+                                onTouchMove={handleUserTouchMove}
+                                onTouchEnd={handleUserTouchEnd}
+                                className={`px-2.5 py-1.5 bg-white border border-team-200 text-team-700 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing select-none hover:bg-team-50 transition-colors touch-none ${
+                                  touchDragUser?.userId === assignment.userId ? 'opacity-50' : ''
+                                }`}
                               >
                                 {user?.name || "이름 없음"}
                                 {user?.position && <span className="ml-1 text-[10px] text-team-400">{getPositionGroup(user.position)}</span>}
                               </span>
                             );
                           })}
-                          {/* 미배정 인원을 클릭하면 이 팀으로 이동 */}
                           {teamMembers.length === 0 && (
-                            <span className="text-xs text-gray-400">팀원을 아래에서 클릭하여 추가하세요</span>
+                            <span className="text-xs text-gray-400">미배정 인원을 여기로 드래그하세요</span>
                           )}
                         </div>
-                      </div>
-                      {/* 미배정 인원을 이 팀에 추가하는 버튼들 */}
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {attendees
-                          .filter((r) => !newSessionTeamAssignments.some((a) => a.userId === r.userId))
-                          .map((r) => (
-                            <button
-                              key={r.userId}
-                              onClick={() => {
-                                setNewSessionTeamAssignments([...newSessionTeamAssignments, { userId: r.userId, teamLabel: label }]);
-                              }}
-                              className="px-2 py-1 bg-gray-100 hover:bg-team-100 text-gray-600 hover:text-team-700 rounded text-xs transition-colors"
-                            >
-                              + {r.user.name || "이름 없음"}
-                            </button>
-                          ))}
                       </div>
                     </div>
                   );

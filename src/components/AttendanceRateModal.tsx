@@ -1,7 +1,7 @@
 "use client";
-import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import useSWR from "swr";
 import Image from "next/image";
 
 interface AttendanceRate {
@@ -15,47 +15,39 @@ interface AttendanceRate {
   rate: number;
 }
 
+interface AttendanceData {
+  attendanceRates: AttendanceRate[];
+  totalEvents: number;
+}
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export default function AttendanceRateModal({ isOpen, onClose }: Props) {
-  const [loading, setLoading] = useState(true);
-  const [attendanceRates, setAttendanceRates] = useState<AttendanceRate[]>([]);
-  const [totalEvents, setTotalEvents] = useState(0);
+  // SWR 캐시: 5분간 유지, 모달 열릴 때만 fetch
+  const { data, isLoading } = useSWR<AttendanceData>(
+    isOpen ? "/api/teams/attendance-rate" : null,
+    fetcher,
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false }
+  );
+
+  const attendanceRates = data?.attendanceRates || [];
+  const totalEvents = data?.totalEvents || 0;
 
   useEffect(() => {
     if (isOpen) {
-      fetchAttendanceRates();
-      // 모달 열릴 때 배경 스크롤 막기
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      // 모달 닫힐 때 배경 스크롤 복구
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
-
-    // 컴포넌트 언마운트 시 정리
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
-
-  const fetchAttendanceRates = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/teams/attendance-rate");
-      if (res.ok) {
-        const data = await res.json();
-        setAttendanceRates(data.attendanceRates || []);
-        setTotalEvents(data.totalEvents || 0);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -84,7 +76,7 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
 
         {/* 내용 */}
         <div className="overflow-y-auto max-h-[calc(80vh-80px)]">
-          {loading ? (
+          {isLoading && attendanceRates.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" />
             </div>

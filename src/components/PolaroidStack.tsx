@@ -88,7 +88,8 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
 
   // MVP가 있는지 확인 (본인이 MVP이거나, 해당 이벤트에 MVP가 선출된 경우)
-  const hasMvp = logs.some(log => log.isMvp || log.eventHasMvp);
+  const mvpLog = logs.find(log => log.isMvp) || logs.find(log => log.eventHasMvp);
+  const hasMvp = !!mvpLog;
 
   // 사진 1개일 때는 로그 ID 기반으로 고유한 회전 생성
   const getSingleCardRotation = (logId: string) => {
@@ -187,14 +188,18 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               );
             })}
 
-            {/* MVP 트로피 (스택 왼쪽 위) */}
+            {/* MVP 트로피 (스택 왼쪽 위) — 클릭 시 MVP 로그 상세 이동 */}
             {!isExpanding && hasMvp && (
               <div
-                className="absolute"
+                className="absolute cursor-pointer"
                 style={{
                   top: -5,
                   left: -30,
                   zIndex: 100,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (mvpLog) router.push(`/log/${mvpLog.id}`);
                 }}
               >
                 <div

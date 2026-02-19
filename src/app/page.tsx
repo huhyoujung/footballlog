@@ -38,16 +38,71 @@ export default async function HomePage() {
     }),
   ]);
 
+  // MVP 판별: trainingEventId 직접 연결 + 날짜 기반 자동 매칭
+  const directEventIds = [...new Set(logsRaw.map((l) => l.trainingEventId).filter(Boolean))] as string[];
+
+  const logsWithoutEvent = logsRaw.filter((l) => !l.trainingEventId);
+  const dateToEventId: Record<string, string> = {};
+
+  if (logsWithoutEvent.length > 0) {
+    const uniqueDates = [...new Set(logsWithoutEvent.map((l) => {
+      const d = new Date(l.trainingDate);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }))];
+
+    for (const dateStr of uniqueDates) {
+      const dayStart = new Date(dateStr + "T00:00:00.000Z");
+      const dayEnd = new Date(dateStr + "T23:59:59.999Z");
+      const event = await prisma.trainingEvent.findFirst({
+        where: { teamId, date: { gte: dayStart, lte: dayEnd } },
+        select: { id: true },
+      });
+      if (event) dateToEventId[dateStr] = event.id;
+    }
+  }
+
+  const allEventIds = [...new Set([...directEventIds, ...Object.values(dateToEventId)])];
+  const mvpUserIdByEvent: Record<string, string> = {};
+
+  if (allEventIds.length > 0) {
+    const pomVotes = await prisma.pomVote.findMany({
+      where: { trainingEventId: { in: allEventIds } },
+      select: { trainingEventId: true, nomineeId: true },
+    });
+
+    const countMap: Record<string, Record<string, number>> = {};
+    for (const v of pomVotes) {
+      if (!countMap[v.trainingEventId]) countMap[v.trainingEventId] = {};
+      countMap[v.trainingEventId][v.nomineeId] = (countMap[v.trainingEventId][v.nomineeId] || 0) + 1;
+    }
+    for (const [eventId, nominees] of Object.entries(countMap)) {
+      const sorted = Object.entries(nominees).sort((a, b) => b[1] - a[1]);
+      if (sorted.length > 0) mvpUserIdByEvent[eventId] = sorted[0][0];
+    }
+  }
+
+  const getEventIdForLog = (log: typeof logsRaw[0]) => {
+    if (log.trainingEventId) return log.trainingEventId;
+    const d = new Date(log.trainingDate);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return dateToEventId[dateStr] || null;
+  };
+
   // JSON 직렬화 (Date → string, Prisma 객체 → plain object)
   const fallback: Record<string, unknown> = {};
 
   fallback["/api/training-logs?limit=20"] = JSON.parse(
     JSON.stringify({
-      logs: logsRaw.map((log) => ({
-        ...log,
-        isLiked: log.likes.length > 0,
-        likes: undefined,
-      })),
+      logs: logsRaw.map((log) => {
+        const matchedEventId = getEventIdForLog(log);
+        return {
+          ...log,
+          isLiked: log.likes.length > 0,
+          isMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId] === log.userId),
+          eventHasMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId]),
+          likes: undefined,
+        };
+      }),
     })
   );
 
