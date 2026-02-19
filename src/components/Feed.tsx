@@ -718,13 +718,12 @@ export default function Feed() {
         userName={session?.user?.name || undefined}
       />
 
-      {/* 디버그 오버레이 — 테스트 후 제거 */}
-      {session?.user?.role === "ADMIN" && (
-        <div className="fixed top-12 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-[9999] font-mono">
-          <div>shake: {shakeSupported ? "Y" : "N"} | perm: {shakePermissionGranted ? "Y" : "N"}</div>
-          <div>delta: <span className={debugDelta > 8 ? "text-red-400 font-bold" : ""}>{debugDelta}</span> (threshold: 8)</div>
-        </div>
-      )}
+      {/* 디버그 오버레이 — 테스트 브랜치 전용 */}
+      <div className="fixed top-12 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-[9999] font-mono">
+        <div>shake: {shakeSupported ? "Y" : "N"} | perm: {shakePermissionGranted ? "Y" : "N"}</div>
+        <div>delta: <span className={debugDelta > 8 ? "text-red-400 font-bold" : ""}>{debugDelta}</span> (threshold: 8)</div>
+        <div className="text-yellow-300 mt-0.5">test branch</div>
+      </div>
 
       {/* 토스트 */}
       <Toast
