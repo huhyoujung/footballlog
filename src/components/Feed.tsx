@@ -110,7 +110,7 @@ export default function Feed() {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
-  const [shakePromptDismissed, setShakePromptDismissed] = useState(false);
+
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
 
@@ -182,25 +182,12 @@ export default function Feed() {
     onShake: handleShake,
   });
 
-  // shakePromptDismissed 초기화 (localStorage)
-  useEffect(() => {
-    if (localStorage.getItem("shakePromptDismissed") === "1") {
-      setShakePromptDismissed(true);
-    }
-  }, []);
-
   // 흔들기 활성화 버튼 핸들러 (사용자 제스처 컨텍스트 → iOS 권한 요청)
-  // "활성화" 클릭 시에는 dismissed를 설정하지 않음 — 권한 만료 시 프롬프트 재표시
-  // X 버튼 클릭 시에만 dismissed 설정 (명시적 거절)
   const handleEnableShake = useCallback(async () => {
     const granted = await requestShakePermission();
     if (granted) {
       showToast("AI 코치가 활성화되었습니다! 흔들어보세요");
       localStorage.setItem("shakeEnabled", "1");
-    } else {
-      // 권한 거부 시에만 프롬프트 숨김
-      setShakePromptDismissed(true);
-      localStorage.setItem("shakePromptDismissed", "1");
     }
   }, [requestShakePermission, showToast]);
 
@@ -516,10 +503,9 @@ export default function Feed() {
         </div>
       )}
 
-      {/* AI 코치 흔들기 활성화 프롬프트 (iOS 권한 미부여 시) */}
-      {/* dismissed여도 이전에 활성화한 적 있으면 (shakeEnabled) 다시 표시 — 권한 만료 대응 */}
+      {/* AI 코치 흔들기 활성화 프롬프트 — 한 번도 활성화한 적 없을 때만 표시 */}
       {!isLoading && shakeSupported && !shakePermissionGranted &&
-        (!shakePromptDismissed || localStorage.getItem("shakeEnabled") === "1") &&
+        localStorage.getItem("shakeEnabled") !== "1" &&
         logs.some(log => log.user.id === session?.user?.id) && (
         <div className="mx-4 mt-3">
           <div className="bg-team-50 border border-team-100 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -527,26 +513,12 @@ export default function Feed() {
               <span>📱</span>
               <span>폰을 흔들면 AI 코치가 나타나요</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleEnableShake}
-                className="text-xs font-semibold text-white bg-team-500 px-3 py-1.5 rounded-full"
-              >
-                활성화
-              </button>
-              <button
-                onClick={() => {
-                  setShakePromptDismissed(true);
-                  localStorage.setItem("shakePromptDismissed", "1");
-                }}
-                className="text-team-300 p-0.5"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={handleEnableShake}
+              className="text-xs font-semibold text-white bg-team-500 px-3 py-1.5 rounded-full"
+            >
+              활성화
+            </button>
           </div>
         </div>
       )}

@@ -14,6 +14,9 @@ import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import MentionTextarea from "@/components/MentionTextarea";
+import dynamic from "next/dynamic";
+
+const AIInsightModal = dynamic(() => import("@/components/AIInsightModal"), { ssr: false });
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -84,6 +87,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState("");
   const [editCommentMentions, setEditCommentMentions] = useState<string[]>([]);
+  const [isInsightOpen, setIsInsightOpen] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   // SWR로 log 데이터 페칭
@@ -554,8 +558,8 @@ export default function LogDetailClient({ logId }: { logId: string }) {
           </div>
         </div>
 
-        {/* 칭찬하기 배너 (다른 사람 글일 때만) */}
-        {!isMyPost && (
+        {/* 칭찬하기 배너 (다른 사람 글) / AI 코치 배너 (내 글) */}
+        {!isMyPost ? (
           <div className="px-4 py-3">
             <Link
               href={`/locker/${log.user.id}`}
@@ -576,6 +580,28 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                 <span className="text-gray-600 text-2xl">&rsaquo;</span>
               </div>
             </Link>
+          </div>
+        ) : (
+          <div className="px-4 py-3">
+            <button
+              onClick={() => setIsInsightOpen(true)}
+              className="w-full bg-gradient-to-r from-team-50 to-team-100 rounded-xl p-3.5 hover:from-team-100 hover:to-team-200 active:scale-[0.98] transition-all touch-manipulation text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">✨</span>
+                  <div>
+                    <h3 className="text-gray-800 font-semibold text-sm">
+                      {localStorage.getItem("aiInsightViewed") === "1" ? "AI 코치 피드백 다시 보기" : "AI 코치 피드백 받기"}
+                    </h3>
+                    <p className="text-gray-600 text-xs">
+                      {localStorage.getItem("aiInsightViewed") === "1" ? "이전 분석 결과를 확인해보세요" : "내 훈련 데이터를 분석해드려요"}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-gray-600 text-2xl">&rsaquo;</span>
+              </div>
+            </button>
           </div>
         )}
 
@@ -741,6 +767,14 @@ export default function LogDetailClient({ logId }: { logId: string }) {
         message={toast?.message || ""}
         visible={!!toast}
         onHide={hideToast}
+      />
+
+      {/* AI 코치 인사이트 모달 */}
+      <AIInsightModal
+        isOpen={isInsightOpen}
+        onClose={() => setIsInsightOpen(false)}
+        type="unified"
+        userName={session?.user?.name || undefined}
       />
     </div>
   );
