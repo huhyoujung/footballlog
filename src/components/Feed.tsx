@@ -190,13 +190,18 @@ export default function Feed() {
   }, []);
 
   // 흔들기 활성화 버튼 핸들러 (사용자 제스처 컨텍스트 → iOS 권한 요청)
+  // "활성화" 클릭 시에는 dismissed를 설정하지 않음 — 권한 만료 시 프롬프트 재표시
+  // X 버튼 클릭 시에만 dismissed 설정 (명시적 거절)
   const handleEnableShake = useCallback(async () => {
     const granted = await requestShakePermission();
     if (granted) {
       showToast("AI 코치가 활성화되었습니다! 흔들어보세요");
+      localStorage.setItem("shakeEnabled", "1");
+    } else {
+      // 권한 거부 시에만 프롬프트 숨김
+      setShakePromptDismissed(true);
+      localStorage.setItem("shakePromptDismissed", "1");
     }
-    setShakePromptDismissed(true);
-    localStorage.setItem("shakePromptDismissed", "1");
   }, [requestShakePermission, showToast]);
 
   const logs = logsData?.logs || [];
@@ -512,7 +517,9 @@ export default function Feed() {
       )}
 
       {/* AI 코치 흔들기 활성화 프롬프트 (iOS 권한 미부여 시) */}
-      {!isLoading && shakeSupported && !shakePermissionGranted && !shakePromptDismissed &&
+      {/* dismissed여도 이전에 활성화한 적 있으면 (shakeEnabled) 다시 표시 — 권한 만료 대응 */}
+      {!isLoading && shakeSupported && !shakePermissionGranted &&
+        (!shakePromptDismissed || localStorage.getItem("shakeEnabled") === "1") &&
         logs.some(log => log.user.id === session?.user?.id) && (
         <div className="mx-4 mt-3">
           <div className="bg-team-50 border border-team-100 rounded-xl px-4 py-3 flex items-center justify-between">
