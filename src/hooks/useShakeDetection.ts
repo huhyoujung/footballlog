@@ -20,6 +20,7 @@ export function useShakeDetection({
 }: ShakeDetectionOptions) {
   const [isSupported, setIsSupported] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [debugDelta, setDebugDelta] = useState(0);
   const lastShakeTime = useRef(0);
   const lastAccel = useRef<{ x: number; y: number; z: number } | null>(null);
 
@@ -89,6 +90,7 @@ export function useShakeDetection({
       lastAccel.current = { x, y, z };
 
       const delta = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      setDebugDelta(Math.round(delta * 10) / 10);
 
       const now = Date.now();
       if (delta > threshold && now - lastShakeTime.current > timeout) {
@@ -108,5 +110,6 @@ export function useShakeDetection({
     isSupported,
     permissionGranted,
     requestPermission,
+    debugDelta, // 디버그용 — 테스트 후 제거
   };
 }

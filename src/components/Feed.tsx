@@ -174,6 +174,7 @@ export default function Feed() {
     isSupported: shakeSupported,
     permissionGranted: shakePermissionGranted,
     requestPermission: requestShakePermission,
+    debugDelta,
   } = useShakeDetection({
     threshold: 8,
     timeout: 2000,
@@ -424,8 +425,11 @@ export default function Feed() {
       });
     }
 
-    // 쪽지 메시지
-    for (const note of recentNotes) {
+    // 쪽지 메시지 (24시간 이내만 전광판에 표시)
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const recentTickerNotes = recentNotes
+      .filter(note => new Date(note.createdAt).getTime() > oneDayAgo);
+    for (const note of recentTickerNotes) {
       const recipientName = note.recipient.name || "팀원";
       messages.push({
         key: `note-${note.id}`,
@@ -706,6 +710,14 @@ export default function Feed() {
         type="unified"
         userName={session?.user?.name || undefined}
       />
+
+      {/* 디버그 오버레이 — 테스트 후 제거 */}
+      {session?.user?.role === "ADMIN" && (
+        <div className="fixed top-12 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-[9999] font-mono">
+          <div>shake: {shakeSupported ? "Y" : "N"} | perm: {shakePermissionGranted ? "Y" : "N"}</div>
+          <div>delta: <span className={debugDelta > 8 ? "text-red-400 font-bold" : ""}>{debugDelta}</span> (threshold: 8)</div>
+        </div>
+      )}
 
       {/* 토스트 */}
       <Toast
