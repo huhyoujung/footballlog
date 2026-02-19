@@ -8,17 +8,38 @@ interface AIInsightModalProps {
   isOpen: boolean;
   onClose: () => void;
   type: "personal" | "team" | "unified";
+  userName?: string;
 }
 
 export default function AIInsightModal({
   isOpen,
   onClose,
   type,
+  userName,
 }: AIInsightModalProps) {
   const [loading, setLoading] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
+
+  // 모달 열릴 때 배경 스크롤 잠금 (iOS Safari 대응)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -65,11 +86,11 @@ export default function AIInsightModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl animate-slide-up"
+        className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[60vh] overflow-hidden shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -79,7 +100,7 @@ export default function AIInsightModal({
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-white font-bold text-lg">
+              <h2 className="text-white font-semibold text-base">
                 {type === "unified"
                   ? "AI 코치 인사이트"
                   : type === "personal"
@@ -87,7 +108,9 @@ export default function AIInsightModal({
                     : "팀 인사이트"}
               </h2>
               {cached && (
-                <p className="text-white/80 text-xs">오늘 이미 생성된 인사이트</p>
+                <p className="text-white/80 text-xs">
+                  {userName ? `${userName}님의` : ""} 데이터를 기반으로 생성된 인사이트
+                </p>
               )}
             </div>
           </div>
@@ -100,12 +123,12 @@ export default function AIInsightModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+        <div className="p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 overflow-y-auto max-h-[calc(60vh-72px)] overscroll-contain">
           {loading && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-12 h-12 text-team-500 animate-spin mb-4" />
               <p className="text-gray-600 text-sm">
-                AI 코치가 분석 중입니다...
+                {cached ? "인사이트를 불러오는 중..." : "AI 코치가 분석 중입니다..."}
               </p>
             </div>
           )}
@@ -117,36 +140,36 @@ export default function AIInsightModal({
           )}
 
           {insight && !loading && (
-            <div className="prose prose-sm max-w-none">
+            <div>
               <ReactMarkdown
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-xl font-bold text-gray-900 mt-4 mb-2">
+                    <h1 className="text-base font-semibold text-gray-900 mt-4 mb-2">
                       {children}
                     </h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-lg font-bold text-gray-800 mt-3 mb-2">
+                    <h2 className="text-sm font-semibold text-gray-900 mt-3 mb-1.5">
                       {children}
                     </h2>
                   ),
                   h3: ({ children }) => (
-                    <h3 className="text-base font-semibold text-gray-700 mt-2 mb-1">
+                    <h3 className="text-sm font-medium text-gray-800 mt-2 mb-1">
                       {children}
                     </h3>
                   ),
                   p: ({ children }) => (
-                    <p className="text-gray-700 leading-relaxed mb-3">
+                    <p className="text-sm text-gray-700 leading-7 mb-2">
                       {children}
                     </p>
                   ),
                   ul: ({ children }) => (
-                    <ul className="list-disc list-inside space-y-1 mb-3">
+                    <ul className="list-disc list-inside space-y-1 mb-2 text-sm">
                       {children}
                     </ul>
                   ),
                   li: ({ children }) => (
-                    <li className="text-gray-700">{children}</li>
+                    <li className="text-sm text-gray-700 leading-7">{children}</li>
                   ),
                   strong: ({ children }) => (
                     <strong className="font-semibold text-team-600">

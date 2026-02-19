@@ -174,7 +174,7 @@ export default function Feed() {
     permissionGranted: shakePermissionGranted,
     requestPermission: requestShakePermission,
   } = useShakeDetection({
-    threshold: 15,
+    threshold: 25,
     timeout: 2000,
     enabled: !isInsightModalOpen,
     onShake: handleShake,
@@ -693,6 +693,7 @@ export default function Feed() {
           mutateInsightStatus();
         }}
         type="unified"
+        userName={session?.user?.name || undefined}
       />
 
       {/* 토스트 */}

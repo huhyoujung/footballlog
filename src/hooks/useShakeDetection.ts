@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface ShakeDetectionOptions {
-  threshold?: number; // 흔들기 강도 임계값 (기본: 15)
+  threshold?: number; // 흔들기 강도 임계값 — 연속 프레임 간 변화량 (기본: 25)
   timeout?: number; // 연속 흔들기 방지 timeout (기본: 1000ms)
   enabled?: boolean; // false면 리스너 해제 (기본: true)
   onShake: () => void; // 흔들기 감지 시 콜백
@@ -13,7 +13,7 @@ interface ShakeDetectionOptions {
  * DeviceMotionEvent를 사용하여 가속도 변화를 감지
  */
 export function useShakeDetection({
-  threshold = 15,
+  threshold = 25,
   timeout = 1000,
   enabled = true,
   onShake,
@@ -21,6 +21,7 @@ export function useShakeDetection({
   const [isSupported, setIsSupported] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const lastShakeTime = useRef(0);
+  const lastAccel = useRef<{ x: number; y: number; z: number } | null>(null);
 
   useEffect(() => {
     // DeviceMotionEvent 지원 여부 확인
@@ -57,21 +58,32 @@ export function useShakeDetection({
   useEffect(() => {
     if (!isSupported || !permissionGranted || !enabled) return;
 
+    lastAccel.current = null;
+
     const handleMotion = (event: DeviceMotionEvent) => {
-      const { accelerationIncludingGravity } = event;
+      const accel = event.accelerationIncludingGravity;
+      if (!accel) return;
 
-      if (!accelerationIncludingGravity) return;
+      const x = accel.x || 0;
+      const y = accel.y || 0;
+      const z = accel.z || 0;
 
-      const { x, y, z } = accelerationIncludingGravity;
+      // 첫 프레임은 기준값 저장만
+      if (!lastAccel.current) {
+        lastAccel.current = { x, y, z };
+        return;
+      }
 
-      // 가속도 변화량 계산
-      const acceleration = Math.sqrt(
-        (x || 0) ** 2 + (y || 0) ** 2 + (z || 0) ** 2
-      );
+      // 이전 프레임과의 변화량 (중력 상쇄됨)
+      const dx = x - lastAccel.current.x;
+      const dy = y - lastAccel.current.y;
+      const dz = z - lastAccel.current.z;
+      lastAccel.current = { x, y, z };
 
-      // 임계값 초과 && timeout 이후 첫 흔들기인 경우
+      const delta = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
       const now = Date.now();
-      if (acceleration > threshold && now - lastShakeTime.current > timeout) {
+      if (delta > threshold && now - lastShakeTime.current > timeout) {
         lastShakeTime.current = now;
         onShake();
       }
