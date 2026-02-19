@@ -77,10 +77,7 @@ const STICKY_COLORS = [
   { value: "#FFCCBC", label: "피치" },
 ];
 
-const STAT_TAGS = [
-  "공격", "스피드", "드리블", "체력", "수비",
-  "피지컬", "패스", "슛", "킥", "팀워크"
-];
+import { STAT_TAGS } from "@/lib/stat-tags";
 
 const POSITIONS = [
   "감독",

@@ -173,7 +173,7 @@ function EventCard({
             </span>
           )}
           {event.isFriendlyMatch && (
-            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-medium rounded-full">
+            <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">
               친선
             </span>
           )}
@@ -198,7 +198,7 @@ function EventCard({
       <div className="flex items-center gap-1 text-xs text-gray-400">
         <span>응답 {event._count.rsvps}명</span>
         {event.isFriendlyMatch && event.opponentTeamName && (
-          <span className="ml-2 text-blue-500">vs {event.opponentTeamName}</span>
+          <span className="ml-2 text-team-500">vs {event.opponentTeamName}</span>
         )}
       </div>
     </Link>

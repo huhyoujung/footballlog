@@ -506,6 +506,7 @@ model PomVote {
   voterId         String   // 투표한 사람
   nomineeId       String   // 선택된 사람
   reason          String   @db.Text // 어떤 플레이가 좋았는지
+  tags            String[] @default([]) // 스탯 태그 (공격, 수비, 패스 등)
   createdAt       DateTime @default(now())
 
   trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)

@@ -153,6 +153,10 @@ export default function TrainingEventForm({
   const [rsvpDeadlineTime, setRsvpDeadlineTime] = useState(initialValues?.rsvpDeadlineTime ?? "22:00");
   const [opponentTeam, setOpponentTeam] = useState(initialValues?.opponentTeam ?? "");
 
+  // 상대팀 검색
+  const [teamResults, setTeamResults] = useState<{ id: string; name: string; logoUrl: string | null; _count: { members: number } }[]>([]);
+  const [showTeamList, setShowTeamList] = useState(false);
+
   // 장소 검색
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [showVenueList, setShowVenueList] = useState(false);
@@ -229,6 +233,38 @@ export default function TrainingEventForm({
     setUniform(opt.name);
     setSelectedUniformColor(opt.color);
     setShowUniformList(false);
+  };
+
+  // ── 상대팀 검색 (디바운스) ──
+
+  const searchTeams = async (query: string) => {
+    if (!query.trim()) {
+      setTeamResults([]);
+      setShowTeamList(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/teams/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeamResults(data.teams || []);
+        setShowTeamList(data.teams && data.teams.length > 0);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const debouncedSearchTeams = useMemo(() => debounce(searchTeams, 300), []);
+
+  const handleOpponentTeamChange = (value: string) => {
+    setOpponentTeam(value);
+    debouncedSearchTeams(value);
+  };
+
+  const handleTeamSelect = (team: { name: string }) => {
+    setOpponentTeam(team.name);
+    setShowTeamList(false);
   };
 
   // ── 장소 검색 (디바운스) ──
@@ -470,14 +506,33 @@ export default function TrainingEventForm({
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">상대팀</label>
-                  <input
-                    type="text"
-                    value={opponentTeam}
-                    onChange={(e) => setOpponentTeam(e.target.value)}
-                    disabled={lockFriendlyFields}
-                    placeholder="상대팀 이름을 입력하세요"
-                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent ${lockFriendlyFields ? "bg-gray-50 opacity-60 cursor-not-allowed" : ""}`}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={opponentTeam}
+                      onChange={(e) => handleOpponentTeamChange(e.target.value)}
+                      onFocus={() => opponentTeam && debouncedSearchTeams(opponentTeam)}
+                      onBlur={() => setTimeout(() => setShowTeamList(false), 200)}
+                      disabled={lockFriendlyFields}
+                      placeholder="상대팀 이름을 검색하세요"
+                      className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent ${lockFriendlyFields ? "bg-gray-50 opacity-60 cursor-not-allowed" : ""}`}
+                    />
+                    {showTeamList && teamResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                        {teamResults.map((team) => (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={() => handleTeamSelect(team)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                          >
+                            <div className="text-sm font-medium text-gray-900">{team.name}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{team._count.members}명</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">최소 인원</label>

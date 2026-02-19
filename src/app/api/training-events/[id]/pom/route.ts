@@ -48,6 +48,7 @@ export async function GET(
       voteCounts[vote.nomineeId].votes.push({
         voter: vote.voter,
         reason: vote.reason,
+        tags: vote.tags,
         createdAt: vote.createdAt,
       });
       voteCounts[vote.nomineeId].count++;
@@ -63,6 +64,7 @@ export async function GET(
         nomineeId: v.nomineeId,
         nomineeName: v.nominee.name,
         reason: v.reason,
+        tags: v.tags,
       }));
 
     return NextResponse.json({
@@ -95,11 +97,11 @@ export async function POST(
     const body = await req.json();
 
     // 다중 투표: nominees 배열 지원, 단일 nomineeId도 하위 호환
-    let nominees: { nomineeId: string; reason: string }[];
+    let nominees: { nomineeId: string; reason: string; tags?: string[] }[];
     if (Array.isArray(body.nominees)) {
       nominees = body.nominees;
     } else if (body.nomineeId) {
-      nominees = [{ nomineeId: body.nomineeId, reason: body.reason }];
+      nominees = [{ nomineeId: body.nomineeId, reason: body.reason, tags: body.tags }];
     } else {
       return NextResponse.json({ error: "선수를 선택해주세요" }, { status: 400 });
     }
@@ -108,6 +110,9 @@ export async function POST(
     for (const n of nominees) {
       if (!n.nomineeId || !n.reason || n.reason.trim().length === 0) {
         return NextResponse.json({ error: "모든 선수에 대해 이유를 입력해주세요" }, { status: 400 });
+      }
+      if (!Array.isArray(n.tags) || n.tags.length === 0) {
+        return NextResponse.json({ error: "스탯 태그를 1개 이상 선택해주세요" }, { status: 400 });
       }
       if (n.nomineeId === session.user.id) {
         return NextResponse.json({ error: "본인에게는 투표할 수 없습니다" }, { status: 400 });
@@ -169,7 +174,7 @@ export async function POST(
       });
 
       // 새 투표 생성
-      const votes: { nomineeId: string; reason: string; nominee: { id: string; name: string | null } }[] = [];
+      const votes: { nomineeId: string; reason: string; tags: string[]; nominee: { id: string; name: string | null } }[] = [];
       for (const n of nominees) {
         const vote = await tx.pomVote.create({
           data: {
@@ -177,6 +182,7 @@ export async function POST(
             voterId: session.user.id,
             nomineeId: n.nomineeId,
             reason: n.reason.trim(),
+            tags: Array.isArray(n.tags) ? n.tags : [],
           },
           include: {
             nominee: { select: { id: true, name: true } },
@@ -194,6 +200,7 @@ export async function POST(
         nomineeId: v.nomineeId,
         nomineeName: v.nominee.name,
         reason: v.reason,
+        tags: v.tags,
       })),
       // 하위 호환
       vote: {

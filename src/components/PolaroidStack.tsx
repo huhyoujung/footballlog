@@ -92,6 +92,13 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [showMvpSheet, setShowMvpSheet] = useState(false);
 
+  // 내가 보냈거나 받은 쪽지는 disableNoteOpen이어도 열 수 있음
+  const canOpenNote = (note: LockerNote) => {
+    if (!disableNoteOpen) return true;
+    if (!currentUserId) return false;
+    return note.author?.id === currentUserId || note.recipient?.id === currentUserId;
+  };
+
   // MVP 트로피: 이벤트 날짜 기반 (로그와 무관)
   const hasMvp = !!mvpEventId;
 
@@ -132,7 +139,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               recipientId={note.recipient?.id || ""}
               recipientName={note.recipient?.name || "팀원"}
               tags={note.tags}
-              onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+              onClick={canOpenNote(note) ? () => setExpandedNoteId(note.id) : undefined}
               showRecipient={disableNoteOpen}
               isMine={!!currentUserId && note.author?.id === currentUserId}
             />
@@ -152,7 +159,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                   recipientId={note.recipient?.id || ""}
                   recipientName={note.recipient?.name || "팀원"}
                   tags={note.tags}
-                  onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+                  onClick={canOpenNote(note) ? () => setExpandedNoteId(note.id) : undefined}
                   showRecipient={disableNoteOpen}
                   isMine={!!currentUserId && note.author?.id === currentUserId}
                 />
@@ -236,7 +243,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                   recipientId={note.recipient?.id || ""}
                   recipientName={note.recipient?.name || "팀원"}
                   tags={note.tags}
-                  onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+                  onClick={canOpenNote(note) ? () => setExpandedNoteId(note.id) : undefined}
                   showRecipient={disableNoteOpen}
                   isMine={!!currentUserId && note.author?.id === currentUserId}
                 />
@@ -258,7 +265,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               recipientId={note.recipient?.id || ""}
               recipientName={note.recipient?.name || "팀원"}
               tags={note.tags}
-              onClick={disableNoteOpen ? undefined : () => setExpandedNoteId(note.id)}
+              onClick={canOpenNote(note) ? () => setExpandedNoteId(note.id) : undefined}
               showRecipient={disableNoteOpen}
               isMine={!!currentUserId && note.author?.id === currentUserId}
             />

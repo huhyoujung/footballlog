@@ -130,18 +130,6 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
       else if (r.status === "LATE") late.push(r);
     }
     const noResp = teamData?.members.filter((m) => !respondedIds.has(m.id)) || [];
-    // "나"를 각 섹션 최상단에 고정
-    const myId = session?.user?.id;
-    if (myId) {
-      const sortMe = (arr: RsvpEntry[]) =>
-        [...arr].sort((a, b) => (a.userId === myId ? -1 : b.userId === myId ? 1 : 0));
-      return {
-        attendees: sortMe(attend),
-        absentees: sortMe(absent),
-        lateComers: sortMe(late),
-        noResponse: [...noResp].sort((a, b) => (a.id === myId ? -1 : b.id === myId ? 1 : 0)),
-      };
-    }
     return { attendees: attend, absentees: absent, lateComers: late, noResponse: noResp };
   }, [event.rsvps, teamData?.members, session?.user?.id]);
 
@@ -164,15 +152,20 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         body: JSON.stringify({ status, reason: reason.trim() || null }),
       });
       if (res.ok) {
+        const label = status === "ATTEND" ? "참석" : status === "ABSENT" ? "불참" : "늦참";
+        showToast(`${label}으로 응답했습니다 ✓`);
         setRsvpStatus(status);
         onRefresh();
+      } else {
+        const data = await res.json().catch(() => null);
+        showToast(data?.error || "응답 저장에 실패했습니다");
       }
     } catch {
-      // ignore
+      showToast("네트워크 오류가 발생했습니다");
     } finally {
       setSubmitting(false);
     }
-  }, [event.id, reason, onRefresh]);
+  }, [event.id, reason, onRefresh, showToast]);
 
   const handleCheckIn = useCallback(async () => {
     setSubmitting(true);
@@ -225,7 +218,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           </div>
           <div className="flex items-center gap-1.5">
             {event.isFriendlyMatch && (
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-medium rounded-full">친선경기</span>
+              <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">친선경기</span>
             )}
             {event.isRegular && (
               <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">정기</span>
@@ -235,7 +228,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         {/* 상대팀 (친선경기) */}
         {event.isFriendlyMatch && event.opponentTeamName && (
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Users className="w-4 h-4 text-blue-500 flex-shrink-0" strokeWidth={1.5} />
+            <Users className="w-4 h-4 text-team-500 flex-shrink-0" strokeWidth={1.5} />
             <span>vs <strong className="text-gray-900">{event.opponentTeamName}</strong></span>
           </div>
         )}
@@ -601,7 +594,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = checkInsMap.get(r.userId);
                 return (
-                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
+                  <div key={r.id}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -648,11 +641,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                         )}
 
                         {/* 뱃지 및 버튼 */}
-                        <div className="flex items-center gap-2 ml-auto">
-                          {isMe && (
-                            <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
-                          )}
-                          {isMe && !isDeadlinePassed && (
+                        {isMe && !isDeadlinePassed && (
+                          <div className="flex items-center gap-2 ml-auto">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -662,8 +652,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             >
                               수정
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {isMe && showEditRsvp && (
@@ -739,7 +729,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
               {absentees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
                 return (
-                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
+                  <div key={r.id}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -765,11 +755,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                           </span>
 
                           {/* 뱃지 및 버튼 */}
-                          <div className="flex items-center gap-2 ml-auto">
-                            {isMe && (
-                              <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
-                            )}
-                            {isMe && !isDeadlinePassed && (
+                          {isMe && !isDeadlinePassed && (
+                            <div className="flex items-center gap-2 ml-auto">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -779,8 +766,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                               >
                                 수정
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                         {/* 불참 사유 */}
                         <div className="text-xs text-gray-500 mt-0.5">{r.reason}</div>
@@ -860,7 +847,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = checkInsMap.get(r.userId);
                 return (
-                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
+                  <div key={r.id}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -908,11 +895,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                           )}
 
                           {/* 뱃지 및 버튼 */}
-                          <div className="flex items-center gap-2 ml-auto">
-                            {isMe && (
-                              <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
-                            )}
-                            {isMe && !isDeadlinePassed && (
+                          {isMe && !isDeadlinePassed && (
+                            <div className="flex items-center gap-2 ml-auto">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -922,8 +906,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                               >
                                 수정
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                         {/* 늦참 사유 */}
                         <div className="text-xs text-gray-500 mt-0.5">{r.reason}</div>
@@ -1028,10 +1012,8 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
             </div>
             {showNoResponse && (
             <div className="pb-3 space-y-2">
-              {noResponse.map((member) => {
-                const isMe = member.id === session?.user?.id;
-                return (
-                  <div key={member.id} className={`flex items-center gap-3 py-1.5 ${isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}`}>
+              {noResponse.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3 py-1.5">
                     {/* 프로필 이미지 */}
                     <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                       {member.image ? (
@@ -1048,22 +1030,11 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {/* 이름 */}
-                      <span className="text-sm font-medium text-gray-900">
-                        {member.name || "익명"}
-                      </span>
-
-                      {/* 나 뱃지 */}
-                      {isMe && (
-                        <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full ml-auto">
-                          나
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {member.name || "익명"}
+                    </span>
                   </div>
-                );
-              })}
+              ))}
             </div>
             )}
           </div>

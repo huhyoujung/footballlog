@@ -24,12 +24,19 @@ export async function GET(req: Request) {
       query
     )}&display=10&sort=random`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const response = await fetch(url, {
       headers: {
         "X-Naver-Client-Id": clientId,
         "X-Naver-Client-Secret": clientSecret,
       },
+      cache: "no-store",
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();

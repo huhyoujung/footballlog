@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -87,33 +87,27 @@ export async function POST(
       },
     });
 
-    // 운영진에게 알림
-    try {
-      const admins = await prisma.user.findMany({
-        where: {
-          teamId: session.user.teamId,
-          role: "ADMIN",
-          id: { not: session.user.id }, // 본인 제외
-        },
-        select: { id: true },
-      });
-
-      if (admins.length > 0) {
-        const statusText = status === "ATTEND" ? "참석" : status === "LATE" ? "지각" : "불참";
-        const userName = session.user.name || "팀원";
-
-        await sendPushToUsers(
-          admins.map((a) => a.id),
-          {
-            title: "RSVP 응답",
-            body: `${userName}님이 ${statusText}으로 응답했습니다`,
-            url: `/training/${id}`,
-          }
-        );
+    // 운영진에게 알림 (응답 이후 비동기 처리)
+    const teamId = session.user.teamId;
+    const userId = session.user.id;
+    const userName = session.user.name || "팀원";
+    after(async () => {
+      try {
+        const admins = await prisma.user.findMany({
+          where: { teamId, role: "ADMIN", id: { not: userId } },
+          select: { id: true },
+        });
+        if (admins.length > 0) {
+          const statusText = status === "ATTEND" ? "참석" : status === "LATE" ? "지각" : "불참";
+          await sendPushToUsers(
+            admins.map((a) => a.id),
+            { title: "RSVP 응답", body: `${userName}님이 ${statusText}으로 응답했습니다`, url: `/training/${id}` }
+          );
+        }
+      } catch {
+        // 푸시 실패해도 무시
       }
-    } catch {
-      // 푸시 실패해도 RSVP 응답은 성공
-    }
+    });
 
     return NextResponse.json(rsvp);
   } catch (error) {
