@@ -281,9 +281,11 @@ export default function TrainingEventForm({
         const data = await res.json();
         setVenues(data.places || []);
         setShowVenueList(data.places && data.places.length > 0);
+      } else {
+        console.error("장소 검색 실패:", res.status, await res.text().catch(() => ""));
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("장소 검색 오류:", err);
     }
   };
 
@@ -577,6 +579,7 @@ export default function TrainingEventForm({
               value={location}
               onChange={(e) => handleLocationChange(e.target.value)}
               onFocus={() => location && debouncedSearchVenues(location)}
+              onBlur={() => setTimeout(() => setShowVenueList(false), 200)}
               placeholder="운동 장소를 입력하세요"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-team-500 focus:border-transparent"
             />

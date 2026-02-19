@@ -15,7 +15,10 @@ export async function GET(req: Request) {
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
-        { error: "네이버 API 키가 설정되지 않았습니다" },
+        {
+          error: "네이버 API 키가 설정되지 않았습니다",
+          debug: { hasClientId: !!clientId, hasClientSecret: !!clientSecret },
+        },
         { status: 500 }
       );
     }
