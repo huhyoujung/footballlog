@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import PolaroidCard from "./PolaroidCard";
 import PostItNote from "./PostItNote";
 import type { TrainingLog } from "@/types/training";
+
+const MvpResultSheet = dynamic(() => import("./MvpResultSheet"), { ssr: false });
 
 interface LockerNote {
   id: string;
@@ -42,6 +45,7 @@ interface Props {
   hideCount?: boolean; // 카운트 숨김 여부 (락커룸용)
   disableNoteOpen?: boolean; // 쪽지 클릭 비활성화 (피드용)
   currentUserId?: string; // From 표시용 (내가 쓴 쪽지만 표시)
+  mvpEventId?: string; // 이 날짜에 MVP가 선출된 이벤트 ID (로그와 무관하게 트로피 표시)
 }
 
 // 날짜 문자열을 seed로 한 결정론적 난수 (같은 날짜 → 항상 같은 배치)
@@ -81,15 +85,15 @@ function generateStackConfigs(date: string) {
   ];
 }
 
-export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding, notes = [], hideCount = false, disableNoteOpen = false, currentUserId }: Props) {
+export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding, notes = [], hideCount = false, disableNoteOpen = false, currentUserId, mvpEventId }: Props) {
   const router = useRouter();
   const visibleLogs = logs.slice(0, 3);
   const configs = useMemo(() => generateStackConfigs(date), [date]);
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
+  const [showMvpSheet, setShowMvpSheet] = useState(false);
 
-  // MVP가 있는지 확인 (본인이 MVP이거나, 해당 이벤트에 MVP가 선출된 경우)
-  const mvpLog = logs.find(log => log.isMvp) || logs.find(log => log.eventHasMvp);
-  const hasMvp = !!mvpLog;
+  // MVP 트로피: 이벤트 날짜 기반 (로그와 무관)
+  const hasMvp = !!mvpEventId;
 
   // 사진 1개일 때는 로그 ID 기반으로 고유한 회전 생성
   const getSingleCardRotation = (logId: string) => {
@@ -116,8 +120,8 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
       onClick={logs.length > 0 ? onClick : undefined}
       className={`flex flex-col items-center group ${logs.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      {/* 폴라로이드 없고 포스트잇만 있을 때 - 3열 그리드 (3/2 배열) */}
-      {logs.length === 0 && notes.length > 0 ? (
+      {/* 폴라로이드 없고 포스트잇만 있을 때 (MVP 없음) - 3열 그리드 */}
+      {logs.length === 0 && notes.length > 0 && !hasMvp ? (
         <div className="grid grid-cols-3 gap-3 justify-items-center" style={{ maxWidth: 228 }}>
           {notes.map((note) => (
             <PostItNote
@@ -156,9 +160,9 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
             </div>
           )}
 
-          {/* 중앙 폴라로이드 스택 (운동 기록이 있을 때만) */}
-          {logs.length > 0 && (
-          <div className="relative w-44 h-56">
+          {/* 중앙: 폴라로이드 스택 또는 MVP 트로피 단독 */}
+          {(logs.length > 0 || hasMvp) && (
+          <div className={`relative ${logs.length > 0 ? 'w-44 h-56' : 'w-20 h-20 flex items-center justify-center'}`}>
             {visibleLogs.map((log, i) => {
               const config = configs[visibleLogs.length - 1 - i] || configs[0];
               const rotation = visibleLogs.length === 1 ? getSingleCardRotation(log.id) : config.rotation;
@@ -188,18 +192,23 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
               );
             })}
 
-            {/* MVP 트로피 (스택 왼쪽 위) — 클릭 시 MVP 로그 상세 이동 */}
+            {/* MVP 트로피 — 클릭 시 MVP 바텀시트 */}
             {!isExpanding && hasMvp && (
               <div
                 className="absolute cursor-pointer"
-                style={{
+                style={logs.length > 0 ? {
                   top: -5,
                   left: -30,
+                  zIndex: 100,
+                } : {
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
                   zIndex: 100,
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (mvpLog) router.push(`/log/${mvpLog.id}`);
+                  setShowMvpSheet(true);
                 }}
               >
                 <div
@@ -338,6 +347,15 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
           </div>
         );
       })()}
+
+      {/* MVP 결과 바텀시트 */}
+      {showMvpSheet && mvpEventId && (
+        <MvpResultSheet
+          eventId={mvpEventId}
+          isOpen={showMvpSheet}
+          onClose={() => setShowMvpSheet(false)}
+        />
+      )}
     </button>
   );
 }

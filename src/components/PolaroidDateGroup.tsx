@@ -43,6 +43,7 @@ interface Props {
   hideCount?: boolean;
   disableNoteOpen?: boolean;
   currentUserId?: string;
+  mvpEventId?: string;
 }
 
 export default function PolaroidDateGroup({
@@ -58,6 +59,7 @@ export default function PolaroidDateGroup({
   hideCount = false,
   disableNoteOpen = false,
   currentUserId,
+  mvpEventId,
 }: Props) {
   return (
     <div className="transition-all duration-300 ease-out">
@@ -79,6 +81,7 @@ export default function PolaroidDateGroup({
           hideCount={hideCount}
           disableNoteOpen={disableNoteOpen}
           currentUserId={currentUserId}
+          mvpEventId={mvpEventId}
         />
       )}
     </div>

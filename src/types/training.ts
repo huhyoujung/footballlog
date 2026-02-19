@@ -29,6 +29,7 @@ export interface TrainingLog {
   isLiked: boolean;
   isMvp?: boolean; // MVP 여부 (본인이 MVP인 경우)
   eventHasMvp?: boolean; // 해당 이벤트에 MVP가 선출된 경우
+  matchedEventId?: string; // 매칭된 운동 이벤트 ID
 }
 
 export interface TeamMember {

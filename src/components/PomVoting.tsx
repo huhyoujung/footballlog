@@ -1,11 +1,12 @@
 // MVP 투표 컴포넌트 - 바텀시트 UI, pomVotesPerPerson에 따라 다중 선택 지원
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import confetti from "canvas-confetti";
 import { useSWRConfig } from "swr";
+import { toPng } from "html-to-image";
 import { getPomVotingStatus, isPomVotingClosed } from "@/lib/pom";
 
 interface User {
@@ -39,9 +40,10 @@ interface Props {
   pomVotingDeadline: string | null;
   pomVotesPerPerson: number;
   checkIns: CheckInEntry[];
+  teamName?: string;
 }
 
-export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVotesPerPerson, checkIns }: Props) {
+export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVotesPerPerson, checkIns, teamName }: Props) {
   const { mutate: globalMutate } = useSWRConfig();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -192,7 +194,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
       <>
         <ClosedResultsInline results={results} onShowDetails={() => setShowResults(true)} />
         {mounted && showResults && results.length > 0 && createPortal(
-          <ResultsSheet results={results} onClose={() => setShowResults(false)} />,
+          <ResultsSheet results={results} eventDate={eventDate} teamName={teamName} onClose={() => setShowResults(false)} />,
           document.getElementById("modal-root")!
         )}
       </>
@@ -226,13 +228,38 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
         {hasVoted ? (
           <div className="space-y-3">
             <p className="text-xs font-semibold text-team-700">✅ 투표 완료</p>
-            <div className="space-y-1.5">
-              {myVotes.map((v) => (
-                <div key={v.nomineeId} className="text-sm">
-                  <span className="font-medium text-gray-900">{v.nomineeName}</span>
-                  <span className="text-gray-500"> — &ldquo;{v.reason}&rdquo;</span>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {myVotes.map((v) => {
+                const nominee = checkIns.find((c) => c.userId === v.nomineeId);
+                return (
+                  <div key={v.nomineeId} className="bg-team-50/60 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      {nominee?.user.image ? (
+                        <Image
+                          src={nominee.user.image}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="w-6 h-6 rounded-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-team-200 flex items-center justify-center">
+                          <span className="text-[10px] font-semibold text-team-600">
+                            {(v.nomineeName || "?")[0]}
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-sm font-semibold text-gray-900">
+                        {v.nomineeName}
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-gray-600 pl-8">
+                      &ldquo;{v.reason}&rdquo;
+                    </p>
+                  </div>
+                );
+              })}
             </div>
             <div className="flex gap-2">
               {!isClosed && (
@@ -283,7 +310,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
 
       {/* 결과 바텀시트 */}
       {mounted && showResults && results.length > 0 && isClosed && createPortal(
-        <ResultsSheet results={results} onClose={() => setShowResults(false)} />,
+        <ResultsSheet results={results} eventDate={eventDate} teamName={teamName} onClose={() => setShowResults(false)} />,
         document.getElementById("modal-root")!
       )}
     </>
@@ -322,7 +349,7 @@ function VotingSheet({
             <h3 className="text-lg font-bold text-gray-900">오늘의 MVP 투표</h3>
             <p className="text-xs text-gray-400">오늘 함께한 선수 중 최고의 플레이어를 뽑아주세요</p>
             {maxVotes > 1 && (
-              <span className="inline-block px-2.5 py-1 bg-green-50 text-green-600 text-[11px] font-semibold rounded-full">
+              <span className="inline-block px-2.5 py-1 bg-team-50 text-team-600 text-[11px] font-semibold rounded-full">
                 최대 {maxVotes}명 선택 가능
               </span>
             )}
@@ -342,14 +369,14 @@ function VotingSheet({
                     disabled={isDisabled}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
                       isSelected
-                        ? "bg-blue-50 border-2 border-blue-400"
+                        ? "bg-team-50 border-2 border-team-400"
                         : isDisabled
                           ? "border border-gray-100 opacity-40"
                           : "border border-gray-200"
                     }`}
                   >
                     <div className={`w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      isSelected ? "bg-blue-500 border-blue-500" : "border-gray-300"
+                      isSelected ? "bg-team-500 border-team-500" : "border-gray-300"
                     }`}>
                       {isSelected && (
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -387,7 +414,7 @@ function VotingSheet({
                       onChange={(e) => onUpdateReason(checkIn.userId, e.target.value)}
                       placeholder="어떤 플레이가 좋았나요?"
                       rows={2}
-                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none bg-white"
+                      className="w-full px-3 py-2 border border-team-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:border-team-400 focus:outline-none bg-white"
                     />
                   )}
                 </div>
@@ -411,8 +438,81 @@ function VotingSheet({
 }
 
 /* ─── 결과 바텀시트 ─── */
-function ResultsSheet({ results, onClose }: { results: PomResult[]; onClose: () => void }) {
+function ResultsSheet({ results, eventDate, teamName, onClose }: {
+  results: PomResult[];
+  eventDate: string;
+  teamName?: string;
+  onClose: () => void;
+}) {
   const winner = results[0];
+  const shareCardRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+
+  const formattedDate = (() => {
+    try {
+      const d = new Date(eventDate);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    } catch { return eventDate; }
+  })();
+
+  // CSS 변수에서 팀 컬러 읽기
+  const getTeamColor = (shade: string) => {
+    if (typeof window === "undefined") return "";
+    return getComputedStyle(document.documentElement).getPropertyValue(`--color-team-${shade}`).trim();
+  };
+
+  // 카드를 PNG로 캡처
+  const captureCard = useCallback(async () => {
+    if (!shareCardRef.current) return null;
+    const dataUrl = await toPng(shareCardRef.current, { pixelRatio: 2, cacheBust: true });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return { dataUrl, blob };
+  }, []);
+
+  // 공유 (Web Share API → 인스타 스토리 포함 시스템 공유시트)
+  const handleShare = useCallback(async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const result = await captureCard();
+      if (!result) return;
+      const file = new File([result.blob], `mvp-${formattedDate}.png`, { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "오늘의 MVP" });
+      } else {
+        // 데스크톱 fallback: 다운로드
+        const link = document.createElement("a");
+        link.href = result.dataUrl;
+        link.download = `mvp-${formattedDate}.png`;
+        link.click();
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.error("공유 실패:", err);
+    } finally {
+      setSharing(false);
+    }
+  }, [formattedDate, sharing, captureCard]);
+
+  // 이미지 저장 (갤러리에 바로 저장)
+  const handleSave = useCallback(async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const result = await captureCard();
+      if (!result) return;
+      const link = document.createElement("a");
+      link.href = result.dataUrl;
+      link.download = `mvp-${formattedDate}.png`;
+      link.click();
+    } catch (err) {
+      console.error("저장 실패:", err);
+    } finally {
+      setSharing(false);
+    }
+  }, [formattedDate, sharing, captureCard]);
+
   if (!winner) return null;
 
   return (
@@ -432,7 +532,7 @@ function ResultsSheet({ results, onClose }: { results: PomResult[]; onClose: () 
           </div>
 
           {/* 우승자 카드 */}
-          <div className="bg-gradient-to-b from-blue-50 to-blue-100 rounded-2xl p-5 mb-5">
+          <div className="bg-gradient-to-b from-team-50 to-team-100 rounded-2xl p-5 mb-5">
             <div className="flex flex-col items-center gap-3">
               {winner.user.image ? (
                 <Image
@@ -444,8 +544,8 @@ function ResultsSheet({ results, onClose }: { results: PomResult[]; onClose: () 
                   unoptimized
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-blue-200 flex items-center justify-center">
-                  <span className="text-2xl text-blue-600">{(winner.user.name || "?")[0]}</span>
+                <div className="w-16 h-16 rounded-full bg-team-200 flex items-center justify-center">
+                  <span className="text-2xl text-team-600">{(winner.user.name || "?")[0]}</span>
                 </div>
               )}
               <div className="text-center">
@@ -456,21 +556,23 @@ function ResultsSheet({ results, onClose }: { results: PomResult[]; onClose: () 
                   </p>
                 )}
               </div>
-              <span className="px-3.5 py-1.5 bg-blue-500 text-white text-[13px] font-bold rounded-full">
+              <span className="px-3.5 py-1.5 bg-team-500 text-white text-[13px] font-bold rounded-full">
                 {winner.count}표 획득
               </span>
             </div>
 
-            {/* 팀원 코멘트 */}
+            {/* 팀원 코멘트 - 가로 스크롤 */}
             {winner.votes.length > 0 && (
-              <div className="mt-4 space-y-1.5">
+              <div className="mt-4">
                 <p className="text-[11px] font-semibold text-gray-500 mb-2">팀원 코멘트</p>
-                {winner.votes.map((vote, idx) => (
-                  <div key={idx} className="bg-white rounded-lg px-3 py-2 flex gap-2 items-start">
-                    <span className="text-xs font-semibold text-gray-700 shrink-0">{vote.voter.name || "익명"}</span>
-                    <span className="text-xs text-gray-600">{vote.reason}</span>
-                  </div>
-                ))}
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide">
+                  {winner.votes.map((vote, idx) => (
+                    <div key={idx} className="bg-white rounded-lg px-3 py-2.5 min-w-[160px] max-w-[200px] shrink-0 snap-start">
+                      <p className="text-xs font-semibold text-gray-700 mb-1">{vote.voter.name || "익명"}</p>
+                      <p className="text-xs text-gray-600 leading-relaxed">&ldquo;{vote.reason}&rdquo;</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -503,13 +605,167 @@ function ResultsSheet({ results, onClose }: { results: PomResult[]; onClose: () 
             </div>
           )}
 
-          {/* 닫기 */}
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold"
-          >
-            닫기
-          </button>
+          {/* 공유/저장/닫기 */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="flex-1 py-3 bg-team-500 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                {sharing ? "준비 중..." : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    스토리 공유
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={sharing}
+                className="flex-1 py-3 bg-team-50 text-team-600 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                이미지 저장
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 text-gray-500 text-sm font-medium"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── 공유용 MVP 카드 (화면 밖 렌더링) ─── */}
+      <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
+        <div
+          ref={shareCardRef}
+          style={{
+            width: 360,
+            height: 480,
+            background: `linear-gradient(180deg, ${getTeamColor("50") || "#F7F5F3"} 0%, ${getTeamColor("100") || "#EFEBE7"} 40%, white 100%)`,
+            fontFamily: "'Pretendard', -apple-system, sans-serif",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "32px 28px 24px",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          {/* 배경 장식 원 */}
+          <div style={{
+            position: "absolute", top: -40, right: -40,
+            width: 160, height: 160, borderRadius: "50%",
+            background: getTeamColor("200") || "#DED7CE", opacity: 0.3,
+          }} />
+          <div style={{
+            position: "absolute", bottom: 60, left: -30,
+            width: 100, height: 100, borderRadius: "50%",
+            background: getTeamColor("200") || "#DED7CE", opacity: 0.2,
+          }} />
+
+          {/* 트로피 + 타이틀 */}
+          <div style={{ fontSize: 40, marginBottom: 4, position: "relative", zIndex: 1 }}>🏆</div>
+          <p style={{
+            fontSize: 18, fontWeight: 800, color: "#111",
+            marginBottom: 20, position: "relative", zIndex: 1,
+          }}>오늘의 MVP</p>
+
+          {/* 프로필 사진 */}
+          {winner.user.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={winner.user.image}
+              alt=""
+              crossOrigin="anonymous"
+              style={{
+                width: 80, height: 80, borderRadius: "50%",
+                objectFit: "cover", border: `3px solid ${getTeamColor("300") || "#C6B9A9"}`,
+                position: "relative", zIndex: 1,
+              }}
+            />
+          ) : (
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%",
+              background: getTeamColor("200") || "#DED7CE",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: `3px solid ${getTeamColor("300") || "#C6B9A9"}`,
+              position: "relative", zIndex: 1,
+            }}>
+              <span style={{ fontSize: 28, color: getTeamColor("600") || "#7D684F", fontWeight: 700 }}>
+                {(winner.user.name || "?")[0]}
+              </span>
+            </div>
+          )}
+
+          {/* 이름 + 포지션 */}
+          <p style={{
+            fontSize: 20, fontWeight: 700, color: "#111",
+            marginTop: 12, position: "relative", zIndex: 1,
+          }}>{winner.user.name || "익명"}</p>
+          {(winner.user.position || winner.user.number) && (
+            <p style={{ fontSize: 12, color: "#888", marginTop: 2, position: "relative", zIndex: 1 }}>
+              {winner.user.position || ""}{winner.user.number ? ` · ${winner.user.number}번` : ""}
+            </p>
+          )}
+
+          {/* 득표 배지 */}
+          <div style={{
+            marginTop: 12, padding: "5px 14px",
+            background: getTeamColor("500") || "#977C5E",
+            color: "white", borderRadius: 20,
+            fontSize: 13, fontWeight: 700,
+            position: "relative", zIndex: 1,
+          }}>
+            {winner.count}표 획득
+          </div>
+
+          {/* 팀원 코멘트 (최대 2개) */}
+          {winner.votes.length > 0 && (
+            <div style={{
+              marginTop: 20, width: "100%",
+              display: "flex", flexDirection: "column", gap: 6,
+              position: "relative", zIndex: 1,
+            }}>
+              {winner.votes.slice(0, 2).map((vote, idx) => (
+                <div key={idx} style={{
+                  background: "rgba(255,255,255,0.85)",
+                  borderRadius: 10, padding: "8px 12px",
+                  textAlign: "center",
+                }}>
+                  <p style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>
+                    &ldquo;{vote.reason}&rdquo;
+                  </p>
+                  <p style={{ fontSize: 10, color: "#999", marginTop: 2 }}>— {vote.voter.name || "익명"}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 하단 팀명 + 날짜 */}
+          <div style={{
+            marginTop: "auto", paddingTop: 16,
+            display: "flex", alignItems: "center", gap: 6,
+            position: "relative", zIndex: 1,
+          }}>
+            <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>
+              {teamName || "네모의 꿈"}
+            </span>
+            <span style={{ fontSize: 11, color: "#ccc" }}>·</span>
+            <span style={{ fontSize: 11, color: "#aaa" }}>{formattedDate}</span>
+          </div>
         </div>
       </div>
     </>
@@ -537,8 +793,8 @@ function ClosedResultsInline({ results, onShowDetails }: { results: PomResult[];
               unoptimized
             />
           ) : (
-            <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
-              <span className="text-xl text-blue-600">{(winner.user.name || "?")[0]}</span>
+            <div className="w-14 h-14 rounded-full bg-team-100 flex items-center justify-center">
+              <span className="text-xl text-team-600">{(winner.user.name || "?")[0]}</span>
             </div>
           )}
           <p className="text-base font-semibold text-gray-900">{winner.user.name || "익명"}</p>

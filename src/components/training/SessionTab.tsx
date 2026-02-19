@@ -792,7 +792,7 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
 
               {/* 팀 배정 정보 */}
               {sess.teamAssignments.length > 0 && (
-                <div className="mt-3 ml-8 space-y-2">
+                <div className="mt-3 space-y-2">
                   {Object.entries(
                     sess.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
                       if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
@@ -803,16 +803,18 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh }: Prop
                       return acc;
                     }, {})
                   ).map(([label, members]) => (
-                    <div key={label} className="bg-gray-50 rounded-lg p-2.5">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="text-xs font-semibold text-team-700">{label}</span>
-                        <span className="text-xs text-gray-500">({members.length}명)</span>
+                    <div key={label} className="bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-0.5 bg-team-500 text-white text-[11px] font-bold rounded-md whitespace-nowrap">
+                          {label}
+                        </span>
+                        <span className="text-xs text-gray-500">{members.length}명</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-x-1 gap-y-1">
                         {members.map((m, i) => (
-                          <span key={i} className="inline-flex items-center gap-0.5 text-xs text-gray-600">
+                          <span key={i} className="text-[13px] text-gray-700">
                             {m.name}
-                            {m.position && <span className="text-[9px] text-gray-400">{getPositionGroup(m.position)}</span>}
+                            {m.position && <span className="text-[10px] text-gray-400 ml-0.5">{getPositionGroup(m.position)}</span>}
                             {i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
                           </span>
                         ))}

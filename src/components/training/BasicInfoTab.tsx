@@ -130,8 +130,20 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
       else if (r.status === "LATE") late.push(r);
     }
     const noResp = teamData?.members.filter((m) => !respondedIds.has(m.id)) || [];
+    // "나"를 각 섹션 최상단에 고정
+    const myId = session?.user?.id;
+    if (myId) {
+      const sortMe = (arr: RsvpEntry[]) =>
+        [...arr].sort((a, b) => (a.userId === myId ? -1 : b.userId === myId ? 1 : 0));
+      return {
+        attendees: sortMe(attend),
+        absentees: sortMe(absent),
+        lateComers: sortMe(late),
+        noResponse: [...noResp].sort((a, b) => (a.id === myId ? -1 : b.id === myId ? 1 : 0)),
+      };
+    }
     return { attendees: attend, absentees: absent, lateComers: late, noResponse: noResp };
-  }, [event.rsvps, teamData?.members]);
+  }, [event.rsvps, teamData?.members, session?.user?.id]);
 
   // 체크인 맵 (O(n) → O(1) 조회)
   const checkInsMap = useMemo(() => {
@@ -496,6 +508,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 pomVotingDeadline={event.pomVotingDeadline}
                 pomVotesPerPerson={event.pomVotesPerPerson}
                 checkIns={event.checkIns}
+                teamName={teamData?.name}
               />
             </div>
           )}
@@ -588,7 +601,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = checkInsMap.get(r.userId);
                 return (
-                  <div key={r.id}>
+                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -636,6 +649,9 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                         {/* 뱃지 및 버튼 */}
                         <div className="flex items-center gap-2 ml-auto">
+                          {isMe && (
+                            <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
+                          )}
                           {isMe && !isDeadlinePassed && (
                             <button
                               onClick={(e) => {
@@ -723,7 +739,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
               {absentees.map((r: RsvpEntry) => {
                 const isMe = r.user.id === session?.user?.id;
                 return (
-                  <div key={r.id}>
+                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -750,6 +766,9 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                           {/* 뱃지 및 버튼 */}
                           <div className="flex items-center gap-2 ml-auto">
+                            {isMe && (
+                              <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
+                            )}
                             {isMe && !isDeadlinePassed && (
                               <button
                                 onClick={(e) => {
@@ -841,7 +860,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 const isMe = r.user.id === session?.user?.id;
                 const checkIn = checkInsMap.get(r.userId);
                 return (
-                  <div key={r.id}>
+                  <div key={r.id} className={isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}>
                     <div className="flex items-center gap-3 py-1.5">
                       {/* 프로필 이미지 */}
                       <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -890,6 +909,9 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                           {/* 뱃지 및 버튼 */}
                           <div className="flex items-center gap-2 ml-auto">
+                            {isMe && (
+                              <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full">나</span>
+                            )}
                             {isMe && !isDeadlinePassed && (
                               <button
                                 onClick={(e) => {
@@ -1009,7 +1031,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
               {noResponse.map((member) => {
                 const isMe = member.id === session?.user?.id;
                 return (
-                  <div key={member.id} className="flex items-center gap-3 py-1.5">
+                  <div key={member.id} className={`flex items-center gap-3 py-1.5 ${isMe ? "bg-team-50 rounded-lg -mx-2 px-2 border-l-2 border-team-400" : ""}`}>
                     {/* 프로필 이미지 */}
                     <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                       {member.image ? (
@@ -1034,7 +1056,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
                       {/* 나 뱃지 */}
                       {isMe && (
-                        <span className="px-2 py-0.5 bg-team-50 text-team-700 text-[10px] font-medium rounded-full ml-auto">
+                        <span className="px-2 py-0.5 bg-team-100 text-team-700 text-[10px] font-medium rounded-full ml-auto">
                           나
                         </span>
                       )}
@@ -1082,7 +1104,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 </div>
                 {s.memo && <p className="text-xs text-gray-500 mt-1 ml-8">{s.memo}</p>}
                 {s.teamAssignments.length > 0 && (
-                  <div className="mt-2 ml-8 space-y-2">
+                  <div className="mt-2.5 space-y-2">
                     {Object.entries(
                       s.teamAssignments.reduce<Record<string, { name: string; position: string | null }[]>>((acc, a) => {
                         if (!acc[a.teamLabel]) acc[a.teamLabel] = [];
@@ -1093,18 +1115,17 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                         return acc;
                       }, {})
                     ).sort((a, b) => a[0].localeCompare(b[0])).map(([label, members]) => (
-                      <div key={label} className="bg-gray-50 rounded-lg p-2.5">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="w-5 h-5 bg-team-500 text-white text-[10px] font-bold rounded flex items-center justify-center flex-shrink-0">
+                      <div key={label} className="bg-gray-50 rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2 py-0.5 bg-team-500 text-white text-[11px] font-bold rounded-md whitespace-nowrap">
                             {label}
                           </span>
-                          <span className="text-xs font-semibold text-gray-700">{members.length}명</span>
+                          <span className="text-xs text-gray-500">{members.length}명</span>
                         </div>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-x-1 gap-y-1">
                           {members.map((m, i) => (
-                            <span key={i} className="inline-flex items-center gap-0.5 text-xs text-gray-600">
-                              {m.name}
-                              {i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
+                            <span key={i} className="text-[13px] text-gray-700">
+                              {m.name}{i < members.length - 1 && <span className="text-gray-300 mx-0.5">·</span>}
                             </span>
                           ))}
                         </div>

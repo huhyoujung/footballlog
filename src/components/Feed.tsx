@@ -35,6 +35,7 @@ interface Nudge {
 }
 
 interface RecentMvp {
+  eventId: string;
   user: {
     id: string;
     name: string | null;
@@ -174,7 +175,7 @@ export default function Feed() {
     permissionGranted: shakePermissionGranted,
     requestPermission: requestShakePermission,
   } = useShakeDetection({
-    threshold: 25,
+    threshold: 12,
     timeout: 2000,
     enabled: !isInsightModalOpen,
     onShake: handleShake,
@@ -202,6 +203,10 @@ export default function Feed() {
   const nextEvents = eventsData?.events || [];
   const recentMvp = mvpData?.mvp || null;
   const recentNotes = recentNotesData || [];
+
+  // MVP 이벤트 날짜 → 로컬 날짜 문자열 (피드 날짜 그룹 매칭용)
+  const mvpDateStr = recentMvp ? getLocalDateString(new Date(recentMvp.eventDate)) : null;
+  const mvpEventId = recentMvp?.eventId || null;
 
   // 로그인 후 알림 구독 요청 (사용자가 수동으로 끈 경우 제외)
   useEffect(() => {
@@ -315,6 +320,11 @@ export default function Feed() {
       if (!grouped[date]) grouped[date] = [];
     }
 
+    // MVP 이벤트 날짜에 로그/쪽지가 없어도 빈 그룹 생성 (트로피 표시용)
+    if (mvpDateStr && !grouped[mvpDateStr]) {
+      grouped[mvpDateStr] = [];
+    }
+
     return Object.entries(grouped)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([date, dateLogs]) => {
@@ -340,7 +350,7 @@ export default function Feed() {
           logs: sortedLogs,
         };
       });
-  }, [logs, notesByDate]);
+  }, [logs, notesByDate, mvpDateStr]);
 
   // 전광판 메시지
   const tickerMessages = useMemo(() => {
@@ -600,6 +610,7 @@ export default function Feed() {
                     notes={notesByDate[group.date] || []}
                     disableNoteOpen
                     currentUserId={session?.user?.id}
+                    mvpEventId={group.date === mvpDateStr ? (mvpEventId ?? undefined) : undefined}
                   />
                 </div>
               );

@@ -51,11 +51,13 @@ export default async function HomePage() {
     }))];
 
     for (const dateStr of uniqueDates) {
-      const dayStart = new Date(dateStr + "T00:00:00.000Z");
+      // 이벤트 다음날 기록하는 경우가 흔하므로 전날~당일 범위로 매칭
+      const prevDayStart = new Date(new Date(dateStr + "T00:00:00.000Z").getTime() - 86400000);
       const dayEnd = new Date(dateStr + "T23:59:59.999Z");
       const event = await prisma.trainingEvent.findFirst({
-        where: { teamId, date: { gte: dayStart, lte: dayEnd } },
+        where: { teamId, date: { gte: prevDayStart, lte: dayEnd } },
         select: { id: true },
+        orderBy: { date: "desc" },
       });
       if (event) dateToEventId[dateStr] = event.id;
     }
@@ -100,6 +102,7 @@ export default async function HomePage() {
           isLiked: log.likes.length > 0,
           isMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId] === log.userId),
           eventHasMvp: !!(matchedEventId && mvpUserIdByEvent[matchedEventId]),
+          matchedEventId: matchedEventId || undefined,
           likes: undefined,
         };
       }),

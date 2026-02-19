@@ -81,6 +81,7 @@ export async function GET() {
 
     return NextResponse.json({
       mvp: {
+        eventId: event.id,
         user: mvp.user,
         voteCount: mvp.count,
         eventDate: event.date,
