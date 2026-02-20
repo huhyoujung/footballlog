@@ -1,14 +1,7 @@
-// 풋살 작전판 (라이트) - 포메이션 선택 + 선수 위치 배치
+// 작전판 - 자유 배치 (포메이션 프리셋 없음)
 "use client";
 
-import React, { useState } from "react";
-import {
-  FUTSAL_FORMATIONS,
-  FORMATION_KEYS,
-  type FormationKey,
-  type FormationSlot,
-  type PositionsMap,
-} from "@/lib/formations";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { getPositionGroup } from "@/lib/position";
 
 interface Player {
@@ -17,243 +10,308 @@ interface Player {
   position: string | null;
 }
 
+export interface FreePositionsMap {
+  [userId: string]: { x: number; y: number };
+}
+
 interface Props {
   mode: "edit" | "readonly";
-  formation: FormationKey | null;
-  positions: PositionsMap | null;
-  players: Player[]; // 팀에 배정된 선수 목록
-  onFormationChange?: (formation: FormationKey) => void;
-  onPositionsChange?: (positions: PositionsMap) => void;
+  positions: FreePositionsMap | null;
+  players: Player[]; // 참석자 전체
+  onPositionsChange?: (positions: FreePositionsMap) => void;
 }
 
 export default function TacticsBoard({
   mode,
-  formation,
   positions,
   players,
-  onFormationChange,
   onPositionsChange,
 }: Props) {
-  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [draggingUserId, setDraggingUserId] = useState<string | null>(null);
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
 
-  const currentFormation = formation ? FUTSAL_FORMATIONS[formation] : null;
+  // 드래그 상태를 ref로 관리 (리렌더 방지)
+  const dragRef = useRef<{
+    userId: string;
+    source: "pool" | "pitch";
+    name: string;
+    active: boolean; // pointerMove가 발생했는지 (탭 vs 드래그 구분)
+  } | null>(null);
+  // 최신 positions를 ref로도 유지 (effect 클로저 문제 방지)
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+
   const currentPositions = positions || {};
 
-  // 슬롯에 배정된 선수 찾기
-  const getPlayerForSlot = (slotIndex: number): Player | null => {
-    const slot = currentFormation?.slots[slotIndex];
-    if (!slot) return null;
-    const entry = Object.entries(currentPositions).find(
-      ([, pos]) =>
-        Math.abs(pos.x - slot.x) < 0.01 &&
-        Math.abs(pos.y - slot.y) < 0.01
-    );
-    if (!entry) return null;
-    return players.find((p) => p.userId === entry[0]) || null;
-  };
-
-  // 배정되지 않은 선수 목록
+  // 미배정 선수
   const assignedUserIds = new Set(Object.keys(currentPositions));
   const unassignedPlayers = players.filter((p) => !assignedUserIds.has(p.userId));
 
-  // 슬롯에 선수 배정
-  const assignPlayer = (slotIndex: number, player: Player) => {
-    if (!currentFormation || !onPositionsChange) return;
-    const slot = currentFormation.slots[slotIndex];
-    const newPositions = { ...currentPositions };
+  // 피치 내 좌표 계산 (0~1 정규화)
+  const getRelativePosition = useCallback((clientX: number, clientY: number) => {
+    if (!pitchRef.current) return null;
+    const rect = pitchRef.current.getBoundingClientRect();
+    const x = Math.max(0.05, Math.min(0.95, (clientX - rect.left) / rect.width));
+    const y = Math.max(0.05, Math.min(0.95, (clientY - rect.top) / rect.height));
+    return { x, y };
+  }, []);
 
-    // 해당 슬롯에 이미 있는 선수 제거
-    const existingEntry = Object.entries(newPositions).find(
-      ([, pos]) =>
-        Math.abs(pos.x - slot.x) < 0.01 &&
-        Math.abs(pos.y - slot.y) < 0.01
-    );
-    if (existingEntry) delete newPositions[existingEntry[0]];
+  // 피치 위에 있는지 확인
+  const isOverPitch = useCallback((clientX: number, clientY: number) => {
+    if (!pitchRef.current) return false;
+    const rect = pitchRef.current.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  }, []);
 
-    // 이 선수가 다른 슬롯에 있으면 제거
-    delete newPositions[player.userId];
+  // 고스트 표시/숨김
+  const showGhost = useCallback((x: number, y: number, name: string) => {
+    if (!ghostRef.current) return;
+    ghostRef.current.style.display = "flex";
+    ghostRef.current.style.left = `${x}px`;
+    ghostRef.current.style.top = `${y}px`;
+    ghostRef.current.textContent = name;
+  }, []);
 
-    // 새 위치에 배정
-    newPositions[player.userId] = { x: slot.x, y: slot.y, role: slot.role };
-    onPositionsChange(newPositions);
-    setSelectedSlotIndex(null);
+  const hideGhost = useCallback(() => {
+    if (!ghostRef.current) return;
+    ghostRef.current.style.display = "none";
+  }, []);
+
+  // 피치 하이라이트
+  const setPitchHighlight = useCallback((on: boolean) => {
+    if (!pitchRef.current) return;
+    if (on) {
+      pitchRef.current.classList.add("ring-2", "ring-white/60");
+    } else {
+      pitchRef.current.classList.remove("ring-2", "ring-white/60");
+    }
+  }, []);
+
+  // 포인터 이동 & 끝 핸들러 (window에 등록, deps 최소화)
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      drag.active = true;
+      e.preventDefault();
+      showGhost(e.clientX, e.clientY, drag.name);
+      setPitchHighlight(isOverPitch(e.clientX, e.clientY));
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+
+      hideGhost();
+      setPitchHighlight(false);
+      dragRef.current = null;
+      setDraggingUserId(null);
+
+      // 드래그가 아닌 탭이었으면 무시 (탭 핸들러에서 처리)
+      if (!drag.active) return;
+
+      const cur = positionsRef.current || {};
+      if (isOverPitch(e.clientX, e.clientY) && onPositionsChange) {
+        const pos = getRelativePosition(e.clientX, e.clientY);
+        if (pos) {
+          onPositionsChange({ ...cur, [drag.userId]: pos });
+        }
+      } else if (drag.source === "pitch" && onPositionsChange) {
+        // 피치 밖으로 드래그 → 미배정으로
+        const newPositions = { ...cur };
+        delete newPositions[drag.userId];
+        onPositionsChange(newPositions);
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [onPositionsChange, getRelativePosition, isOverPitch, showGhost, hideGhost, setPitchHighlight]);
+
+  // 미배정 선수 포인터 다운
+  const handleUnassignedPointerDown = (e: React.PointerEvent, player: Player) => {
+    if (mode !== "edit") return;
+    e.preventDefault();
+    dragRef.current = {
+      userId: player.userId,
+      source: "pool",
+      name: player.name || "?",
+      active: false,
+    };
   };
 
-  // 슬롯에서 선수 해제
-  const unassignPlayer = (userId: string) => {
-    if (!onPositionsChange) return;
+  // 미배정 선수 탭 (드래그 안 한 경우)
+  const handleUnassignedClick = (userId: string) => {
+    if (mode !== "edit") return;
+    // dragRef.active가 true면 드래그 후 click이므로 무시
+    setSelectedPlayer(selectedPlayer === userId ? null : userId);
+  };
+
+  // 피치 탭 → 선택된 선수를 해당 위치에 배치
+  const handlePitchClick = (e: React.MouseEvent) => {
+    if (mode !== "edit" || !selectedPlayer || !onPositionsChange) return;
+    const pos = getRelativePosition(e.clientX, e.clientY);
+    if (!pos) return;
+
+    onPositionsChange({ ...currentPositions, [selectedPlayer]: pos });
+    setSelectedPlayer(null);
+  };
+
+  // 배치된 선수 포인터 다운
+  const handlePlacedPointerDown = (e: React.PointerEvent, player: Player) => {
+    if (mode !== "edit") return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      userId: player.userId,
+      source: "pitch",
+      name: player.name || "?",
+      active: false,
+    };
+    setDraggingUserId(player.userId);
+  };
+
+  // 배치된 선수 탭 → 제거 (미배정으로)
+  const handlePlacedClick = (e: React.MouseEvent, userId: string) => {
+    if (mode !== "edit" || !onPositionsChange) return;
+    e.stopPropagation();
+    // 드래그 후 click이면 무시
+    if (dragRef.current?.active) return;
     const newPositions = { ...currentPositions };
     delete newPositions[userId];
     onPositionsChange(newPositions);
   };
 
-  // 포메이션 변경 시 기존 배정 유지하되 좌표만 업데이트
-  const handleFormationChange = (key: FormationKey) => {
-    if (!onFormationChange || !onPositionsChange) return;
-    onFormationChange(key);
+  const placedCount = Object.keys(currentPositions).length;
 
-    const newFormation = FUTSAL_FORMATIONS[key];
-    const newPositions: PositionsMap = {};
-    const assignedIds = Object.keys(currentPositions);
-
-    // 기존 배정된 선수를 새 포메이션 슬롯에 순서대로 매핑
-    newFormation.slots.forEach((slot, i) => {
-      if (i < assignedIds.length) {
-        newPositions[assignedIds[i]] = { x: slot.x, y: slot.y, role: slot.role };
-      }
-    });
-    onPositionsChange(newPositions);
-  };
-
-  if (!currentFormation && mode === "readonly") return null;
+  if (mode === "readonly" && placedCount === 0) return null;
 
   return (
     <div className="space-y-3">
-      {/* 포메이션 선택 */}
+      {/* 드래그 고스트 (DOM 직접 조작으로 리렌더 없이 이동) */}
+      <div
+        ref={ghostRef}
+        className="fixed z-50 pointer-events-none items-center justify-center min-w-[36px] h-9 rounded-full px-2.5 text-[11px] font-bold shadow-lg bg-white text-team-700 border-2 border-team-500 whitespace-nowrap opacity-90 -translate-x-1/2 -translate-y-1/2"
+        style={{ display: "none" }}
+      />
+
+      {/* 미배정 선수 풀 (편집 모드) */}
       {mode === "edit" && (
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">포메이션</label>
-          <div className="grid grid-cols-3 gap-2">
-            {FORMATION_KEYS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleFormationChange(key)}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  formation === key
-                    ? "bg-team-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {key}
-              </button>
-            ))}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-700">
+              미배정 ({unassignedPlayers.length}명)
+            </span>
+            {selectedPlayer && (
+              <span className="text-[11px] text-team-500 font-medium animate-pulse">
+                피치를 탭하여 배치하세요
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 min-h-[36px] border border-dashed border-gray-300 rounded-lg p-2.5">
+            {unassignedPlayers.length === 0 ? (
+              <span className="text-xs text-gray-400">모든 선수가 배치되었습니다</span>
+            ) : (
+              unassignedPlayers.map((p) => (
+                <button
+                  key={p.userId}
+                  type="button"
+                  onClick={() => handleUnassignedClick(p.userId)}
+                  onPointerDown={(e) => handleUnassignedPointerDown(e, p)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all select-none touch-none ${
+                    selectedPlayer === p.userId
+                      ? "bg-team-500 text-white ring-2 ring-team-300 scale-105"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-grab active:cursor-grabbing"
+                  }`}
+                >
+                  {p.name || "이름 없음"}
+                  {p.position && (
+                    <span className={`ml-1 text-[10px] ${selectedPlayer === p.userId ? "text-white/70" : "text-gray-400"}`}>
+                      {getPositionGroup(p.position)}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
 
       {/* 피치 뷰 */}
-      {currentFormation && (
-        <div className="relative w-full aspect-[3/4] bg-green-600 rounded-xl overflow-hidden">
+      <div
+        ref={pitchRef}
+        className={`relative w-full aspect-[3/5] rounded-xl overflow-hidden transition-shadow ${
+          mode === "edit" && selectedPlayer ? "ring-2 ring-team-300 cursor-crosshair" : ""
+        }`}
+        onClick={handlePitchClick}
+      >
+        {/* 피치 + 대기석 배경 */}
+        <svg
+          viewBox="0 0 300 500"
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* 필드 영역 */}
+          <rect x="0" y="0" width="300" height="420" fill="currentColor" className="text-team-500" />
+          {/* 대기석 영역 */}
+          <rect x="0" y="420" width="300" height="80" fill="currentColor" className="text-team-700" />
+          <line x1="0" y1="420" x2="300" y2="420" stroke="white" strokeWidth="1.5" opacity="0.3" strokeDasharray="6 4" />
+          <text x="150" y="438" textAnchor="middle" fill="white" opacity="0.3" fontSize="10" fontWeight="500">교체 대기</text>
+
           {/* 피치 라인 */}
-          <svg
-            viewBox="0 0 300 400"
-            className="absolute inset-0 w-full h-full"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {/* 외곽선 */}
-            <rect x="10" y="10" width="280" height="380" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-            {/* 중앙선 */}
-            <line x1="10" y1="200" x2="290" y2="200" stroke="white" strokeWidth="2" opacity="0.5" />
-            {/* 중앙 원 */}
-            <circle cx="150" cy="200" r="40" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-            <circle cx="150" cy="200" r="3" fill="white" opacity="0.5" />
-            {/* 상단 페널티 박스 */}
-            <rect x="75" y="10" width="150" height="60" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-            <rect x="110" y="10" width="80" height="25" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-            {/* 하단 페널티 박스 */}
-            <rect x="75" y="330" width="150" height="60" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-            <rect x="110" y="365" width="80" height="25" fill="none" stroke="white" strokeWidth="2" opacity="0.5" />
-          </svg>
+          <rect x="10" y="10" width="280" height="400" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <line x1="10" y1="210" x2="290" y2="210" stroke="white" strokeWidth="2" opacity="0.4" />
+          <circle cx="150" cy="210" r="40" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <circle cx="150" cy="210" r="3" fill="white" opacity="0.4" />
+          {/* 상단 페널티/골 에어리어 */}
+          <rect x="75" y="10" width="150" height="65" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <rect x="110" y="10" width="80" height="25" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          {/* 하단 페널티/골 에어리어 */}
+          <rect x="75" y="345" width="150" height="65" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <rect x="110" y="385" width="80" height="25" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          {/* 코너킥 아크 (안쪽으로 볼록) */}
+          <path d="M20,10 A10,10 0 0,1 10,20" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <path d="M280,10 A10,10 0 0,0 290,20" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <path d="M10,400 A10,10 0 0,1 20,410" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+          <path d="M290,400 A10,10 0 0,0 280,410" fill="none" stroke="white" strokeWidth="2" opacity="0.4" />
+        </svg>
 
-          {/* 선수 슬롯 */}
-          {currentFormation.slots.map((slot, i) => {
-            const player = getPlayerForSlot(i);
-            const isSelected = selectedSlotIndex === i;
+        {/* 배치된 선수 마커 */}
+        {Object.entries(currentPositions).map(([userId, pos]) => {
+          const player = players.find((p) => p.userId === userId);
+          if (!player) return null;
 
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  if (mode !== "edit") return;
-                  if (player) {
-                    unassignPlayer(player.userId);
-                  } else {
-                    setSelectedSlotIndex(isSelected ? null : i);
-                  }
-                }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5"
-                style={{
-                  left: `${slot.x * 100}%`,
-                  top: `${slot.y * 100}%`,
-                }}
-              >
-                {/* 원형 마커 */}
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-md transition-all ${
-                    player
-                      ? "bg-white text-team-700 border-2 border-team-400"
-                      : isSelected
-                      ? "bg-yellow-300 text-yellow-900 border-2 border-yellow-500 scale-110"
-                      : "bg-white/30 text-white border-2 border-white/60"
-                  }`}
-                >
-                  {player
-                    ? (player.name?.[0] || "?")
-                    : slot.label}
-                </div>
-                {/* 이름 라벨 */}
-                <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
-                    player
-                      ? "bg-black/60 text-white"
-                      : "bg-black/30 text-white/80"
-                  }`}
-                >
-                  {player ? (player.name || "이름 없음") : slot.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 선수 선택 패널 (편집 모드 + 슬롯 선택 시) */}
-      {mode === "edit" && selectedSlotIndex !== null && currentFormation && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-700">
-              {currentFormation.slots[selectedSlotIndex].label} 포지션에 배정할 선수
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedSlotIndex(null)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+          return (
+            <div
+              key={userId}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 touch-none ${
+                mode === "edit" ? "cursor-grab active:cursor-grabbing" : ""
+              } ${draggingUserId === userId ? "opacity-30 scale-90" : ""}`}
+              style={{
+                left: `${pos.x * 100}%`,
+                top: `${pos.y * 100}%`,
+              }}
+              onClick={(e) => handlePlacedClick(e, userId)}
+              onPointerDown={(e) => handlePlacedPointerDown(e, player)}
             >
-              닫기
-            </button>
-          </div>
-          {unassignedPlayers.length === 0 ? (
-            <p className="text-xs text-gray-400">모든 선수가 배정되었습니다</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {unassignedPlayers.map((p) => (
-                <button
-                  key={p.userId}
-                  type="button"
-                  onClick={() => assignPlayer(selectedSlotIndex, p)}
-                  className="px-2.5 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-md text-xs font-medium hover:bg-team-50 hover:border-team-200 transition-colors"
-                >
-                  {p.name || "이름 없음"}
-                  {p.position && (
-                    <span className="ml-1 text-[10px] text-gray-400">
-                      {getPositionGroup(p.position)}
-                    </span>
-                  )}
-                </button>
-              ))}
+              <div className="min-w-[36px] h-9 rounded-full flex items-center justify-center px-2.5 text-[11px] font-bold shadow-md bg-white text-team-700 border-2 border-team-300 whitespace-nowrap">
+                {player.name || "?"}
+              </div>
             </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* 배정된 선수 요약 (읽기 모드) */}
-      {mode === "readonly" && currentFormation && (
-        <div className="text-xs text-gray-500 text-center">
-          {formation} 포메이션 · {Object.keys(currentPositions).length}/{currentFormation.slots.length}명 배정
-        </div>
-      )}
+      {/* 배치 요약 */}
+      <div className="text-xs text-gray-500 text-center">
+        {placedCount}명 배치 · {unassignedPlayers.length}명 미배정
+      </div>
     </div>
   );
 }
