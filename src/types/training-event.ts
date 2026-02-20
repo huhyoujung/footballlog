@@ -124,6 +124,7 @@ export interface SessionEntry {
   requiresTeams: boolean;
   sessionType?: string;
   orderIndex: number;
+  formation?: string | null;
   positions: Record<string, { x: number; y: number }> | null;
   teamAssignments: {
     id: string;
