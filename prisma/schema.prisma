@@ -124,7 +124,7 @@ model Team {
   name         String
   inviteCode   String   @unique @default(cuid())
   logoUrl      String?
-  primaryColor String   @default("#967B5D")
+  primaryColor String   @default("#1D4237")
   vestOrder    String[] @default([])  // 조끼 당번 순서 (사용자 ID 배열)
   eloRating    Float    @default(1000.0) // ELO 레이팅 (초기값 1000)
   createdAt    DateTime @default(now())
@@ -278,14 +278,14 @@ enum LateFeeStatus {
 }
 
 enum MatchStatus {
-  DRAFT           // 초안 (매칭 요청 전)
-  PENDING         // 매칭 요청 중
+  DRAFT           // 인원조사 중 (도전장 발송 전)
+  CHALLENGE_SENT  // 도전장 발송 완료, 상대 응답 대기
   CONFIRMED       // 매칭 확정
   RULES_PENDING   // 룰 합의 중
   RULES_CONFIRMED // 룰 합의 완료
   IN_PROGRESS     // 경기 진행 중
   COMPLETED       // 경기 완료
-  CANCELLED       // 취소됨
+  CANCELLED       // 취소/거절/만료
 }
 
 enum CancellationReason {
@@ -348,6 +348,9 @@ model TrainingEvent {
   teamAScore          Int              @default(0)     // 우리팀 총점
   teamBScore          Int              @default(0)     // 상대팀 총점
   eloRatingChange     Float?           // ELO 레이팅 변화량
+  challengeToken          String?   @unique // 도전장 URL 토큰
+  challengeTokenExpiresAt DateTime?         // 도전장 토큰 만료 시각 (= 응답기한)
+  challengeRejectionReason String?          // 거절 사유
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -436,11 +439,11 @@ model TrainingSession {
   title           String?
   memo            String?  @db.Text
   requiresTeams   Boolean  @default(false)
+  sessionType     String   @default("ALL") // "LINEUP" | "TEAMS" | "ALL"
   orderIndex      Int      @default(0)
 
-  // 친선경기 라인업 (포지션 시각화)
-  formation       String?  // "3-3", "4-4-2", "4-3-3" 등
-  positions       Json?    // { userId: { x: 0.5, y: 0.3, position: "FW" } }
+  // 라인업 선발 (자유 배치)
+  positions       Json?    // { userId: { x: 0.5, y: 0.3 } }
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         rsvpDeadlineOffset: hostEvent.rsvpDeadlineOffset,
         minimumPlayers: hostEvent.minimumPlayers,
         opponentTeamId: user.teamId,
-        matchStatus: 'PENDING',
+        matchStatus: 'CHALLENGE_SENT',
       },
     });
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       data: {
         linkedEventId: opponentEvent.id,
         opponentTeamId: opponentTeamId,
-        matchStatus: 'PENDING',
+        matchStatus: 'CHALLENGE_SENT',
       },
     });
 

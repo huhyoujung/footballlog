@@ -39,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: 'Not your team event' }, { status: 403 });
     }
 
-    if (opponentEvent.matchStatus !== 'PENDING') {
+    if (opponentEvent.matchStatus !== 'CHALLENGE_SENT') {
       return NextResponse.json({ error: 'Match is not pending' }, { status: 400 });
     }
 

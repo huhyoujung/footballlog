@@ -47,6 +47,7 @@ export async function GET(
           orderBy: { checkedInAt: "asc" },
         },
         // 친선경기 관련
+        matchRules: true,
         linkedEvent: {
           select: {
             id: true,
@@ -60,7 +61,6 @@ export async function GET(
         opponentTeam: {
           select: { id: true, name: true, logoUrl: true, eloRating: true },
         },
-        matchRules: true,
         refereeAssignment: {
           include: {
             quarterReferees: {
@@ -257,7 +257,11 @@ export async function PUT(
           sunset: body.weatherData.sunset || null,
         }),
         // 친선경기 정보 업데이트
-        ...(body.isFriendlyMatch !== undefined && { isFriendlyMatch: body.isFriendlyMatch }),
+        ...(body.isFriendlyMatch !== undefined && {
+          isFriendlyMatch: body.isFriendlyMatch,
+          // 일반→친선 전환 시 matchStatus를 DRAFT로 설정 (도전장 발송 가능하도록)
+          ...(!event.isFriendlyMatch && body.isFriendlyMatch && { matchStatus: 'DRAFT' }),
+        }),
         ...(body.minimumPlayers !== undefined && { minimumPlayers: body.minimumPlayers || null }),
         ...(body.rsvpDeadlineOffset !== undefined && { rsvpDeadlineOffset: body.rsvpDeadlineOffset || null }),
         ...(body.opponentTeam !== undefined && { opponentTeamName: body.isFriendlyMatch ? (body.opponentTeam || null) : null }),

@@ -24,7 +24,7 @@ export async function GET(
             { teamId: session.user.teamId!, opponentTeamId: teamId },
             { teamId: teamId, opponentTeamId: session.user.teamId! },
           ],
-          matchStatus: { in: ["PENDING", "CONFIRMED"] },
+          matchStatus: { in: ["CHALLENGE_SENT", "CONFIRMED"] },
         },
       });
 

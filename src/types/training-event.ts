@@ -79,6 +79,13 @@ export interface TrainingEventDetail {
   lateFees?: LateFeeEntry[];
   equipmentAssignments?: EquipmentAssignmentEntry[];
   // 친선경기 관련
+  matchStatus: "DRAFT" | "CHALLENGE_SENT" | "CONFIRMED" | "RULES_PENDING" | "RULES_CONFIRMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  linkedEventId: string | null;
+  opponentTeamId: string | null;
+  opponentTeam: { id: string; name: string; logoUrl: string | null } | null;
+  challengeToken: string | null;
+  challengeTokenExpiresAt: string | null;
+  challengeRejectionReason: string | null;
   matchRules?: MatchRulesEntry | null;
   refereeAssignment?: RefereeAssignmentEntry | null;
   myRsvp: RsvpStatus | null;
@@ -115,9 +122,9 @@ export interface SessionEntry {
   title: string | null;
   memo: string | null;
   requiresTeams: boolean;
+  sessionType?: string;
   orderIndex: number;
-  formation: string | null;
-  positions: Record<string, { x: number; y: number; role: string }> | null;
+  positions: Record<string, { x: number; y: number }> | null;
   teamAssignments: {
     id: string;
     userId: string;
