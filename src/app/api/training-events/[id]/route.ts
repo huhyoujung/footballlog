@@ -55,11 +55,13 @@ export async function GET(
             teamId: true,
             date: true,
             location: true,
+            challengeToken: true,
             team: { select: { id: true, name: true, logoUrl: true } },
+            _count: { select: { rsvps: { where: { status: "ATTEND" } } } },
           },
         },
         opponentTeam: {
-          select: { id: true, name: true, logoUrl: true, eloRating: true },
+          select: { id: true, name: true, logoUrl: true, eloRating: true, primaryColor: true },
         },
         refereeAssignment: {
           include: {
@@ -81,6 +83,13 @@ export async function GET(
           include: {
             playerOut: { select: userSelect },
             playerIn: { select: userSelect },
+            recordedBy: { select: userSelect },
+          },
+          orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+        },
+        cardRecords: {
+          include: {
+            player: { select: userSelect },
             recordedBy: { select: userSelect },
           },
           orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
@@ -108,6 +117,51 @@ export async function GET(
 
     const myRsvp = event.rsvps.find((r) => r.userId === session.user.id);
     const myCheckIn = event.checkIns.find((c) => c.userId === session.user.id);
+
+    // 친선경기 상대팀 이벤트인 경우: host 이벤트의 records를 TEAM_A↔B 플립해서 병합
+    // (linkedEventId 없고 isFriendlyMatch인 경우 = 상대팀으로 수락된 이벤트)
+    if (event.isFriendlyMatch && !event.linkedEventId && event.opponentTeamId) {
+      const hostEvent = await prisma.trainingEvent.findFirst({
+        where: { linkedEventId: event.id },
+        select: {
+          id: true,
+          challengeToken: true,
+          teamAScore: true,
+          teamBScore: true,
+          matchStatus: true,
+          goalRecords: {
+            include: { scorer: { select: userSelect }, assistant: { select: userSelect }, recordedBy: { select: userSelect } },
+            orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+          },
+          playerSubstitutions: {
+            include: { playerOut: { select: userSelect }, playerIn: { select: userSelect }, recordedBy: { select: userSelect } },
+            orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+          },
+          cardRecords: {
+            include: { player: { select: userSelect }, recordedBy: { select: userSelect } },
+            orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+          },
+        },
+      });
+
+      if (hostEvent) {
+        const flip = (side: "TEAM_A" | "TEAM_B") => (side === "TEAM_A" ? "TEAM_B" : "TEAM_A");
+        return NextResponse.json({
+          ...event,
+          sessions: (event as any).sessions || [],
+          myRsvp: myRsvp?.status || null,
+          myCheckIn: myCheckIn?.checkedInAt || null,
+          // 상대팀 관점: 우리팀=TEAM_A, 상대=TEAM_B → host 이벤트 TEAM_A↔B 뒤집기
+          challengeToken: hostEvent.challengeToken, // 리다이렉트용 호스트 토큰
+          teamAScore: hostEvent.teamBScore,
+          teamBScore: hostEvent.teamAScore,
+          matchStatus: hostEvent.matchStatus,
+          goalRecords: hostEvent.goalRecords.map((r) => ({ ...r, scoringTeam: flip(r.scoringTeam as "TEAM_A" | "TEAM_B") })),
+          playerSubstitutions: hostEvent.playerSubstitutions.map((r) => ({ ...r, teamSide: flip(r.teamSide as "TEAM_A" | "TEAM_B") })),
+          cardRecords: hostEvent.cardRecords.map((r) => ({ ...r, teamSide: flip(r.teamSide as "TEAM_A" | "TEAM_B") })),
+        });
+      }
+    }
 
     return NextResponse.json({
       ...event,
@@ -265,6 +319,7 @@ export async function PUT(
         ...(body.minimumPlayers !== undefined && { minimumPlayers: body.minimumPlayers || null }),
         ...(body.rsvpDeadlineOffset !== undefined && { rsvpDeadlineOffset: body.rsvpDeadlineOffset || null }),
         ...(body.opponentTeam !== undefined && { opponentTeamName: body.isFriendlyMatch ? (body.opponentTeam || null) : null }),
+        ...(body.opponentTeamId !== undefined && { opponentTeamId: body.isFriendlyMatch ? (body.opponentTeamId || null) : null }),
       },
     });
 
