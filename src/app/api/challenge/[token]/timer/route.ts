@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildPhases } from "@/lib/match-phases";
 
 type TimerAction = "start" | "pause" | "next" | "prev";
 
@@ -83,7 +84,12 @@ export async function POST(
       return NextResponse.json({ error: "기록 권한이 없습니다" }, { status: 403 });
     }
 
-    const { action } = (await req.json()) as { action: TimerAction };
+    const body = await req.json().catch(() => ({}));
+    const { action } = body as { action: unknown };
+    const validActions = ["start", "pause", "next", "prev"];
+    if (!action || !validActions.includes(action as string)) {
+      return NextResponse.json({ error: "유효하지 않은 action" }, { status: 400 });
+    }
     const rules = event.matchRules;
     const now = new Date();
     const isRunning = rules.timerStartedAt !== null;
@@ -128,6 +134,15 @@ export async function POST(
       }
 
       case "next": {
+        const phases = buildPhases(
+          rules.quarterCount,
+          rules.quarterMinutes,
+          rules.quarterBreak,
+          rules.halftime
+        );
+        if (rules.currentPhase >= phases.length) {
+          return NextResponse.json({ error: "이미 마지막 페이즈입니다" }, { status: 400 });
+        }
         const newPhase = rules.currentPhase + 1;
         updateData = {
           timerElapsedSec: 0,
