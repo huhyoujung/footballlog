@@ -1,5 +1,3 @@
-// Prisma schema for Football Log
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,22 +8,20 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// NextAuth.js 모델
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -46,193 +42,161 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// 앱 모델
-enum Role {
-  ADMIN
-  MEMBER
-}
-
 model User {
-  id                 String    @id @default(cuid())
-  name               String?
-  email              String?   @unique
-  emailVerified      DateTime?
-  image              String?
-  role               Role      @default(MEMBER)
-  teamId             String?
-  position           String?
-  number             Int?
-  isEquipmentManager Boolean   @default(false)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  // 관계
-  team         Team?         @relation(fields: [teamId], references: [id])
-  accounts     Account[]
-  sessions     Session[]
-  trainingLogs TrainingLog[]
-  comments     Comment[]
-  likes             Like[]
-  pushSubscriptions PushSubscription[]
-  nudgesSent        Nudge[]       @relation("NudgeSender")
-  nudgesReceived    Nudge[]       @relation("NudgeRecipient")
-  createdTeam       Team?         @relation("CreatedBy")
-
-  // 팀 운동 관계
-  createdTrainingEvents  TrainingEvent[]         @relation("TrainingEventCreator")
-  vestBringerEvents      TrainingEvent[]         @relation("VestBringer")
-  vestReceiverEvents     TrainingEvent[]         @relation("VestReceiver")
-  rsvps                  Rsvp[]
-  checkIns               CheckIn[]
-  lateFees               LateFee[]
-  sessionTeamAssignments SessionTeamAssignment[]
-  equipmentAssignments   EquipmentAssignment[]
-  managedEquipments      Equipment[]             @relation("EquipmentManagers")
-  taggedInLogs           TrainingLog[]           @relation("TaggedInLogs")
-  pomVotesCast           PomVote[]               @relation("PomVoter")
-  pomVotesReceived       PomVote[]               @relation("PomNominee")
-
-  // 친선경기 관계
+  id                        String                  @id @default(cuid())
+  name                      String?
+  email                     String?                 @unique
+  emailVerified             DateTime?
+  image                     String?
+  role                      Role                    @default(MEMBER)
+  teamId                    String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  number                    Int?
+  position                  String?
+  isEquipmentManager        Boolean                 @default(false)
+  aiInsights                AIInsight[]
+  accounts                  Account[]
+  checkIns                  CheckIn[]
+  comments                  Comment[]
+  equipmentAssignments      EquipmentAssignment[]
+  feedbacks                 Feedback[]
+  cardsReceived             CardRecord[]            @relation("CardPlayer")
+  cardsRecorded             CardRecord[]            @relation("CardRecorder")
+  goalsAssisted             GoalRecord[]            @relation("GoalAssistant")
+  goalsRecorded             GoalRecord[]            @relation("GoalRecorder")
+  goalsScored               GoalRecord[]            @relation("GoalScorer")
+  lateFees                  LateFee[]
+  likes                     Like[]
+  sentNotes                 LockerNote[]            @relation("SentNotes")
+  receivedNotes             LockerNote[]            @relation("ReceivedNotes")
+  nudgesReceived            Nudge[]                 @relation("NudgeRecipient")
+  nudgesSent                Nudge[]                 @relation("NudgeSender")
+  substitutionsIn           PlayerSubstitution[]    @relation("PlayerIn")
+  substitutionsOut          PlayerSubstitution[]    @relation("PlayerOut")
+  substitutionsRecorded     PlayerSubstitution[]    @relation("SubstitutionRecorder")
+  pomVotesReceived          PomVote[]               @relation("PomNominee")
+  pomVotesCast              PomVote[]               @relation("PomVoter")
+  pushSubscriptions         PushSubscription[]
   quarterRefereeAssignments QuarterReferee[]
-  goalsScored               GoalRecord[]           @relation("GoalScorer")
-  goalsAssisted             GoalRecord[]           @relation("GoalAssistant")
-  goalsRecorded             GoalRecord[]           @relation("GoalRecorder")
-  substitutionsOut          PlayerSubstitution[]   @relation("PlayerOut")
-  substitutionsIn           PlayerSubstitution[]   @relation("PlayerIn")
-  substitutionsRecorded     PlayerSubstitution[]   @relation("SubstitutionRecorder")
+  rsvps                     Rsvp[]
+  sessions                  Session[]
+  sessionTeamAssignments    SessionTeamAssignment[]
+  createdTeam               Team?                   @relation("CreatedBy")
+  createdTrainingEvents     TrainingEvent[]         @relation("TrainingEventCreator")
+  vestBringerEvents         TrainingEvent[]         @relation("VestBringer")
+  vestReceiverEvents        TrainingEvent[]         @relation("VestReceiver")
+  trainingEventComments     TrainingEventComment[]
+  trainingLogs              TrainingLog[]
+  team                      Team?                   @relation(fields: [teamId], references: [id])
+  managedEquipments         Equipment[]             @relation("EquipmentManagers")
+  taggedInLogs              TrainingLog[]           @relation("TaggedInLogs")
 
-  // 락커 쪽지 관계
-  sentNotes     LockerNote[] @relation("SentNotes")
-  receivedNotes LockerNote[] @relation("ReceivedNotes")
-
-  // 피드백 관계
-  feedbacks Feedback[]
-
-  // 팀 운동 댓글 관계
-  trainingEventComments TrainingEventComment[]
-
-  // AI 인사이트 관계
-  aiInsights AIInsight[]
-
-  // 인덱스 - 팀별 조회 성능 최적화
   @@index([teamId])
   @@index([teamId, isEquipmentManager])
 }
 
 model Team {
-  id           String   @id @default(cuid())
-  name         String
-  inviteCode   String   @unique @default(cuid())
-  logoUrl      String?
-  primaryColor String   @default("#1D4237")
-  vestOrder    String[] @default([])  // 조끼 당번 순서 (사용자 ID 배열)
-  eloRating    Float    @default(1000.0) // ELO 레이팅 (초기값 1000)
-  createdAt    DateTime @default(now())
-  createdBy    String   @unique
-
-  // 관계
-  creator            User             @relation("CreatedBy", fields: [createdBy], references: [id])
-  members            User[]
-  nudges             Nudge[]
-  trainingEvents     TrainingEvent[]
-  opponentEvents     TrainingEvent[] @relation("OpponentTeam")
-  venues             Venue[]
-  equipments         Equipment[]
-  uniforms           Uniform[]
-  aiInsights         AIInsight[]
+  id             String          @id @default(cuid())
+  name           String
+  inviteCode     String          @unique @default(cuid())
+  createdAt      DateTime        @default(now())
+  createdBy      String          @unique
+  logoUrl        String?
+  primaryColor   String          @default("#967B5D")
+  vestOrder      String[]        @default([])
+  eloRating      Float           @default(1000.0)
+  aiInsights     AIInsight[]
+  equipments     Equipment[]
+  nudges         Nudge[]
+  creator        User            @relation("CreatedBy", fields: [createdBy], references: [id])
+  opponentEvents TrainingEvent[] @relation("OpponentTeam")
+  trainingEvents TrainingEvent[]
+  uniforms       Uniform[]
+  members        User[]
+  venues         Venue[]
 }
 
 model Uniform {
   id        String   @id @default(cuid())
   teamId    String
-  name      String   // 예: "홈", "원정", "3rd"
-  color     String   // HEX color code (예: "#FF0000")
+  name      String
+  color     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, name])
   @@index([teamId])
 }
 
 model Venue {
-  id              String   @id @default(cuid())
-  teamId          String
-  name            String
-  address         String?
-  mapUrl          String?  // 네이버 지도 URL
-  latitude        Float?   // 위도
-  longitude       Float?   // 경도
-  surface         String?
-  recommendedShoes String[] @default([])
-  usageCount      Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  team            Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  trainingEvents  TrainingEvent[]
+  id               String          @id @default(cuid())
+  teamId           String
+  name             String
+  address          String?
+  surface          String?
+  recommendedShoes String[]        @default([])
+  usageCount       Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  latitude         Float?
+  longitude        Float?
+  mapUrl           String?
+  trainingEvents   TrainingEvent[]
+  team             Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, name])
 }
 
 model TrainingLog {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   userId          String
-  trainingEventId String?  // 팀 운동 연결 (nullable)
-  title           String?  // 개인 운동 제목 (nullable)
   trainingDate    DateTime
-  condition       Int      // 0-10
-  conditionReason String   @db.Text
-  keyPoints       String   @db.Text
-  improvement     String   @db.Text
-  notes           String?  @db.Text // 기타 메모 (선택)
+  condition       Int
+  conditionReason String
+  keyPoints       String
+  improvement     String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   imageUrl        String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  title           String?
+  trainingEventId String?
+  notes           String?
+  comments        Comment[]
+  likes           Like[]
+  lockerNotes     LockerNote[]   @relation("LockerNotes")
+  trainingEvent   TrainingEvent? @relation(fields: [trainingEventId], references: [id])
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taggedUsers     User[]         @relation("TaggedInLogs")
 
-  // 관계
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trainingEvent TrainingEvent? @relation(fields: [trainingEventId], references: [id], onDelete: SetNull)
-  comments      Comment[]
-  likes         Like[]
-  taggedUsers   User[]         @relation("TaggedInLogs")
-  lockerNotes   LockerNote[]   @relation("LockerNotes")
-
-  // 인덱스 - 피드 조회 성능 최적화
   @@index([userId, createdAt(sort: Desc)])
   @@index([trainingEventId])
 }
 
 model Comment {
-  id            String   @id @default(cuid())
-  content       String   @db.Text
-  mentions      String[] @default([])  // 멘션된 유저 ID 배열
+  id            String      @id @default(cuid())
+  content       String
   userId        String
   trainingLogId String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  mentions      String[]    @default([])
+  trainingLog   TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // 관계
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trainingLog TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
-
-  // 인덱스 - 댓글 조회 성능 최적화
   @@index([trainingLogId, createdAt])
 }
 
 model Like {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   userId        String
   trainingLogId String
-  createdAt     DateTime @default(now())
-
-  // 관계
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trainingLog TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  trainingLog   TrainingLog @relation(fields: [trainingLogId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trainingLogId])
-  // 인덱스 - 좋아요 조회 성능 최적화
   @@index([trainingLogId])
 }
 
@@ -243,8 +207,7 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, endpoint])
 }
@@ -255,162 +218,115 @@ model Nudge {
   recipientId String
   teamId      String
   createdAt   DateTime @default(now())
+  recipient   User     @relation("NudgeRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender      User     @relation("NudgeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  sender    User @relation("NudgeSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient User @relation("NudgeRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
-  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  // 인덱스 - 닦달 조회 성능 최적화
   @@index([teamId, createdAt(sort: Desc)])
 }
 
-// === 팀 운동 ===
-
-enum RsvpStatus {
-  ATTEND
-  ABSENT
-  LATE
-}
-
-enum LateFeeStatus {
-  PENDING
-  PAID
-}
-
-enum MatchStatus {
-  DRAFT           // 인원조사 중 (도전장 발송 전)
-  CHALLENGE_SENT  // 도전장 발송 완료, 상대 응답 대기
-  CONFIRMED       // 매칭 확정
-  RULES_PENDING   // 룰 합의 중
-  RULES_CONFIRMED // 룰 합의 완료
-  IN_PROGRESS     // 경기 진행 중
-  COMPLETED       // 경기 완료
-  CANCELLED       // 취소/거절/만료
-}
-
-enum CancellationReason {
-  INSUFFICIENT_PLAYERS  // 인원 부족
-  WEATHER              // 날씨
-  VENUE_UNAVAILABLE    // 장소 문제
-  OTHER                // 기타
-}
-
-enum TeamSide {
-  TEAM_A  // 호스트팀
-  TEAM_B  // 상대팀
-}
-
 model TrainingEvent {
-  id                  String    @id @default(cuid())
-  teamId              String
-  createdById         String
-  title               String
-  isRegular           Boolean   @default(true)
-  enablePomVoting     Boolean   @default(true)
-  pomVotingDeadline   DateTime?
-  pomVotesPerPerson   Int       @default(1)
-  date                DateTime
-  location            String
-  venueId             String?
-  shoes               String[]  @default([])
-  uniform             String?   @db.Text
-  notes               String?   @db.Text
-  vestBringerId       String?
-  vestReceiverId      String?
-  rsvpDeadline        DateTime
-  weather             String?   // 날씨 상태 (Clear, Clouds, Rain, Snow 등)
-  weatherDescription  String?   // 날씨 설명 (맑음, 흐림, 비 등)
-  temperature         Float?    // 온도 (섭씨)
-  minTempC            Float?    // 일 최저기온 (섭씨)
-  maxTempC            Float?    // 일 최고기온 (섭씨)
-  feelsLikeC          Float?    // 체감온도 (섭씨)
-  precipMm            Float?    // 강수량 (mm)
-  chanceOfRain        Int?      // 강수 확률 (%)
-  windKph             Float?    // 풍속 (km/h)
-  uvIndex             Float?    // 자외선 지수 (0-11+)
-  airQualityIndex     Int?      // 대기질 지수 (AQI, 1-500)
-  pm25                Float?    // 미세먼지 PM2.5 (μg/m³)
-  pm10                Float?    // 미세먼지 PM10 (μg/m³)
-  sunrise             String?   // 일출 시간 (HH:MM AM/PM 형식)
-  sunset              String?   // 일몰 시간 (HH:MM AM/PM 형식)
+  id                       String                 @id @default(cuid())
+  teamId                   String
+  createdById              String
+  date                     DateTime
+  location                 String
+  uniform                  String?
+  vestBringerId            String?
+  vestReceiverId           String?
+  rsvpDeadline             DateTime
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  isRegular                Boolean                @default(true)
+  title                    String
+  notes                    String?
+  shoes                    String[]               @default([])
+  venueId                  String?
+  enablePomVoting          Boolean                @default(true)
+  pomVotesPerPerson        Int                    @default(1)
+  pomVotingDeadline        DateTime?
+  temperature              Float?
+  weather                  String?
+  weatherDescription       String?
+  airQualityIndex          Int?
+  pm10                     Float?
+  pm25                     Float?
+  chanceOfRain             Int?
+  feelsLikeC               Float?
+  precipMm                 Float?
+  uvIndex                  Float?
+  windKph                  Float?
+  sunrise                  String?
+  sunset                   String?
+  maxTempC                 Float?
+  minTempC                 Float?
+  cancellationReason       CancellationReason?
+  cancelled                Boolean                @default(false)
+  convertedFromMatch       Boolean                @default(false)
+  eloRatingChange          Float?
+  isFriendlyMatch          Boolean                @default(false)
+  linkedEventId            String?                @unique
+  matchStatus              MatchStatus            @default(DRAFT)
+  minimumPlayers           Int?
+  opponentTeamId           String?
+  rsvpDeadlineOffset       Int?
+  teamAScore               Int                    @default(0)
+  teamBScore               Int                    @default(0)
+  opponentTeamName         String?
+  challengeToken           String?                @unique
+  challengeTokenExpiresAt  DateTime?
+  challengeRejectionReason String?
+  checkIns                 CheckIn[]
+  equipmentAssignments     EquipmentAssignment[]
+  cardRecords              CardRecord[]
+  goalRecords              GoalRecord[]
+  lateFees                 LateFee[]
+  lockerNotes              LockerNote[]
+  matchRules               MatchRules?
+  playerSubstitutions      PlayerSubstitution[]
+  pomVotes                 PomVote[]
+  refereeAssignment        RefereeAssignment?
+  rsvps                    Rsvp[]
+  createdBy                User                   @relation("TrainingEventCreator", fields: [createdById], references: [id])
+  linkedEvent              TrainingEvent?         @relation("FriendlyPair", fields: [linkedEventId], references: [id])
+  linkedByEvent            TrainingEvent?         @relation("FriendlyPair")
+  opponentTeam             Team?                  @relation("OpponentTeam", fields: [opponentTeamId], references: [id])
+  team                     Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  venue                    Venue?                 @relation(fields: [venueId], references: [id])
+  vestBringer              User?                  @relation("VestBringer", fields: [vestBringerId], references: [id])
+  vestReceiver             User?                  @relation("VestReceiver", fields: [vestReceiverId], references: [id])
+  comments                 TrainingEventComment[]
+  trainingLogs             TrainingLog[]
+  sessions                 TrainingSession[]
 
-  // === 친선경기 관련 필드 ===
-  isFriendlyMatch     Boolean          @default(false)
-  minimumPlayers      Int?             // 최소 인원
-  rsvpDeadlineOffset  Int?             // RSVP 마감 오프셋 (예: -7, -5, -3, -1일 전)
-  linkedEventId       String?          @unique // 상대팀 TrainingEvent ID
-  opponentTeamId      String?          // 상대팀 ID
-  opponentTeamName    String?          // 상대팀 이름 (자유 입력)
-  matchStatus         MatchStatus      @default(DRAFT)
-  cancelled           Boolean          @default(false)
-  cancellationReason  CancellationReason?
-  convertedFromMatch  Boolean          @default(false) // 친선경기에서 팀 운동으로 전환됨
-  teamAScore          Int              @default(0)     // 우리팀 총점
-  teamBScore          Int              @default(0)     // 상대팀 총점
-  eloRatingChange     Float?           // ELO 레이팅 변화량
-  challengeToken          String?   @unique // 도전장 URL 토큰
-  challengeTokenExpiresAt DateTime?         // 도전장 토큰 만료 시각 (= 응답기한)
-  challengeRejectionReason String?          // 거절 사유
-
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  team                 Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  venue                Venue?                @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  createdBy            User                  @relation("TrainingEventCreator", fields: [createdById], references: [id])
-  vestBringer          User?                 @relation("VestBringer", fields: [vestBringerId], references: [id])
-  vestReceiver         User?                 @relation("VestReceiver", fields: [vestReceiverId], references: [id])
-  rsvps                Rsvp[]
-  checkIns             CheckIn[]
-  lateFees             LateFee[]
-  sessions             TrainingSession[]
-  equipmentAssignments EquipmentAssignment[]
-  trainingLogs         TrainingLog[]
-  pomVotes             PomVote[]
-
-  // 친선경기 관계
-  linkedEvent          TrainingEvent?        @relation("FriendlyPair", fields: [linkedEventId], references: [id], onDelete: SetNull)
-  linkedByEvent        TrainingEvent?        @relation("FriendlyPair")
-  opponentTeam         Team?                 @relation("OpponentTeam", fields: [opponentTeamId], references: [id], onDelete: SetNull)
-  matchRules           MatchRules?
-  refereeAssignment    RefereeAssignment?
-  goalRecords          GoalRecord[]
-  playerSubstitutions  PlayerSubstitution[]
-  lockerNotes          LockerNote[]
-  comments             TrainingEventComment[]
-
-  // 인덱스 - 팀 운동 조회 성능 최적화
   @@index([teamId, date(sort: Desc)])
   @@index([isFriendlyMatch, matchStatus])
 }
 
 model Rsvp {
-  id              String     @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
   userId          String
   status          RsvpStatus
-  reason          String?    @db.Text
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, userId])
-  // 인덱스 - RSVP 조회 성능 최적화
   @@index([trainingEventId])
   @@index([userId, status])
 }
 
 model CheckIn {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
   userId          String
-  checkedInAt     DateTime @default(now())
-  isLate          Boolean  @default(false)
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkedInAt     DateTime      @default(now())
+  isLate          Boolean       @default(false)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, userId])
   @@index([trainingEventId])
@@ -425,142 +341,113 @@ model LateFee {
   status          LateFeeStatus @default(PENDING)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingEventId, userId])
   @@index([trainingEventId])
 }
 
 model TrainingSession {
-  id              String   @id @default(cuid())
+  id              String                  @id @default(cuid())
   trainingEventId String
   title           String?
-  memo            String?  @db.Text
-  requiresTeams   Boolean  @default(false)
-  sessionType     String   @default("ALL") // "LINEUP" | "TEAMS" | "ALL"
-  orderIndex      Int      @default(0)
-
-  // 라인업 선발 (자유 배치)
-  positions       Json?    // { userId: { x: 0.5, y: 0.3 } }
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  trainingEvent   TrainingEvent           @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  memo            String?
+  orderIndex      Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  requiresTeams   Boolean                 @default(false)
+  formation       String?
+  positions       Json?
+  sessionType     String                  @default("ALL")
   teamAssignments SessionTeamAssignment[]
+  trainingEvent   TrainingEvent           @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 }
 
 model SessionTeamAssignment {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
   trainingSessionId String
   userId            String
   teamLabel         String
-  createdAt         DateTime @default(now())
-
-  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  trainingSession   TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([trainingSessionId, userId])
   @@index([trainingSessionId])
 }
 
-// === 장비 관리 ===
-
 model Equipment {
-  id          String   @id @default(cuid())
+  id          String                @id @default(cuid())
   teamId      String
   name        String
   description String?
-  orderIndex  Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  orderIndex  Int                   @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
   team        Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  managers    User[]                @relation("EquipmentManagers")
   assignments EquipmentAssignment[]
+  managers    User[]                @relation("EquipmentManagers")
 
   @@unique([teamId, name])
 }
 
 model EquipmentAssignment {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
   equipmentId     String
   userId          String?
-  memo            String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  equipment     Equipment     @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  user          User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  memo            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  equipment       Equipment     @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  user            User?         @relation(fields: [userId], references: [id])
 
   @@unique([trainingEventId, equipmentId])
   @@index([trainingEventId])
 }
 
-// === POM (Player of the Match) ===
-
 model PomVote {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
-  voterId         String   // 투표한 사람
-  nomineeId       String   // 선택된 사람
-  reason          String   @db.Text // 어떤 플레이가 좋았는지
-  tags            String[] @default([]) // 스탯 태그 (공격, 수비, 패스 등)
-  createdAt       DateTime @default(now())
+  voterId         String
+  nomineeId       String
+  reason          String
+  createdAt       DateTime      @default(now())
+  tags            String[]      @default([])
+  nominee         User          @relation("PomNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  voter           User          @relation("PomVoter", fields: [voterId], references: [id], onDelete: Cascade)
 
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  voter         User          @relation("PomVoter", fields: [voterId], references: [id], onDelete: Cascade)
-  nominee       User          @relation("PomNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
-
-  @@unique([trainingEventId, voterId, nomineeId]) // 한 이벤트당 같은 사람에게 중복 투표 방지
+  @@unique([trainingEventId, voterId, nomineeId])
   @@index([trainingEventId])
   @@index([nomineeId])
-}
-
-// === 친선경기 시스템 ===
-
-enum RuleTemplate {
-  FUTSAL          // 풋살 기본 (4쿼터 x 12분, 백패스X, 오프사이드X)
-  ELEVEN_HALVES   // 11인제 전후반 (2쿼터 x 45분, 백패스O, 오프사이드O)
-  CUSTOM          // 커스텀 룰
 }
 
 model MatchRules {
   id              String        @id @default(cuid())
   trainingEventId String        @unique
   template        RuleTemplate  @default(CUSTOM)
+  kickoffTime     String?
   quarterCount    Int           @default(4)
   quarterMinutes  Int           @default(12)
-  quarterBreak    Int           @default(2)  // 쿼터 간 휴식 (분)
-  halftime        Int           @default(5)  // 하프타임 휴식 (분, 2쿼터 후)
-  playersPerSide  Int           @default(6)  // 한 팀당 인원
-  allowBackpass   Boolean       @default(false)
-  allowOffside    Boolean       @default(false)
-  agreedByTeamA   Boolean       @default(false)
+  quarterBreak    Int           @default(2)
+  halftime        Int           @default(5)
+  playersPerSide  Int           @default(6)
+  allowBackpass       Boolean       @default(false)
+  allowOffside        Boolean       @default(false)
+  quarterRefereeTeams Json?
+  agreedByTeamA       Boolean       @default(false)
   agreedByTeamB   Boolean       @default(false)
+  currentPhase    Int       @default(0)   // 0=시작전, 1=1Q, 2=휴식/하프타임, 3=2Q ...
+  timerStartedAt  DateTime?               // null이면 정지 상태
+  timerElapsedSec Int       @default(0)   // 정지 시점까지 누적 초
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 
   @@index([trainingEventId])
-}
-
-enum AssignmentStatus {
-  DRAFT             // 초안 (자동 배정)
-  PENDING_APPROVAL  // 승인 대기 중
-  CONFIRMED         // 양팀 합의 완료
-}
-
-enum TimerStatus {
-  IDLE     // 시작 전
-  RUNNING  // 진행 중
-  PAUSED   // 일시정지
-  ENDED    // 종료
 }
 
 model RefereeAssignment {
@@ -571,28 +458,26 @@ model RefereeAssignment {
   approvedByTeamB Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-
-  trainingEvent   TrainingEvent   @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
   quarterReferees QuarterReferee[]
+  trainingEvent   TrainingEvent    @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 
   @@index([trainingEventId])
 }
 
 model QuarterReferee {
-  id             String      @id @default(cuid())
+  id             String            @id @default(cuid())
   assignmentId   String
-  quarter        Int         // 1, 2, 3, 4
+  quarter        Int
   userId         String
-  teamSide       TeamSide    // 심판이 속한 팀
   startedAt      DateTime?
   endedAt        DateTime?
-  timerStatus    TimerStatus @default(IDLE)
-  elapsedSeconds Int         @default(0)  // 누적 경과 시간 (초)
-  lastResumedAt  DateTime?               // 마지막 시작/재개 시각
-  createdAt      DateTime    @default(now())
-
-  assignment RefereeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  teamSide       TeamSide
+  elapsedSeconds Int               @default(0)
+  lastResumedAt  DateTime?
+  timerStatus    TimerStatus       @default(IDLE)
+  assignment     RefereeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, quarter])
   @@index([assignmentId])
@@ -600,154 +485,216 @@ model QuarterReferee {
 }
 
 model GoalRecord {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
-  quarter         Int      // 1, 2, 3, 4
-  scoringTeam     TeamSide // 득점한 팀
-  scorerId        String?  // 득점자 (nullable - 자책골 등)
-  assistId        String?  // 도움 (nullable)
-  recordedById    String   // 기록한 사람 (벤치 멤버)
-  minute          Int?     // 득점 시간 (쿼터 내 분)
-  isOwnGoal       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  scorer        User?         @relation("GoalScorer", fields: [scorerId], references: [id], onDelete: SetNull)
-  assistant     User?         @relation("GoalAssistant", fields: [assistId], references: [id], onDelete: SetNull)
-  recordedBy    User          @relation("GoalRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+  quarter         Int
+  scorerId        String?
+  assistId        String?
+  recordedById    String
+  minute          Int?
+  isOwnGoal       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  scoringTeam     TeamSide
+  assistant       User?         @relation("GoalAssistant", fields: [assistId], references: [id])
+  recordedBy      User          @relation("GoalRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+  scorer          User?         @relation("GoalScorer", fields: [scorerId], references: [id])
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 
   @@index([trainingEventId, quarter])
 }
 
 model PlayerSubstitution {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trainingEventId String
-  quarter         Int      // 1, 2, 3, 4
-  teamSide        TeamSide // 교체가 발생한 팀
-  playerOutId     String   // 나간 선수
-  playerInId      String   // 들어온 선수
-  recordedById    String   // 기록한 사람 (체크인한 사람 누구나)
-  minute          Int?     // 교체 시간 (쿼터 내 분)
-  createdAt       DateTime @default(now())
-
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
-  playerOut     User          @relation("PlayerOut", fields: [playerOutId], references: [id], onDelete: Cascade)
-  playerIn      User          @relation("PlayerIn", fields: [playerInId], references: [id], onDelete: Cascade)
-  recordedBy    User          @relation("SubstitutionRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+  quarter         Int
+  playerOutId     String?
+  playerInId      String?
+  recordedById    String
+  minute          Int?
+  createdAt       DateTime      @default(now())
+  teamSide        TeamSide
+  playerIn        User?         @relation("PlayerIn", fields: [playerInId], references: [id], onDelete: SetNull)
+  playerOut       User?         @relation("PlayerOut", fields: [playerOutId], references: [id], onDelete: SetNull)
+  recordedBy      User          @relation("SubstitutionRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 
   @@index([trainingEventId, quarter])
   @@index([playerOutId])
   @@index([playerInId])
 }
 
-// === 락커 칭찬 쪽지 ===
-
 model LockerNote {
-  id          String   @id @default(cuid())
-  content     String   @db.Text // 쪽지 내용
-  color       String   // 포스트잇 색상 (hex)
-  rotation    Float    @default(0) // 회전 각도 (-3 ~ +3)
-  positionX   Float    @default(0) // X 좌표 (0-1 정규화)
-  positionY   Float    @default(0) // Y 좌표 (0-1 정규화)
-  isAnonymous Boolean  @default(false)
-  tags        String[] // 축구 스탯 태그 (공격, 패스, 수비 등)
+  id              String         @id @default(cuid())
+  content         String
+  color           String
+  rotation        Float          @default(0)
+  positionX       Float          @default(0)
+  positionY       Float          @default(0)
+  isAnonymous     Boolean        @default(false)
+  authorId        String
+  recipientId     String
+  trainingEventId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  tags            String[]
+  trainingLogId   String?
+  author          User           @relation("SentNotes", fields: [authorId], references: [id], onDelete: Cascade)
+  recipient       User           @relation("ReceivedNotes", fields: [recipientId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent? @relation(fields: [trainingEventId], references: [id])
+  trainingLog     TrainingLog?   @relation("LockerNotes", fields: [trainingLogId], references: [id])
 
-  authorId    String
-  author      User     @relation("SentNotes", fields: [authorId], references: [id], onDelete: Cascade)
-
-  recipientId String
-  recipient   User     @relation("ReceivedNotes", fields: [recipientId], references: [id], onDelete: Cascade)
-
-  trainingEventId String?  // 팀 운동 연결 (선택)
-  trainingEvent   TrainingEvent? @relation(fields: [trainingEventId], references: [id], onDelete: SetNull)
-
-  trainingLogId String?  // 개인 운동일지 연결 (선택)
-  trainingLog   TrainingLog? @relation("LockerNotes", fields: [trainingLogId], references: [id], onDelete: SetNull)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // 인덱스 - 락커 조회 성능 최적화
   @@index([recipientId, createdAt(sort: Desc)])
   @@index([authorId])
   @@index([trainingLogId])
-}
-
-// === 피드백 ===
-
-enum FeedbackType {
-  FEATURE_REQUEST  // 기능 제안
-  BUG_REPORT       // 버그 신고
-  IMPROVEMENT      // 개선 제안
-  OTHER            // 기타
-}
-
-enum FeedbackStatus {
-  NEW         // 새로운 피드백
-  IN_REVIEW   // 검토 중
-  PLANNED     // 계획됨
-  IN_PROGRESS // 진행 중
-  COMPLETED   // 완료
-  REJECTED    // 거절됨
 }
 
 model Feedback {
   id        String         @id @default(cuid())
   type      FeedbackType
   title     String
-  content   String         @db.Text
+  content   String
   status    FeedbackStatus @default(NEW)
   userId    String?
-  user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userEmail String?        // 사용자 이메일 (비로그인 시 직접 입력)
-  userName  String?        // 사용자 이름 (비로그인 시 직접 입력)
+  userEmail String?
+  userName  String?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+  user      User?          @relation(fields: [userId], references: [id])
 
   @@index([status, createdAt(sort: Desc)])
   @@index([userId])
 }
 
-// 팀 운동 댓글
 model TrainingEventComment {
   id              String        @id @default(cuid())
-  content         String        @db.Text
+  content         String
   authorId        String
   trainingEventId String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-
-  author        User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  trainingEvent TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
 
   @@index([trainingEventId, createdAt(sort: Desc)])
   @@index([authorId])
 }
 
-// === AI 인사이트 ===
-
-enum InsightType {
-  PERSONAL  // 개인 누적 인사이트
-  TEAM      // 팀 인사이트
-}
-
-// AI 인사이트 저장
 model AIInsight {
   id        String      @id @default(cuid())
   type      InsightType
-  content   String      @db.Text // AI가 생성한 인사이트 내용 (마크다운)
-  userId    String?     // 개인 인사이트의 경우
-  teamId    String?     // 팀 인사이트의 경우
-  dateOnly  String      // YYYY-MM-DD 형식 (하루 1번 제한용)
+  content   String
+  userId    String?
+  teamId    String?
+  dateOnly  String
   createdAt DateTime    @default(now())
+  team      Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  // 개인 인사이트: userId + dateOnly로 유일
-  // 팀 인사이트: teamId + dateOnly로 유일
   @@unique([userId, dateOnly])
   @@unique([teamId, dateOnly])
   @@index([userId, createdAt(sort: Desc)])
   @@index([teamId, createdAt(sort: Desc)])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum RsvpStatus {
+  ATTEND
+  ABSENT
+  LATE
+}
+
+enum LateFeeStatus {
+  PENDING
+  PAID
+}
+
+enum MatchStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  RULES_PENDING
+  RULES_CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  CHALLENGE_SENT
+}
+
+enum CancellationReason {
+  INSUFFICIENT_PLAYERS
+  WEATHER
+  VENUE_UNAVAILABLE
+  OTHER
+}
+
+enum TeamSide {
+  TEAM_A
+  TEAM_B
+}
+
+enum RuleTemplate {
+  FUTSAL
+  ELEVEN_HALVES
+  CUSTOM
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  CONFIRMED
+}
+
+enum TimerStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  ENDED
+}
+
+enum FeedbackType {
+  FEATURE_REQUEST
+  BUG_REPORT
+  IMPROVEMENT
+  OTHER
+}
+
+enum FeedbackStatus {
+  NEW
+  IN_REVIEW
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum InsightType {
+  PERSONAL
+  TEAM
+}
+
+enum CardType {
+  YELLOW
+  RED
+}
+
+model CardRecord {
+  id              String        @id @default(cuid())
+  trainingEventId String
+  quarter         Int
+  minute          Int?
+  playerId        String?
+  cardType        CardType      @default(YELLOW)
+  teamSide        TeamSide
+  recordedById    String
+  createdAt       DateTime      @default(now())
+
+  trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
+  player          User?         @relation("CardPlayer", fields: [playerId], references: [id], onDelete: SetNull)
+  recordedBy      User          @relation("CardRecorder", fields: [recordedById], references: [id])
+
+  @@index([trainingEventId, quarter])
 }
