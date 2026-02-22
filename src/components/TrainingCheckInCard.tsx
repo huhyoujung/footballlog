@@ -27,19 +27,12 @@ export default function TrainingCheckInCard({
   const [submitting, setSubmitting] = useState(false);
   const { playSound } = useSound();
 
-  const { message, isPast } = getTimeUntilEvent(event.date);
+  const { message } = getTimeUntilEvent(event.date);
 
   // Prefetch training detail page for faster navigation
   useEffect(() => {
     router.prefetch(`/training/${event.id}`);
   }, [router, event.id]);
-  const eventDate = new Date(event.date);
-  const dateStr = `${eventDate.getMonth() + 1}/${eventDate.getDate()}(${
-    ["일", "월", "화", "수", "목", "금", "토"][eventDate.getDay()]
-  }) ${eventDate.getHours().toString().padStart(2, "0")}:${eventDate
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
 
   const handleCheckIn = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -47,12 +40,9 @@ export default function TrainingCheckInCard({
 
     setSubmitting(true);
 
-    // Optimistic UI: 즉시 페이지 이동
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-    router.push(`/training/${event.id}`);
 
-    // 백그라운드에서 API 호출
     try {
       const res = await fetch(`/api/training-events/${event.id}/check-in`, {
         method: "POST",
@@ -60,14 +50,17 @@ export default function TrainingCheckInCard({
 
       if (res.ok) {
         playSound("whistle"); // 🎵 체크인 성공 - 휘슬 소리!
-        onShowToast?.(timeStr + "에 체크인되었습니다");
         onCheckInSuccess?.();
+        // 체크인 완료 후 training 상세 페이지로 이동 (query param으로 토스트 전달)
+        router.push(`/training/${event.id}?checkin=${encodeURIComponent(timeStr)}`);
       } else {
         const data = await res.json();
         onShowToast?.(data.error || "체크인에 실패했습니다");
+        setSubmitting(false);
       }
     } catch (error) {
       onShowToast?.("체크인에 실패했습니다");
+      setSubmitting(false);
     }
   };
 
