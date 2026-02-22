@@ -27,9 +27,11 @@ interface CheckInEntry {
 interface Props {
   rsvps: RsvpEntry[];
   checkIns: CheckInEntry[];
+  isAdmin?: boolean;
+  onManageClick?: () => void;
 }
 
-export default function AttendanceTab({ rsvps, checkIns }: Props) {
+export default function AttendanceTab({ rsvps, checkIns, isAdmin, onManageClick }: Props) {
   // RSVP 중 ATTEND/LATE
   const attendees = rsvps.filter((r) => r.status === "ATTEND" || r.status === "LATE");
 
@@ -71,6 +73,14 @@ export default function AttendanceTab({ rsvps, checkIns }: Props) {
           <p className="text-sm text-gray-400 text-center py-4">RSVP한 멤버가 없습니다</p>
         )}
       </div>
+      {isAdmin && onManageClick && (
+        <button
+          onClick={onManageClick}
+          className="mt-4 w-full py-2.5 rounded-xl bg-team-50 text-team-700 text-sm font-medium hover:bg-team-100 transition-colors"
+        >
+          출석 관리
+        </button>
+      )}
     </div>
   );
 }
