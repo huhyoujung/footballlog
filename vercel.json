@@ -3,6 +3,14 @@
     {
       "path": "/api/scheduled/weather-reminder",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/mvp-notification",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/equipment-check-notification",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
