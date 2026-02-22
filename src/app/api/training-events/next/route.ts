@@ -59,26 +59,29 @@ export async function GET(req: Request) {
       orderBy,
     });
 
-    return NextResponse.json({
-      events: events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        isRegular: event.isRegular,
-        date: event.date,
-        location: event.location,
-        venue: event.venue,
-        weather: event.weather,
-        weatherDescription: event.weatherDescription,
-        temperature: event.temperature,
-        airQualityIndex: event.airQualityIndex,
-        pm25: event.pm25,
-        pm10: event.pm10,
-        rsvpDeadline: event.rsvpDeadline,
-        _count: event._count,
-        myRsvp: event.rsvps[0]?.status || null,
-        myCheckIn: event.checkIns[0]?.checkedInAt.toISOString() || null,
-      })),
-    });
+    return NextResponse.json(
+      {
+        events: events.map((event) => ({
+          id: event.id,
+          title: event.title,
+          isRegular: event.isRegular,
+          date: event.date,
+          location: event.location,
+          venue: event.venue,
+          weather: event.weather,
+          weatherDescription: event.weatherDescription,
+          temperature: event.temperature,
+          airQualityIndex: event.airQualityIndex,
+          pm25: event.pm25,
+          pm10: event.pm10,
+          rsvpDeadline: event.rsvpDeadline,
+          _count: event._count,
+          myRsvp: event.rsvps[0]?.status || null,
+          myCheckIn: event.checkIns[0]?.checkedInAt.toISOString() || null,
+        })),
+      },
+      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" } },
+    );
   } catch (error) {
     console.error("다음 이벤트 조회 오류:", error);
     return NextResponse.json({ events: [] });
