@@ -22,9 +22,10 @@ import { useToast } from "@/lib/useToast";
 const LateFeeTab = lazy(() => import("@/components/training/LateFeeTab"));
 const SessionTab = lazy(() => import("@/components/training/SessionTab"));
 const EquipmentTab = lazy(() => import("@/components/training/EquipmentTab"));
-const MatchLiveTab = lazy(() => import("@/components/training/MatchLiveTab"));
+const AttendanceTab = lazy(() => import("@/components/training/AttendanceTab"));
+const AttendanceManageSheet = lazy(() => import("@/components/training/AttendanceManageSheet"));
 
-type AdminTab = "info" | "latefee" | "session" | "equipment";
+type AdminTab = "info" | "latefee" | "session" | "equipment" | "attendance";
 
 export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const { data: session } = useSession();
@@ -33,6 +34,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const [showConvertSheet, setShowConvertSheet] = useState(false);
   const [converting, setConverting] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
+  const [showAttendanceManage, setShowAttendanceManage] = useState(false);
   const [sendingChallenge, setSendingChallenge] = useState(false);
   // 응답기한: 기본 30일 후
   const defaultDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -66,8 +68,9 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     apiUrl,
     fetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 60000,
+      // 앱 포커스 복귀 시 갱신 — 다른 팀원 체크인/RSVP 변경 즉시 반영
+      revalidateOnFocus: true,
+      dedupingInterval: 10000,
     }
   );
 
@@ -137,39 +140,22 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   }
 
   const isAdmin = session?.user?.role === "ADMIN";
-  const teamName = session?.user?.team?.name || "우리팀";
   const opponentColor = event.opponentTeam?.primaryColor ?? "#374151";
 
   // 친선경기 IN_PROGRESS: 도전장 링크로 리다이렉트 (골/카드 등 모든 기록이 호스트 이벤트에 집중)
   if (event.isFriendlyMatch && event.matchStatus === "IN_PROGRESS") {
     const challengeToken = event.challengeToken ?? event.linkedEvent?.challengeToken ?? null;
     if (challengeToken) {
-      window.location.replace(`/invite/challenge/${challengeToken}`);
+      window.location.replace(`/invite/${challengeToken}`);
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <p className="text-gray-400 text-sm">경기 페이지로 이동 중...</p>
         </div>
       );
     }
-    // challengeToken 없는 경우 (레거시) — MatchLiveTab 폴백
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <PageHeader
-          title={event.title || "경기 진행 중"}
-          left={<BackButton href="/" />}
-          className="!z-20"
-        />
-        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" /></div>}>
-          <MatchLiveTab
-            eventId={eventId}
-            initialEvent={event}
-            isAdmin={isAdmin}
-            teamName={teamName}
-            onMatchEnd={() => mutate()}
-          />
-        </Suspense>
-      </div>
-    );
+    // challengeToken 없는 경우 — 홈으로 리다이렉트
+    window.location.replace("/");
+    return null;
   }
 
   const handleShare = async () => {
@@ -261,7 +247,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     // CHALLENGE_SENT 수정: 토큰이 이미 있으므로 즉시 복사+토스트, API는 백그라운드 업데이트
     if (event.matchStatus === "CHALLENGE_SENT" && event.challengeToken) {
       setShowSendDialog(false);
-      const challengeUrl = `${window.location.origin}/invite/challenge/${event.challengeToken}`;
+      const challengeUrl = `${window.location.origin}/invite/${event.challengeToken}`;
       showToast("도전장이 복사되었습니다! 상대팀에게 공유하세요.");
       navigator.clipboard.writeText(buildText(challengeUrl)).catch(() => {});
       // 백그라운드에서 matchRules 업데이트
@@ -303,7 +289,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const handleCopyLink = async () => {
     if (event?.matchStatus === "CHALLENGE_SENT" && event?.challengeToken) {
       const baseUrl = window.location.origin;
-      const challengeUrl = `${baseUrl}/invite/challenge/${event.challengeToken}`;
+      const challengeUrl = `${baseUrl}/invite/${event.challengeToken}`;
       const dateStr = new Date(event.date).toLocaleDateString("ko-KR", {
         month: "long",
         day: "numeric",
@@ -396,6 +382,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     { key: "session", label: "세션" },
     { key: "latefee", label: "지각비" },
     { key: "equipment", label: "장비" },
+    { key: "attendance", label: "출석" },
   ];
 
   return (
@@ -460,13 +447,13 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
         onEditChallenge={handleEditChallenge}
         onEditRules={event?.matchStatus === "CONFIRMED" ? openSendDialog : undefined}
         onConvertToRegular={isAdmin ? () => setShowConvertSheet(true) : undefined}
-        onStartMatch={isAdmin ? () => {
+        onStartMatch={() => {
           if (event?.challengeToken) {
-            window.location.href = `/invite/challenge/${event.challengeToken}`;
+            window.location.href = `/invite/${event.challengeToken}`;
           } else {
             mutate();
           }
-        } : undefined}
+        }}
         mutate={() => mutate()}
       />
 
@@ -522,7 +509,31 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
             <EquipmentTab eventId={eventId} />
           </Suspense>
         )}
+
+        {isAdmin && activeTab === "attendance" && (
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" /></div>}>
+            <AttendanceTab
+              rsvps={event.rsvps}
+              checkIns={event.checkIns}
+              isAdmin={isAdmin}
+              onManageClick={() => setShowAttendanceManage(true)}
+            />
+          </Suspense>
+        )}
       </main>
+
+      {isAdmin && showAttendanceManage && (
+        <Suspense fallback={null}>
+          <AttendanceManageSheet
+            eventId={eventId}
+            teamId={event.teamId}
+            checkIns={event.checkIns}
+            isOpen={showAttendanceManage}
+            onClose={() => setShowAttendanceManage(false)}
+            onRefresh={() => mutate()}
+          />
+        </Suspense>
+      )}
 
       {/* 도전장 발송 다이얼로그 */}
       {showSendDialog && (
