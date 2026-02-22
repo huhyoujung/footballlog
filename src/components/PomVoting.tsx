@@ -1,14 +1,14 @@
 // MVP 투표 컴포넌트 - 바텀시트 UI, pomVotesPerPerson에 따라 다중 선택 지원
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import confetti from "canvas-confetti";
 import { useSWRConfig } from "swr";
-import { toPng } from "html-to-image";
 import { getPomVotingStatus, isPomVotingClosed } from "@/lib/pom";
 import { STAT_TAGS } from "@/lib/stat-tags";
+import MvpResultSheet from "./MvpResultSheet";
 
 interface User {
   id: string;
@@ -220,9 +220,12 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
     return (
       <>
         <ClosedResultsInline results={results} onShowDetails={() => setShowResults(true)} />
-        {mounted && showResults && results.length > 0 && createPortal(
-          <ResultsSheet results={results} eventDate={eventDate} teamName={teamName} onClose={() => setShowResults(false)} />,
-          document.getElementById("modal-root")!
+        {mounted && (
+          <MvpResultSheet
+            eventId={eventId}
+            isOpen={showResults && results.length > 0}
+            onClose={() => setShowResults(false)}
+          />
         )}
       </>
     );
@@ -347,9 +350,12 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
       )}
 
       {/* 결과 바텀시트 */}
-      {mounted && showResults && results.length > 0 && isClosed && createPortal(
-        <ResultsSheet results={results} eventDate={eventDate} teamName={teamName} onClose={() => setShowResults(false)} />,
-        document.getElementById("modal-root")!
+      {mounted && (
+        <MvpResultSheet
+          eventId={eventId}
+          isOpen={showResults && results.length > 0 && isClosed}
+          onClose={() => setShowResults(false)}
+        />
       )}
     </>
   );
@@ -492,375 +498,6 @@ function VotingSheet({
             {submitting ? "투표 중..." : `투표하기${selectedCount > 0 ? ` (${selectedCount}명)` : ""}`}
           </button>
           <p className="text-[11px] text-gray-400 text-center mt-2">{votingMessage}</p>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─── 결과 바텀시트 ─── */
-function ResultsSheet({ results, eventDate, teamName, onClose }: {
-  results: PomResult[];
-  eventDate: string;
-  teamName?: string;
-  onClose: () => void;
-}) {
-  const winner = results[0];
-  const shareCardRef = useRef<HTMLDivElement>(null);
-  const [sharing, setSharing] = useState(false);
-
-  const formattedDate = (() => {
-    try {
-      const d = new Date(eventDate);
-      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-    } catch { return eventDate; }
-  })();
-
-  // CSS 변수에서 팀 컬러 읽기
-  const getTeamColor = (shade: string) => {
-    if (typeof window === "undefined") return "";
-    return getComputedStyle(document.documentElement).getPropertyValue(`--color-team-${shade}`).trim();
-  };
-
-  // 카드를 PNG로 캡처
-  const captureCard = useCallback(async () => {
-    if (!shareCardRef.current) return null;
-    const dataUrl = await toPng(shareCardRef.current, { pixelRatio: 2, cacheBust: true });
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    return { dataUrl, blob };
-  }, []);
-
-  // 공유 (Web Share API → 인스타 스토리 포함 시스템 공유시트)
-  const handleShare = useCallback(async () => {
-    if (sharing) return;
-    setSharing(true);
-    try {
-      const result = await captureCard();
-      if (!result) return;
-      const file = new File([result.blob], `mvp-${formattedDate}.png`, { type: "image/png" });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "오늘의 MVP" });
-      } else {
-        // 데스크톱 fallback: 다운로드
-        const link = document.createElement("a");
-        link.href = result.dataUrl;
-        link.download = `mvp-${formattedDate}.png`;
-        link.click();
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") console.error("공유 실패:", err);
-    } finally {
-      setSharing(false);
-    }
-  }, [formattedDate, sharing, captureCard]);
-
-
-  if (!winner) return null;
-
-  return (
-    <>
-      <div onClick={onClose} className="fixed inset-0 bg-black/50 z-50" />
-      <div className="fixed bottom-0 left-0 right-0 z-51 animate-slide-up">
-        <div className="bg-white rounded-t-[20px] max-w-lg mx-auto px-5 pt-3 pb-7 max-h-[85vh] overflow-y-auto">
-          {/* 핸들바 */}
-          <div className="flex justify-center mb-5">
-            <div className="w-10 h-1 bg-gray-300 rounded-full" />
-          </div>
-
-          {/* 트로피 + 타이틀 */}
-          <div className="text-center mb-4">
-            <div className="text-5xl mb-2">🏆</div>
-            <h3 className="text-xl font-extrabold text-gray-900">오늘의 MVP</h3>
-          </div>
-
-          {/* 우승자 카드 */}
-          <div className="bg-gradient-to-b from-team-50 to-team-100 rounded-2xl p-5 mb-5">
-            <div className="flex flex-col items-center gap-3">
-              {winner.user.image ? (
-                <Image
-                  src={winner.user.image}
-                  alt={winner.user.name || ""}
-                  width={64}
-                  height={64}
-                  className="w-16 h-16 rounded-full object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-team-200 flex items-center justify-center">
-                  <span className="text-2xl text-team-600">{(winner.user.name || "?")[0]}</span>
-                </div>
-              )}
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{winner.user.name || "익명"}</p>
-                {(winner.user.position || winner.user.number) && (
-                  <p className="text-xs text-gray-500">
-                    {winner.user.position || ""}{winner.user.number ? ` · ${winner.user.number}번` : ""}
-                  </p>
-                )}
-              </div>
-              <span className="px-3.5 py-1.5 bg-team-500 text-white text-[13px] font-bold rounded-full">
-                {winner.count}표 획득
-              </span>
-            </div>
-
-            {/* 팀원 코멘트 - 가로 스크롤 */}
-            {winner.votes.length > 0 && (
-              <div className="mt-4">
-                <p className="text-[11px] font-semibold text-gray-500 mb-2">팀원 코멘트</p>
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide">
-                  {winner.votes.map((vote, idx) => (
-                    <div key={idx} className="bg-white rounded-lg px-3 py-2.5 min-w-[160px] max-w-[200px] shrink-0 snap-start">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">{vote.voter.name || "익명"}</p>
-                      {vote.tags && vote.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-1">
-                          {vote.tags.map((tag) => (
-                            <span key={tag} className="px-1.5 py-0.5 bg-team-50 text-team-600 rounded text-[10px] font-medium">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-xs text-gray-600 leading-relaxed">&ldquo;{vote.reason}&rdquo;</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 전체 순위 */}
-          {results.length > 1 && (
-            <div className="mb-5 space-y-2">
-              <p className="text-[13px] font-bold text-gray-700">전체 순위</p>
-              {results.slice(1).map((result, idx) => (
-                <div key={idx} className="flex items-center gap-2.5 px-3.5 py-2.5 bg-gray-50 rounded-xl">
-                  <span className="text-sm font-bold text-gray-400 w-5 text-center">{idx + 2}</span>
-                  {result.user.image ? (
-                    <Image
-                      src={result.user.image}
-                      alt={result.user.name || ""}
-                      width={28}
-                      height={28}
-                      className="w-7 h-7 rounded-full object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-[10px] text-gray-500">{(result.user.name || "?")[0]}</span>
-                    </div>
-                  )}
-                  <span className="text-[13px] font-semibold text-gray-700 flex-1">{result.user.name || "익명"}</span>
-                  <span className="text-xs text-gray-500">{result.count}표</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 공유/닫기 */}
-          <div className="space-y-2">
-            <button
-              onClick={handleShare}
-              disabled={sharing}
-              className="w-full py-3 bg-team-500 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
-            >
-              {sharing ? "준비 중..." : (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                  이미지로 공유하기
-                </>
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-full py-2.5 text-gray-500 text-sm font-medium"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── 공유용 MVP 카드 (화면 밖 렌더링) ─── */}
-      <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
-        <div
-          ref={shareCardRef}
-          style={{
-            width: 360,
-            height: 480,
-            background: getTeamColor("600") || "#6B5A44",
-            fontFamily: "'Pretendard', -apple-system, sans-serif",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          {/* 배경 그라디언트 오버레이 */}
-          <div style={{
-            position: "absolute", inset: 0,
-            background: `radial-gradient(ellipse at 50% 0%, ${getTeamColor("400") || "#A8956F"}44 0%, transparent 60%),
-                          radial-gradient(ellipse at 80% 100%, ${getTeamColor("500") || "#977C5E"}33 0%, transparent 50%)`,
-          }} />
-
-          {/* 상단 장식 라인 */}
-          <div style={{
-            position: "absolute", top: 0, left: 0, right: 0, height: 3,
-            background: `linear-gradient(90deg, transparent, ${getTeamColor("300") || "#C6B9A9"}, transparent)`,
-          }} />
-
-          {/* 콘텐츠 영역 */}
-          <div style={{
-            position: "relative", zIndex: 1,
-            display: "flex", flexDirection: "column", alignItems: "center",
-            padding: "36px 28px 24px",
-            height: "100%",
-          }}>
-            {/* 타이틀 영역 */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              marginBottom: 24,
-            }}>
-              <div style={{
-                width: 1, height: 16,
-                background: getTeamColor("300") || "#C6B9A9",
-              }} />
-              <span style={{
-                fontSize: 11, fontWeight: 700, letterSpacing: 3,
-                color: getTeamColor("200") || "#DED7CE",
-                textTransform: "uppercase" as const,
-              }}>
-                오늘의 MVP
-              </span>
-              <div style={{
-                width: 1, height: 16,
-                background: getTeamColor("300") || "#C6B9A9",
-              }} />
-            </div>
-
-            {/* 트로피 */}
-            <div style={{ fontSize: 48, marginBottom: 16, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}>🏆</div>
-
-            {/* 프로필 사진 - 링 장식 */}
-            <div style={{
-              position: "relative",
-              width: 100, height: 100,
-              marginBottom: 16,
-            }}>
-              {/* 외곽 링 */}
-              <div style={{
-                position: "absolute", inset: -4,
-                borderRadius: "50%",
-                border: `2px solid ${getTeamColor("300") || "#C6B9A9"}`,
-                opacity: 0.5,
-              }} />
-              {winner.user.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={winner.user.image}
-                  alt=""
-                  crossOrigin="anonymous"
-                  style={{
-                    width: 100, height: 100, borderRadius: "50%",
-                    objectFit: "cover",
-                    border: `3px solid ${getTeamColor("200") || "#DED7CE"}`,
-                    boxShadow: `0 8px 24px rgba(0,0,0,0.3)`,
-                  }}
-                />
-              ) : (
-                <div style={{
-                  width: 100, height: 100, borderRadius: "50%",
-                  background: getTeamColor("500") || "#977C5E",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `3px solid ${getTeamColor("200") || "#DED7CE"}`,
-                  boxShadow: `0 8px 24px rgba(0,0,0,0.3)`,
-                }}>
-                  <span style={{ fontSize: 36, color: "white", fontWeight: 700 }}>
-                    {(winner.user.name || "?")[0]}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* 이름 */}
-            <p style={{
-              fontSize: 22, fontWeight: 800, color: "white",
-              textShadow: "0 2px 8px rgba(0,0,0,0.3)",
-            }}>{winner.user.name || "익명"}</p>
-            {(winner.user.position || winner.user.number) && (
-              <p style={{
-                fontSize: 12, color: getTeamColor("200") || "#DED7CE",
-                marginTop: 4, fontWeight: 500,
-              }}>
-                {winner.user.position || ""}{winner.user.number ? ` · ${winner.user.number}번` : ""}
-              </p>
-            )}
-
-            {/* 득표 배지 */}
-            <div style={{
-              marginTop: 12, padding: "6px 20px",
-              background: `linear-gradient(135deg, ${getTeamColor("300") || "#C6B9A9"}, ${getTeamColor("200") || "#DED7CE"})`,
-              color: getTeamColor("700") || "#564732",
-              borderRadius: 20,
-              fontSize: 13, fontWeight: 800,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}>
-              {winner.count}표 획득
-            </div>
-
-            {/* 팀원 코멘트 (최대 2개) */}
-            {winner.votes.length > 0 && (
-              <div style={{
-                marginTop: 20, width: "100%",
-                display: "flex", flexDirection: "column", gap: 6,
-              }}>
-                {winner.votes.slice(0, 2).map((vote, idx) => (
-                  <div key={idx} style={{
-                    background: `${getTeamColor("500") || "#977C5E"}88`,
-                    backdropFilter: "blur(8px)",
-                    borderRadius: 12, padding: "10px 14px",
-                    textAlign: "center",
-                    border: `1px solid ${getTeamColor("400") || "#A8956F"}44`,
-                  }}>
-                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", lineHeight: 1.5 }}>
-                      &ldquo;{vote.reason}&rdquo;
-                    </p>
-                    <p style={{ fontSize: 10, color: getTeamColor("200") || "#DED7CE", marginTop: 3, fontWeight: 600 }}>
-                      — {vote.voter.name || "익명"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 하단 팀명 + 날짜 */}
-            <div style={{
-              marginTop: "auto", paddingTop: 16,
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <div style={{
-                width: 20, height: 1,
-                background: getTeamColor("400") || "#A8956F",
-                opacity: 0.5,
-              }} />
-              <span style={{ fontSize: 11, color: getTeamColor("300") || "#C6B9A9", fontWeight: 600 }}>
-                {teamName || "네모의 꿈"}
-              </span>
-              <span style={{ fontSize: 11, color: getTeamColor("400") || "#A8956F" }}>·</span>
-              <span style={{ fontSize: 11, color: getTeamColor("300") || "#C6B9A9" }}>{formattedDate}</span>
-              <div style={{
-                width: 20, height: 1,
-                background: getTeamColor("400") || "#A8956F",
-                opacity: 0.5,
-              }} />
-            </div>
-          </div>
         </div>
       </div>
     </>
