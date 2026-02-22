@@ -71,19 +71,19 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
     return () => controller.abort();
   }, [isOpen, eventId]);
 
-  // 배경 스크롤 잠금
+  // 배경 스크롤 잠금 (iOS Safari 포함)
   useEffect(() => {
     if (!isOpen) return;
     const scrollY = window.scrollY;
+    document.documentElement.style.overflow = "hidden";
     document.body.style.position = "fixed";
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
     return () => {
+      document.documentElement.style.overflow = "";
       document.body.style.position = "";
       document.body.style.top = "";
       document.body.style.width = "";
-      document.body.style.overflow = "";
       window.scrollTo(0, scrollY);
     };
   }, [isOpen]);

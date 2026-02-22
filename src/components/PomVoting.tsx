@@ -380,6 +380,22 @@ function VotingSheet({
   onClose: () => void;
   canSubmit: boolean;
 }) {
+  // 배경 스크롤 잠금 (iOS Safari 포함)
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/50 z-50" />
