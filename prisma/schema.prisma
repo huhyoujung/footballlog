@@ -54,6 +54,7 @@ model User {
   updatedAt                 DateTime                @updatedAt
   number                    Int?
   position                  String?
+  phoneNumber               String?
   isEquipmentManager        Boolean                 @default(false)
   aiInsights                AIInsight[]
   accounts                  Account[]
@@ -246,6 +247,7 @@ model TrainingEvent {
   pomVotesPerPerson        Int                    @default(1)
   pomVotingDeadline        DateTime?
   pomPushSentAt            DateTime?
+  equipmentCheckPushSentAt DateTime?
   temperature              Float?
   weather                  String?
   weatherDescription       String?
@@ -608,6 +610,7 @@ enum RsvpStatus {
   ATTEND
   ABSENT
   LATE
+  NO_SHOW
 }
 
 enum LateFeeStatus {
