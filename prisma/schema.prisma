@@ -245,6 +245,7 @@ model TrainingEvent {
   enablePomVoting          Boolean                @default(true)
   pomVotesPerPerson        Int                    @default(1)
   pomVotingDeadline        DateTime?
+  pomPushSentAt            DateTime?
   temperature              Float?
   weather                  String?
   weatherDescription       String?
@@ -300,6 +301,7 @@ model TrainingEvent {
   sessions                 TrainingSession[]
 
   @@index([teamId, date(sort: Desc)])
+  @@index([teamId, date(sort: Asc)], map: "TrainingEvent_teamId_date_asc_idx")   // 예정 운동 조회 (gte + orderBy asc)
   @@index([isFriendlyMatch, matchStatus])
 }
 
@@ -325,6 +327,7 @@ model CheckIn {
   userId          String
   checkedInAt     DateTime      @default(now())
   isLate          Boolean       @default(false)
+  manualEntry     Boolean       @default(false)
   trainingEvent   TrainingEvent @relation(fields: [trainingEventId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
