@@ -81,13 +81,19 @@ export interface TrainingEventDetail {
   // 친선경기 관련
   matchStatus: "DRAFT" | "CHALLENGE_SENT" | "CONFIRMED" | "RULES_PENDING" | "RULES_CONFIRMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
   linkedEventId: string | null;
+  linkedEvent: { id: string; challengeToken: string | null; _count: { rsvps: number } } | null;
   opponentTeamId: string | null;
-  opponentTeam: { id: string; name: string; logoUrl: string | null } | null;
+  opponentTeam: { id: string; name: string; logoUrl: string | null; primaryColor: string | null } | null;
   challengeToken: string | null;
   challengeTokenExpiresAt: string | null;
   challengeRejectionReason: string | null;
+  teamAScore: number;
+  teamBScore: number;
   matchRules?: MatchRulesEntry | null;
   refereeAssignment?: RefereeAssignmentEntry | null;
+  goalRecords?: GoalRecordEntry[];
+  playerSubstitutions?: SubstitutionEntry[];
+  cardRecords?: CardRecordEntry[];
   myRsvp: RsvpStatus | null;
   myCheckIn: string | null; // checkedInAt ISO string
 }
@@ -105,6 +111,7 @@ export interface CheckInEntry {
   userId: string;
   checkedInAt: string;
   isLate: boolean;
+  manualEntry?: boolean;
   user: { id: string; name: string | null; image: string | null };
 }
 
@@ -162,6 +169,7 @@ export interface RefereeAssignmentEntry {
 export interface MatchRulesEntry {
   id: string;
   template: "FUTSAL" | "ELEVEN_HALVES" | "CUSTOM";
+  kickoffTime: string | null;
   quarterCount: number;
   quarterMinutes: number;
   quarterBreak: number;
@@ -169,6 +177,7 @@ export interface MatchRulesEntry {
   playersPerSide: number;
   allowBackpass: boolean;
   allowOffside: boolean;
+  quarterRefereeTeams: ("TEAM_A" | "TEAM_B")[] | null;
 }
 
 export interface EquipmentAssignmentEntry {
@@ -178,4 +187,35 @@ export interface EquipmentAssignmentEntry {
   memo: string | null;
   equipment: { id: string; name: string; description: string | null };
   user: { id: string; name: string | null; image: string | null } | null;
+}
+
+export interface GoalRecordEntry {
+  id: string;
+  quarter: number;
+  minute: number | null;
+  scoringTeam: "TEAM_A" | "TEAM_B";
+  isOwnGoal: boolean;
+  scorer: { id: string; name: string | null; image: string | null } | null;
+  assistant: { id: string; name: string | null; image: string | null } | null;
+  createdAt: string;
+}
+
+export interface SubstitutionEntry {
+  id: string;
+  quarter: number;
+  minute: number | null;
+  teamSide: "TEAM_A" | "TEAM_B";
+  playerOut: { id: string; name: string | null; image: string | null } | null;
+  playerIn: { id: string; name: string | null; image: string | null } | null;
+  createdAt: string;
+}
+
+export interface CardRecordEntry {
+  id: string;
+  quarter: number;
+  minute: number | null;
+  cardType: "YELLOW" | "RED";
+  teamSide: "TEAM_A" | "TEAM_B";
+  player: { id: string; name: string | null; image: string | null } | null;
+  createdAt: string;
 }
