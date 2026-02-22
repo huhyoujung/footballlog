@@ -397,8 +397,8 @@ export default function LockerClient({ userId }: { userId: string }) {
       return;
     }
 
-    if (noteContent.length > 50) {
-      showToast("쪽지는 50자 이내로 작성해주세요");
+    if (noteContent.length > 500) {
+      showToast("쪽지는 500자 이내로 작성해주세요");
       return;
     }
 
@@ -780,7 +780,6 @@ export default function LockerClient({ userId }: { userId: string }) {
                       width={96}
                       height={96}
                       className="w-full h-full object-cover"
-                      unoptimized
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
@@ -905,8 +904,7 @@ export default function LockerClient({ userId }: { userId: string }) {
                               const y = 200 + 150 * ratio * Math.sin(angle);
                               return `${x},${y}`;
                             }).join(' ')}
-                            fill="rgba(150, 123, 93, 0.2)"
-                            stroke="#967B5D"
+                            className="fill-team-500/20 stroke-team-500"
                             strokeWidth="2"
                             strokeLinejoin="round"
                           />
@@ -927,7 +925,7 @@ export default function LockerClient({ userId }: { userId: string }) {
                                   cx={x}
                                   cy={y}
                                   r="4"
-                                  fill="#967B5D"
+                                  className="fill-team-500"
                                   stroke="white"
                                   strokeWidth="2"
                                 />
@@ -1133,12 +1131,12 @@ export default function LockerClient({ userId }: { userId: string }) {
             <textarea
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
-              placeholder="칭찬 메시지를 남겨주세요 (50자 이내)"
-              maxLength={50}
+              placeholder="칭찬 메시지를 남겨주세요 (500자 이내)"
+              maxLength={500}
               className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-team-500 text-sm"
             />
             <p className="text-xs text-gray-500 text-right mt-1">
-              {noteContent.length}/50
+              {noteContent.length}/500
             </p>
 
             {/* 운동 태그 선택 */}
