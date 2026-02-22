@@ -98,7 +98,9 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
           setSelections(restored);
           setSelectionTags(restoredTags);
         }
-        if (isClosed && data.results.length > 0) {
+        // 최초 확인 시에만 자동 오픈 (이미 본 경우 localStorage에 기록)
+        const seenKey = `pom-result-seen-${eventId}`;
+        if (isClosed && data.results.length > 0 && !localStorage.getItem(seenKey)) {
           setShowResults(true);
         }
       }
@@ -141,6 +143,11 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
     if (selectedCount === 0) return false;
     if (!Object.values(selections).every((reason) => reason.trim().length > 0)) return false;
     return Object.keys(selections).every((id) => (selectionTags[id] || []).length > 0);
+  };
+
+  const handleCloseResults = () => {
+    localStorage.setItem(`pom-result-seen-${eventId}`, "true");
+    setShowResults(false);
   };
 
   const handleSubmit = async () => {
@@ -224,7 +231,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
           <MvpResultSheet
             eventId={eventId}
             isOpen={showResults && results.length > 0}
-            onClose={() => setShowResults(false)}
+            onClose={handleCloseResults}
           />
         )}
       </>
@@ -257,7 +264,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
 
         {hasVoted ? (
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-team-700">투표 응답 완료</p>
+            <p className="text-xs font-semibold text-team-700">{isClosed ? "내가 뽑은 MVP" : "투표 응답 완료"}</p>
             <div className="space-y-2">
               {myVotes.map((v) => {
                 const nominee = checkIns.find((c) => c.userId === v.nomineeId);
@@ -271,7 +278,6 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
                           width={24}
                           height={24}
                           className="w-6 h-6 rounded-full object-cover"
-                          unoptimized
                         />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-team-200 flex items-center justify-center">
@@ -304,7 +310,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
               {!isClosed && (
                 <button
                   onClick={openRevote}
-                  className="flex-1 py-2 bg-white border border-team-300 text-team-600 rounded-lg text-sm font-medium hover:bg-team-50 transition-colors"
+                  className="flex-1 py-2 bg-white border border-team-300 text-team-600 rounded-lg text-sm font-medium hover:bg-team-50 transition-colors touch-manipulation active:scale-[0.97]"
                 >
                   다시 투표하기
                 </button>
@@ -312,7 +318,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
               {isClosed && totalVotes > 0 && (
                 <button
                   onClick={() => setShowResults(true)}
-                  className="flex-1 py-2 bg-team-500 text-white rounded-lg text-sm font-medium"
+                  className="flex-1 py-2 bg-team-500 text-white rounded-lg text-sm font-medium transition-colors touch-manipulation active:scale-[0.97]"
                 >
                   결과 보기 ({totalVotes}표)
                 </button>
@@ -322,7 +328,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
         ) : (
           <button
             onClick={openVoting}
-            className="w-full py-3 bg-team-500 text-white rounded-[14px] font-semibold text-sm"
+            className="w-full py-3 bg-team-500 text-white rounded-[14px] font-semibold text-sm transition-colors touch-manipulation active:scale-[0.98]"
           >
             투표하기
           </button>
@@ -354,7 +360,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
         <MvpResultSheet
           eventId={eventId}
           isOpen={showResults && results.length > 0 && isClosed}
-          onClose={() => setShowResults(false)}
+          onClose={handleCloseResults}
         />
       )}
     </>
@@ -429,7 +435,7 @@ function VotingSheet({
                     type="button"
                     onClick={() => onToggle(checkIn.userId)}
                     disabled={isDisabled}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors touch-manipulation active:scale-[0.98] ${
                       isSelected
                         ? "bg-team-50 border-2 border-team-400"
                         : isDisabled
@@ -453,7 +459,6 @@ function VotingSheet({
                         width={36}
                         height={36}
                         className="w-9 h-9 rounded-full object-cover"
-                        unoptimized
                       />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center">
@@ -480,7 +485,7 @@ function VotingSheet({
                               key={tag}
                               type="button"
                               onClick={() => onToggleTag(checkIn.userId, tag)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors touch-manipulation active:scale-[0.97] ${
                                 active
                                   ? "bg-team-500 text-white"
                                   : "bg-gray-100 text-gray-600"
@@ -509,7 +514,7 @@ function VotingSheet({
           <button
             onClick={onSubmit}
             disabled={!canSubmit || submitting}
-            className="w-full py-3.5 bg-team-500 text-white rounded-[14px] font-semibold text-[15px] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3.5 bg-team-500 text-white rounded-[14px] font-semibold text-[15px] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-[0.98]"
           >
             {submitting ? "투표 중..." : `투표하기${selectedCount > 0 ? ` (${selectedCount}명)` : ""}`}
           </button>
@@ -538,7 +543,6 @@ function ClosedResultsInline({ results, onShowDetails }: { results: PomResult[];
               width={56}
               height={56}
               className="w-14 h-14 rounded-full object-cover"
-              unoptimized
             />
           ) : (
             <div className="w-14 h-14 rounded-full bg-team-100 flex items-center justify-center">
