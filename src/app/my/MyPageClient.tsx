@@ -40,6 +40,7 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
   const [selectedMember, setSelectedMember] = useState<{
     id: string;
     name: string | null;
+    phoneNumber: string | null;
   } | null>(null);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
   const [nudgeMessage, setNudgeMessage] = useState("");
@@ -154,6 +155,7 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
               setSelectedMember({
                 id: member.id,
                 name: member.name,
+                phoneNumber: member.phoneNumber ?? null,
               });
             }}
             showSelfBadge={true}
@@ -176,7 +178,7 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
         {/* 피드백 배너 */}
         <Link
           href="/my/feedback"
-          className="block bg-team-50 border border-team-200 rounded-2xl p-5 hover:bg-team-100 transition-all"
+          className="block bg-team-50 border border-team-200 rounded-2xl p-5 hover:bg-team-100 transition-colors"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -234,8 +236,28 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
           >
             <div className="bg-white rounded-t-[20px] max-w-lg mx-auto px-5 pt-3 pb-6">
               {/* 핸들바 */}
-              <div className="flex justify-center mb-5">
+              <div className="flex items-center justify-center mb-5 mt-1">
+                <div className="flex-1 flex justify-start">
+                  {selectedMember.phoneNumber ? (
+                    <a
+                      href={`tel:${selectedMember.phoneNumber}`}
+                      className="p-2 text-team-500"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.54 5.54l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                    </a>
+                  ) : (
+                    <div className="p-2 text-gray-300">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.54 5.54l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
                 <div className="w-10 h-1 bg-gray-300 rounded-full" />
+                <div className="flex-1" />
               </div>
 
               {/* 헤더 */}
@@ -275,7 +297,7 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
               <button
                 onClick={() => handleNudge(selectedMember.id, selectedMember.name || '팀원')}
                 disabled={nudgedToday.has(selectedMember.id)}
-                className={`w-full py-3.5 rounded-[14px] font-semibold transition-all flex items-center justify-center gap-2 ${
+                className={`w-full py-3.5 rounded-[14px] font-semibold transition-[background-color,transform,opacity] flex items-center justify-center gap-2 ${
                   nudgedToday.has(selectedMember.id)
                     ? "bg-gray-50 text-gray-400 cursor-not-allowed border-2 border-gray-200"
                     : "bg-team-500 text-white hover:bg-team-600 active:scale-[0.98]"
