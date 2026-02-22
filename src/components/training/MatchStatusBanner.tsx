@@ -100,9 +100,9 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
       );
     }
   } else if (event.matchStatus === "CONFIRMED") {
-    if (isAdmin && isMatchDay && hasEnoughPlayers && onStartMatch) {
+    if (isMatchDay && hasEnoughPlayers) {
       icon = "⚽";
-      text = "오늘 경기입니다! 경기를 시작하세요.";
+      text = isAdmin ? "오늘 경기입니다! 경기를 시작하세요." : "오늘 경기입니다!";
       bgColor = "bg-green-50 text-green-700 border-green-100";
       action = (
         <div className="flex gap-1.5 shrink-0">
@@ -114,13 +114,15 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
               경기 방식
             </button>
           )}
-          <button
-            onClick={handleStartMatch}
-            disabled={startingMatch}
-            className="text-xs px-2.5 py-1.5 bg-green-500 rounded-lg text-white font-semibold active:scale-95 whitespace-nowrap disabled:opacity-50"
-          >
-            {startingMatch ? "..." : "경기 시작"}
-          </button>
+          {isAdmin && onStartMatch && (
+            <button
+              onClick={handleStartMatch}
+              disabled={startingMatch}
+              className="text-xs px-2.5 py-1.5 bg-green-500 rounded-lg text-white font-semibold active:scale-95 whitespace-nowrap disabled:opacity-50"
+            >
+              {startingMatch ? "..." : "경기 시작"}
+            </button>
+          )}
         </div>
       );
     } else if (!hasEnoughPlayers) {
@@ -128,7 +130,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
       const opponentPart = opponentAttendCount !== null ? ` · 상대팀 ${opponentAttendCount}명` : "";
       text = `인원 모집 중 — 우리팀 ${attendCount}/${requiredPlayers}명${opponentPart}`;
       bgColor = "bg-green-50 text-green-700 border-green-100";
-      if (isAdmin && onEditRules) {
+      if (onEditRules) {
         action = (
           <button
             onClick={onEditRules}
@@ -143,7 +145,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
       const opponentPart = opponentAttendCount !== null ? ` · 상대팀 ${opponentAttendCount}명` : "";
       text = `매칭 완료!${opponentPart ? ` (우리팀 ${attendCount}명${opponentPart})` : ""}`;
       bgColor = "bg-green-50 text-green-700 border-green-100";
-      if (isAdmin && onEditRules) {
+      if (onEditRules) {
         action = (
           <button
             onClick={onEditRules}
