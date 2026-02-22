@@ -94,19 +94,25 @@ export async function GET(req: Request) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       }))];
 
+      // N번 순차 쿼리 → 1번 배치 쿼리 후 인메모리 매칭
+      const dates = uniqueDates.map((d) => new Date(d));
+      const minDate = new Date(Math.min(...dates.map((d) => d.getTime())) - 86400000);
+      const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())) + 86400000);
+
+      const rangeEvents = await prisma.trainingEvent.findMany({
+        where: {
+          teamId: session.user.teamId!,
+          date: { gte: minDate, lte: maxDate },
+        },
+        select: { id: true, date: true },
+        orderBy: { date: "desc" },
+      });
+
       for (const dateStr of uniqueDates) {
-        // 이벤트 다음날 기록하는 경우가 흔하므로 전날~당일 범위로 매칭
         const prevDayStart = new Date(new Date(dateStr + "T00:00:00.000Z").getTime() - 86400000);
         const dayEnd = new Date(dateStr + "T23:59:59.999Z");
-        const event = await prisma.trainingEvent.findFirst({
-          where: {
-            teamId: session.user.teamId!,
-            date: { gte: prevDayStart, lte: dayEnd },
-          },
-          select: { id: true },
-          orderBy: { date: "desc" }, // 가장 가까운 이벤트 우선
-        });
-        if (event) dateToEventId[dateStr] = event.id;
+        const match = rangeEvents.find((e) => e.date >= prevDayStart && e.date <= dayEnd);
+        if (match) dateToEventId[dateStr] = match.id;
       }
     }
 
@@ -152,15 +158,18 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({
-      logs: logsWithLikeStatus,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        logs: logsWithLikeStatus,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
+    );
   } catch (error) {
     console.error("운동 일지 조회 오류:", error);
     return NextResponse.json(
