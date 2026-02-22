@@ -166,7 +166,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
       icon = "⏳";
       text = `도전장 링크를 상대팀에게 공유하세요${dday ? ` (${dday})` : ""}`;
       bgColor = "bg-amber-50 text-amber-700 border-amber-100";
-      if (isAdmin && (onCopyLink || onEditChallenge)) {
+      if (onCopyLink || onEditChallenge) {
         action = (
           <div className="flex gap-1.5 shrink-0">
             {onEditChallenge && (
@@ -196,30 +196,26 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
       icon = "📋";
       text = `도전장을 보내기 위한 우리 팀 인원 모집 중 (${attendCount}/${requiredPlayers}명)`;
       bgColor = "bg-team-50 text-team-600 border-team-100";
-      if (isAdmin) {
-        action = (
-          <button
-            onClick={onSendChallenge}
-            className="text-xs px-2.5 py-1 bg-white border border-team-200 rounded-lg text-team-600 font-medium active:scale-95"
-          >
-            미리 공유
-          </button>
-        );
-      }
+      action = (
+        <button
+          onClick={onSendChallenge}
+          className="text-xs px-2.5 py-1 bg-white border border-team-200 rounded-lg text-team-600 font-medium active:scale-95"
+        >
+          미리 공유
+        </button>
+      );
     } else {
       icon = "⚔️";
       text = "인원이 충족되었습니다. 도전장을 보내세요!";
       bgColor = "bg-amber-50 text-amber-700 border-amber-100";
-      if (isAdmin) {
-        action = (
-          <button
-            onClick={onSendChallenge}
-            className="text-xs px-2.5 py-1 bg-amber-500 rounded-lg text-white font-medium active:scale-95"
+      action = (
+        <button
+          onClick={onSendChallenge}
+          className="text-xs px-2.5 py-1 bg-amber-500 rounded-lg text-white font-medium active:scale-95"
           >
             도전장 보내기
           </button>
         );
-      }
     }
   } else {
     return null;

@@ -67,11 +67,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ token: event.challengeToken, saved: true });
     }
 
-    // DRAFT / CHALLENGE_SENT 도전장 발송은 어드민만
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: '운영진만 도전장을 보낼 수 있습니다' }, { status: 403 });
-    }
-
     // CHALLENGE_SENT면 기존 토큰 유지하고 matchRules만 업데이트
     if (event.matchStatus === 'CHALLENGE_SENT' && event.challengeToken) {
       const updatedExpiresAt = responseDeadline ? new Date(responseDeadline) : event.challengeTokenExpiresAt;

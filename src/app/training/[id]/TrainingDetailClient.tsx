@@ -457,7 +457,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
           setShowSendDialog(true);
         }}
         onCopyLink={handleCopyLink}
-        onEditChallenge={isAdmin ? handleEditChallenge : undefined}
+        onEditChallenge={handleEditChallenge}
         onEditRules={event?.matchStatus === "CONFIRMED" ? openSendDialog : undefined}
         onConvertToRegular={isAdmin ? () => setShowConvertSheet(true) : undefined}
         onStartMatch={isAdmin ? () => {
