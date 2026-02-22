@@ -530,9 +530,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSendDialog(false)} />
           <div className="relative w-full bg-white rounded-t-2xl p-6 space-y-4">
             <h3 className="font-semibold text-gray-900">
-              {event.matchStatus === "CONFIRMED"
-                ? isAdmin ? "경기 방식 수정" : "경기 방식"
-                : event.matchStatus === "CHALLENGE_SENT" ? "경기 방식 수정 후 재공유" : "도전장 보내기"}
+              {event.matchStatus === "CONFIRMED" ? "경기 방식 수정" : event.matchStatus === "CHALLENGE_SENT" ? "경기 방식 수정 후 재공유" : "도전장 보내기"}
             </h3>
             {/* 경기 방식 */}
             <div>
@@ -541,33 +539,33 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">쿼터 수</span>
                   <div className="flex items-center gap-3">
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => {
+                    <button type="button" onClick={() => {
                       const next = Math.max(1, quarterCount - 1);
                       setQuarterCount(next);
                       setQuarterRefereeTeams(prev => Array.from({ length: next }, (_, i) => prev[i] ?? (i % 2 === 0 ? "TEAM_A" : "TEAM_B")));
-                    }} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">−</button>
+                    }} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">−</button>
                     <span className="w-8 text-center text-sm font-semibold text-gray-900">{quarterCount}</span>
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => {
+                    <button type="button" onClick={() => {
                       const next = Math.min(8, quarterCount + 1);
                       setQuarterCount(next);
                       setQuarterRefereeTeams(prev => Array.from({ length: next }, (_, i) => prev[i] ?? (i % 2 === 0 ? "TEAM_A" : "TEAM_B")));
-                    }} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">+</button>
+                    }} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">+</button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">쿼터별 시간</span>
                   <div className="flex items-center gap-3">
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => setQuarterMinutes(Math.max(1, quarterMinutes - 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">−</button>
+                    <button type="button" onClick={() => setQuarterMinutes(Math.max(1, quarterMinutes - 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">−</button>
                     <span className="w-12 text-center text-sm font-semibold text-gray-900">{quarterMinutes}분</span>
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => setQuarterMinutes(Math.min(60, quarterMinutes + 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">+</button>
+                    <button type="button" onClick={() => setQuarterMinutes(Math.min(60, quarterMinutes + 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">+</button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">쿼터 사이 쉬는시간</span>
                   <div className="flex items-center gap-3">
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => setQuarterBreak(Math.max(0, quarterBreak - 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">−</button>
+                    <button type="button" onClick={() => setQuarterBreak(Math.max(0, quarterBreak - 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">−</button>
                     <span className="w-12 text-center text-sm font-semibold text-gray-900">{quarterBreak}분</span>
-                    <button type="button" disabled={event.matchStatus === "CONFIRMED" && !isAdmin} onClick={() => setQuarterBreak(Math.min(30, quarterBreak + 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium disabled:opacity-30">+</button>
+                    <button type="button" onClick={() => setQuarterBreak(Math.min(30, quarterBreak + 1))} className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-600 font-medium">+</button>
                   </div>
                 </div>
                 {/* 총 경기시간 요약 */}
@@ -589,17 +587,15 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
                     <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
                       <button
                         type="button"
-                        disabled={event.matchStatus === "CONFIRMED" && !isAdmin}
                         onClick={() => setQuarterRefereeTeams(prev => prev.map((t, j) => j === i ? "TEAM_A" : t))}
-                        className={`px-3 py-1.5 transition-colors disabled:opacity-60 ${quarterRefereeTeams[i] === "TEAM_A" ? "bg-team-500 text-white" : "bg-white text-gray-500"}`}
+                        className={`px-3 py-1.5 transition-colors ${quarterRefereeTeams[i] === "TEAM_A" ? "bg-team-500 text-white" : "bg-white text-gray-500"}`}
                       >
                         우리팀
                       </button>
                       <button
                         type="button"
-                        disabled={event.matchStatus === "CONFIRMED" && !isAdmin}
                         onClick={() => setQuarterRefereeTeams(prev => prev.map((t, j) => j === i ? "TEAM_B" : t))}
-                        className={`px-3 py-1.5 transition-colors disabled:opacity-60 ${quarterRefereeTeams[i] === "TEAM_B" ? "text-white" : "bg-white text-gray-500"}`}
+                        className={`px-3 py-1.5 transition-colors ${quarterRefereeTeams[i] === "TEAM_B" ? "text-white" : "bg-white text-gray-500"}`}
                         style={quarterRefereeTeams[i] === "TEAM_B" ? { backgroundColor: opponentColor } : {}}
                       >
                         상대팀
@@ -648,30 +644,21 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
                 <p className="text-xs text-gray-400 mt-1">이 날짜까지 상대팀이 응답하지 않으면 도전장이 만료됩니다</p>
               </div>
             )}
-            {event.matchStatus === "CONFIRMED" && !isAdmin ? (
+            <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowSendDialog(false)}
-                className="w-full py-3 rounded-xl bg-gray-100 text-gray-700 font-medium"
+                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium"
               >
-                확인
+                취소
               </button>
-            ) : (
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowSendDialog(false)}
-                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleSendChallenge}
-                  disabled={sendingChallenge}
-                  className="flex-1 py-3 rounded-xl bg-team-500 text-white font-medium disabled:opacity-50"
-                >
-                  {sendingChallenge ? "저장 중..." : event.matchStatus === "CONFIRMED" ? "저장" : event.matchStatus === "CHALLENGE_SENT" ? "수정 후 링크 복사" : "도전장 링크 복사"}
-                </button>
-              </div>
-            )}
+              <button
+                onClick={handleSendChallenge}
+                disabled={sendingChallenge}
+                className="flex-1 py-3 rounded-xl bg-team-500 text-white font-medium disabled:opacity-50"
+              >
+                {sendingChallenge ? "저장 중..." : event.matchStatus === "CONFIRMED" ? "저장" : event.matchStatus === "CHALLENGE_SENT" ? "수정 후 링크 복사" : "도전장 링크 복사"}
+              </button>
+            </div>
           </div>
         </div>
       )}

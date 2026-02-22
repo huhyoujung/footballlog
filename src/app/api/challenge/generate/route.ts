@@ -21,10 +21,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '팀에 소속되어 있지 않습니다' }, { status: 400 });
     }
 
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: '운영진만 도전장을 보낼 수 있습니다' }, { status: 403 });
-    }
-
     const { trainingEventId, responseDeadline, quarterCount, quarterMinutes, quarterBreak, kickoffTime, quarterRefereeTeams } = await request.json();
 
     const event = await prisma.trainingEvent.findUnique({
@@ -40,14 +36,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (event.teamId !== user.teamId) {
-      return NextResponse.json({ error: '본인 팀의 운동만 도전장을 보낼 수 있습니다' }, { status: 403 });
+      return NextResponse.json({ error: '본인 팀의 운동만 접근할 수 있습니다' }, { status: 403 });
     }
 
     if (!event.isFriendlyMatch) {
       return NextResponse.json({ error: '친선경기만 도전장을 보낼 수 있습니다' }, { status: 400 });
     }
 
-    // CONFIRMED 상태: matchRules만 업데이트, 상태/토큰 변경 없음
+    // CONFIRMED 상태: 팀원 누구나 matchRules 업데이트 가능 (기록관 역할)
     if (event.matchStatus === 'CONFIRMED') {
       await prisma.matchRules.upsert({
         where: { trainingEventId: event.id },
@@ -69,6 +65,11 @@ export async function POST(request: NextRequest) {
         },
       });
       return NextResponse.json({ token: event.challengeToken, saved: true });
+    }
+
+    // DRAFT / CHALLENGE_SENT 도전장 발송은 어드민만
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: '운영진만 도전장을 보낼 수 있습니다' }, { status: 403 });
     }
 
     // CHALLENGE_SENT면 기존 토큰 유지하고 matchRules만 업데이트
