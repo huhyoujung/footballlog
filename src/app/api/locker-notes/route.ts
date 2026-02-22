@@ -71,7 +71,9 @@ export async function GET(req: NextRequest) {
       take: 50, // 팀 행사 시 쪽지가 많을 수 있으므로 넉넉하게
     });
 
-    return NextResponse.json(recentNotes);
+    return NextResponse.json(recentNotes, {
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" },
+    });
   } catch (error) {
     console.error("Failed to fetch recent locker notes:", error);
     return NextResponse.json(
