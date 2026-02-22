@@ -135,7 +135,6 @@ export default function CommentsSection({ eventId }: Props) {
                     width={32}
                     height={32}
                     className="w-full h-full object-cover"
-                    unoptimized
                   />
                 </div>
               </div>
@@ -176,7 +175,6 @@ export default function CommentsSection({ eventId }: Props) {
                       width={32}
                       height={32}
                       className="w-full h-full object-cover"
-                      unoptimized
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500">

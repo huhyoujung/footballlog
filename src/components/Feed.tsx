@@ -73,11 +73,11 @@ interface LockerNote {
 }
 
 // SWR 설정 (컴포넌트 밖으로 이동 — 매 렌더마다 재생성 방지)
-// 글로벌 SWRProvider의 5분 캐시와 동일 — 뒤로가기 시 캐시에서 즉시 표시
+// revalidateIfStale: true (기본값) — 5분 지난 캐시는 백그라운드 갱신
+// localStorage 캐시 덕분에 앱 재실행해도 즉시 이전 데이터 표시 후 갱신
 const swrConfig = {
   revalidateOnFocus: false,
-  revalidateIfStale: false,
-  dedupingInterval: 300000, // 5분 — 글로벌 캐시와 동일
+  dedupingInterval: 300000, // 5분 내 재방문은 캐시 그대로 사용
   keepPreviousData: true,
 };
 
@@ -145,6 +145,7 @@ export default function Feed() {
       ...swrConfig,
       revalidateOnFocus: true, // 다른 페이지에서 쪽지 작성 후 돌아올 때 갱신
       dedupingInterval: 30000, // 30초 — 쪽지는 자주 변하므로 짧게
+      fallbackData: [],        // 피드 로딩 블로킹 방지 — 쪽지는 보조 데이터
     }
   );
 
@@ -426,7 +427,11 @@ export default function Feed() {
     [nextEvents]
   );
 
-  const isLoading = !logsData || !recentNotesData || teamLoading;
+  // teamLoading은 제외 — 피드 폴라로이드는 팀 데이터 불필요 (헤더/ticker가 알아서 처리)
+  // 훈련 일지만 체크 — 쪽지(recentNotesData)는 fallbackData: []로 항상 정의됨
+  const isLoading = !logsData;
+  // 체크인/초대 배너는 eventsData만 있으면 즉시 렌더 (서버 fallback으로 즉시 주입됨)
+  const isEventsLoading = !eventsData;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -434,17 +439,17 @@ export default function Feed() {
         left={teamLoading ? (
           <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
         ) : teamLogoUrl ? (
-          <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority unoptimized />
+          <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority />
         ) : (
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="15" fill="#967B5D" />
-            <circle cx="16" cy="16" r="7" fill="none" stroke="#F5F0EB" strokeWidth="1.5" />
-            <path d="M16 9 L16 23 M9 16 L23 16" stroke="#F5F0EB" strokeWidth="1.5" strokeLinecap="round" />
-            <circle cx="16" cy="16" r="2.5" fill="#F5F0EB" />
+            <circle cx="16" cy="16" r="15" className="fill-team-500" />
+            <circle cx="16" cy="16" r="7" fill="none" className="stroke-team-50" strokeWidth="1.5" />
+            <path d="M16 9 L16 23 M9 16 L23 16" className="stroke-team-50" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="16" cy="16" r="2.5" className="fill-team-50" />
           </svg>
         )}
         right={
-          <Link href="/my" className="w-10 h-10 flex items-center justify-center text-team-500 hover:text-team-600 transition-colors">
+          <Link href="/my" className="w-10 h-10 flex items-center justify-center text-team-500 hover:text-team-600 active:opacity-60 transition-colors touch-manipulation">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
@@ -456,14 +461,14 @@ export default function Feed() {
       />
 
       {/* 전광판 */}
-      {!isLoading && (
-        <div className="sticky top-[41px] z-10">
+      {!isEventsLoading && (
+        <div className="sticky top-[41px] z-20">
           <TickerBanner messages={tickerMessages} />
         </div>
       )}
 
-      {/* 체크인 유도 카드 */}
-      {!isLoading && checkInEvents.length > 0 && (
+      {/* 체크인 유도 카드 — eventsData 있으면 즉시 표시 */}
+      {!isEventsLoading && checkInEvents.length > 0 && (
         <div className={`pt-8 pb-3 ${checkInEvents.length === 1 ? 'flex justify-center' : ''}`}>
           <div className={`overflow-x-auto scrollbar-hide px-4 ${checkInEvents.length === 1 ? '' : ''}`}>
             <div className={`flex gap-3 ${checkInEvents.length === 1 ? '' : 'w-max'}`}>
@@ -472,7 +477,6 @@ export default function Feed() {
                   key={event.id}
                   event={event}
                   onCheckInSuccess={fetchData}
-                  onShowToast={showToast}
                 />
               ))}
             </div>
@@ -481,7 +485,7 @@ export default function Feed() {
       )}
 
       {/* 미투표 초대장들 */}
-      {!isLoading && pendingInvites.length > 0 && (
+      {!isEventsLoading && pendingInvites.length > 0 && (
         <div className={`pt-3 pb-3 ${pendingInvites.length === 1 ? 'flex justify-center' : ''}`}>
           <div className={`overflow-x-auto scrollbar-hide px-4 ${pendingInvites.length === 1 ? '' : ''}`}>
             <div className={`flex gap-3 ${pendingInvites.length === 1 ? '' : 'w-max'}`}>
@@ -587,7 +591,7 @@ export default function Feed() {
           {isAdmin ? (
             <button
               onClick={() => setShowFabMenu(!showFabMenu)}
-              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 transition-all"
+              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-all touch-manipulation"
             >
               <svg
                 width="24"
@@ -607,7 +611,7 @@ export default function Feed() {
           ) : (
             <Link
               href="/compliment"
-              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 transition-colors"
+              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-all touch-manipulation"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
