@@ -591,7 +591,7 @@ export default function Feed() {
           {isAdmin ? (
             <button
               onClick={() => setShowFabMenu(!showFabMenu)}
-              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-all touch-manipulation"
+              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-[background-color,transform] touch-manipulation"
             >
               <svg
                 width="24"
@@ -611,7 +611,7 @@ export default function Feed() {
           ) : (
             <Link
               href="/compliment"
-              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-all touch-manipulation"
+              className="w-14 h-14 bg-team-500 rounded-full flex items-center justify-center shadow-lg hover:bg-team-600 active:scale-95 transition-[background-color,transform] touch-manipulation"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
