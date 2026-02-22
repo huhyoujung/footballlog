@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToUsers } from "@/lib/push";
+import { isPomVotingClosed } from "@/lib/pom";
 
 // POM 투표 결과 조회
 export async function GET(
@@ -23,6 +25,8 @@ export async function GET(
         date: true,
         teamId: true,
         pomVotesPerPerson: true,
+        pomVotingDeadline: true,
+        pomPushSentAt: true,
         team: { select: { name: true } },
       },
     });
@@ -71,6 +75,57 @@ export async function GET(
         reason: v.reason,
         tags: v.tags,
       }));
+
+    // MVP 푸시 알림 (lazy trigger: 마감 후 첫 조회 시 1회 발송)
+    const isClosed = isPomVotingClosed(
+      event.date.toISOString(),
+      event.pomVotingDeadline?.toISOString() ?? null
+    );
+
+    if (isClosed && !event.pomPushSentAt && results.length > 0) {
+      // 원자적 check-and-set (race condition 방지)
+      const updated = await prisma.trainingEvent.updateMany({
+        where: { id, pomPushSentAt: null },
+        data: { pomPushSentAt: new Date() },
+      });
+
+      if (updated.count > 0) {
+        // 1위 선수들 (공동 포함)
+        const topCount = results[0].count;
+        const mvps = results.filter((r) => r.count === topCount);
+        const mvpIds = mvps.map((r) => r.user.id);
+
+        // MVP 당선 알림
+        await Promise.allSettled(
+          mvps.map((mvp) =>
+            sendPushToUsers([mvp.user.id], {
+              title: mvpIds.length > 1 ? "🏆 공동 MVP!" : "🏆 오늘의 MVP는 당신!",
+              body:
+                mvpIds.length > 1
+                  ? "팀원들이 선택한 오늘의 영웅 중 한 명이에요 😍"
+                  : `${mvp.count}명의 팀원이 선택했어요. 이미 알고 있었죠? 😏`,
+              url: `/training/${id}`,
+            })
+          )
+        );
+
+        // 투표 적중 알림 (MVP에게 투표한 사람, MVP 본인 제외)
+        const mvpVoterIds = votes
+          .filter((v) => mvpIds.includes(v.nomineeId) && !mvpIds.includes(v.voterId))
+          .map((v) => v.voterId);
+
+        const uniqueVoterIds = [...new Set(mvpVoterIds)];
+
+        if (uniqueVoterIds.length > 0) {
+          const mvpNames = mvps.map((m) => m.user.name || "팀원").join(", ");
+          await sendPushToUsers(uniqueVoterIds, {
+            title: "👀 보는 눈이 있으시네요!",
+            body: `${mvpNames}님이 오늘 MVP가 됐어요. 탁월한 안목이에요 🎯`,
+            url: `/training/${id}`,
+          });
+        }
+      }
+    }
 
     return NextResponse.json({
       results,
