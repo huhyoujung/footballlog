@@ -19,7 +19,12 @@ export async function GET(
 
     const event = await prisma.trainingEvent.findUnique({
       where: { id },
-      select: { date: true, teamId: true, pomVotesPerPerson: true },
+      select: {
+        date: true,
+        teamId: true,
+        pomVotesPerPerson: true,
+        team: { select: { name: true } },
+      },
     });
 
     if (!event || event.teamId !== session.user.teamId) {
@@ -71,6 +76,8 @@ export async function GET(
       results,
       totalVotes: votes.length,
       pomVotesPerPerson: event.pomVotesPerPerson,
+      eventDate: event.date,
+      teamName: event.team.name,
       myVotes,
       // 하위 호환: 기존 myVote 필드 유지
       myVote: myVotes.length > 0 ? myVotes[0] : null,
