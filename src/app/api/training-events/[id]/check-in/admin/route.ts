@@ -100,6 +100,7 @@ export async function DELETE(
       return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
 
+    // 정책: 어드민은 수동 등록 여부와 무관하게 모든 체크인 취소 가능 (출석 정정 목적)
     // 체크인 기록 존재 여부 확인
     const existing = await prisma.checkIn.findUnique({
       where: { trainingEventId_userId: { trainingEventId: id, userId } },

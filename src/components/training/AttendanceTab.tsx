@@ -1,27 +1,13 @@
 "use client";
 
-interface User {
-  id: string;
-  name: string | null;
-  image: string | null;
-  position?: string | null;
-  number?: number | null;
-}
+import type { CheckInEntry } from "@/types/training-event";
 
 interface RsvpEntry {
   id: string;
   userId: string;
   status: "ATTEND" | "ABSENT" | "LATE";
   reason: string | null;
-  user: User;
-}
-
-interface CheckInEntry {
-  id: string;
-  userId: string;
-  checkedInAt: string;
-  isLate: boolean;
-  user: User;
+  user: { id: string; name: string | null; image: string | null };
 }
 
 interface Props {

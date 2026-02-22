@@ -52,7 +52,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   // URL 쿼리 파라미터에서 탭 설정 + 체크인 토스트
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "info" || tabParam === "latefee" || tabParam === "session" || tabParam === "equipment") {
+    if (tabParam === "info" || tabParam === "latefee" || tabParam === "session" || tabParam === "equipment" || tabParam === "attendance") {
       setActiveTab(tabParam);
     }
     const checkinTime = searchParams.get("checkin");
