@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '운영진만 도전장을 보낼 수 있습니다' }, { status: 403 });
     }
 
-    const { trainingEventId, responseDeadline } = await request.json();
+    const { trainingEventId, responseDeadline, quarterCount, quarterMinutes, quarterBreak, kickoffTime, quarterRefereeTeams } = await request.json();
 
     const event = await prisma.trainingEvent.findUnique({
       where: { id: trainingEventId },
@@ -47,21 +47,69 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '친선경기만 도전장을 보낼 수 있습니다' }, { status: 400 });
     }
 
-    if (event.matchStatus !== 'DRAFT') {
-      return NextResponse.json({ error: '이미 매칭이 진행 중입니다' }, { status: 400 });
+    // CONFIRMED 상태: matchRules만 업데이트, 상태/토큰 변경 없음
+    if (event.matchStatus === 'CONFIRMED') {
+      await prisma.matchRules.upsert({
+        where: { trainingEventId: event.id },
+        create: {
+          trainingEventId: event.id,
+          kickoffTime: kickoffTime ?? null,
+          quarterCount: quarterCount ?? 4,
+          quarterMinutes: quarterMinutes ?? 20,
+          quarterBreak: quarterBreak ?? 5,
+          quarterRefereeTeams: quarterRefereeTeams ?? null,
+          playersPerSide: event.minimumPlayers ?? 0,
+        },
+        update: {
+          ...(kickoffTime !== undefined && { kickoffTime }),
+          ...(quarterCount !== undefined && { quarterCount }),
+          ...(quarterMinutes !== undefined && { quarterMinutes }),
+          ...(quarterBreak !== undefined && { quarterBreak }),
+          ...(quarterRefereeTeams !== undefined && { quarterRefereeTeams }),
+        },
+      });
+      return NextResponse.json({ token: event.challengeToken, saved: true });
     }
 
-    // 최소 인원 충족 여부 확인
-    const requiredPlayers = event.matchRules?.playersPerSide ?? event.minimumPlayers ?? 0;
-    if (requiredPlayers > 0 && event.rsvps.length < requiredPlayers) {
-      return NextResponse.json(
-        { error: `최소 ${requiredPlayers}명이 참석 확정되어야 도전장을 보낼 수 있습니다 (현재 ${event.rsvps.length}명)`, code: 'INSUFFICIENT_PLAYERS' },
-        { status: 400 }
-      );
+    // CHALLENGE_SENT면 기존 토큰 유지하고 matchRules만 업데이트
+    if (event.matchStatus === 'CHALLENGE_SENT' && event.challengeToken) {
+      const updatedExpiresAt = responseDeadline ? new Date(responseDeadline) : event.challengeTokenExpiresAt;
+      await Promise.all([
+        prisma.matchRules.upsert({
+          where: { trainingEventId: event.id },
+          create: {
+            trainingEventId: event.id,
+            kickoffTime: kickoffTime ?? null,
+            quarterCount: quarterCount ?? 4,
+            quarterMinutes: quarterMinutes ?? 20,
+            quarterBreak: quarterBreak ?? 5,
+            quarterRefereeTeams: quarterRefereeTeams ?? null,
+            playersPerSide: event.minimumPlayers ?? 0,
+          },
+          update: {
+            ...(kickoffTime !== undefined && { kickoffTime }),
+            ...(quarterCount !== undefined && { quarterCount }),
+            ...(quarterMinutes !== undefined && { quarterMinutes }),
+            ...(quarterBreak !== undefined && { quarterBreak }),
+            ...(quarterRefereeTeams !== undefined && { quarterRefereeTeams }),
+            playersPerSide: event.minimumPlayers ?? 0,
+          },
+        }),
+        responseDeadline && prisma.trainingEvent.update({
+          where: { id: event.id },
+          data: { challengeTokenExpiresAt: new Date(responseDeadline) },
+        }),
+      ]);
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://lockerroom.team';
+      const challengeUrl = `${baseUrl}/invite/challenge/${event.challengeToken}`;
+      return NextResponse.json({ token: event.challengeToken, challengeUrl, expiresAt: updatedExpiresAt });
+    }
+
+    if (event.matchStatus !== 'DRAFT') {
+      return NextResponse.json({ error: '이미 확정된 경기입니다' }, { status: 400 });
     }
 
     const token = crypto.randomUUID();
-    // responseDeadline이 있으면 사용, 없으면 30일 기본값
     const expiresAt = responseDeadline
       ? new Date(responseDeadline)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -72,6 +120,27 @@ export async function POST(request: NextRequest) {
         challengeToken: token,
         challengeTokenExpiresAt: expiresAt,
         matchStatus: 'CHALLENGE_SENT',
+      },
+    });
+
+    await prisma.matchRules.upsert({
+      where: { trainingEventId: event.id },
+      create: {
+        trainingEventId: event.id,
+        kickoffTime: kickoffTime ?? null,
+        quarterCount: quarterCount ?? 4,
+        quarterMinutes: quarterMinutes ?? 20,
+        quarterBreak: quarterBreak ?? 5,
+        quarterRefereeTeams: quarterRefereeTeams ?? null,
+        playersPerSide: event.minimumPlayers ?? 0,
+      },
+      update: {
+        kickoffTime: kickoffTime ?? null,
+        quarterCount: quarterCount ?? 4,
+        quarterMinutes: quarterMinutes ?? 20,
+        quarterBreak: quarterBreak ?? 5,
+        quarterRefereeTeams: quarterRefereeTeams ?? null,
+        playersPerSide: event.minimumPlayers ?? 0,
       },
     });
 
