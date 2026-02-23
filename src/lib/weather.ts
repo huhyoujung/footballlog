@@ -455,6 +455,22 @@ export function getWeatherCardStyle(
   };
 }
 
+// 풍속 등급 (기상청 기준, m/s)
+export function getWindGrade(windKph: number | null): {
+  ms: number;
+  label: string;
+  color: string;
+  warning: boolean;
+} | null {
+  if (windKph === null || windKph === undefined) return null;
+  const ms = Math.round((windKph / 3.6) * 10) / 10;
+
+  if (ms < 4) return { ms, label: "잔잔", color: "#9CA3AF", warning: false };
+  if (ms < 9) return { ms, label: "약한 바람", color: "#3B82F6", warning: false };
+  if (ms < 14) return { ms, label: "바람 있음", color: "#F59E0B", warning: true };
+  return { ms, label: "강풍", color: "#EF4444", warning: true };  // 기상청 강풍주의보 기준 14m/s
+}
+
 // 날씨별 아이콘 타입 (lucide-react 아이콘 이름)
 export function getWeatherIcon(weather: string | null, timeOfDay?: TimeOfDay): string {
   if (!weather) return "Cloud";
