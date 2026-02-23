@@ -24,6 +24,7 @@ export async function GET(req: Request) {
           gte: deployedAt,
           lte: now,
         },
+        cancelled: false,
         equipmentCheckPushSentAt: null,
       },
       select: {
