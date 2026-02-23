@@ -21,7 +21,7 @@ export const usePWA = () => {
     logoUrl,
     startUrl = "/",
     description = "",
-    themeColor = "#967B5D",
+    themeColor = "#1D4237",
     backgroundColor = "white",
     orientation = "portrait",
   }: {

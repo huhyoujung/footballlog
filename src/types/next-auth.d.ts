@@ -14,6 +14,7 @@ declare module "next-auth" {
         id: string;
         name: string;
         inviteCode: string;
+        primaryColor?: string;
       } | null;
     };
   }
@@ -28,5 +29,11 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: Role;
     teamId?: string | null;
+    team?: {
+      id: string;
+      name: string;
+      inviteCode: string;
+      primaryColor?: string;
+    } | null;
   }
 }

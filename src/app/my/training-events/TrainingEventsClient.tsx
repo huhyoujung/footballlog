@@ -158,29 +158,33 @@ function EventCard({
       }`}
     >
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className={`text-base font-semibold ${event.cancelled ? "text-gray-400" : "text-gray-900"}`}>
+        <div className="flex-1 min-w-0">
+          <h3 className={`text-base font-semibold truncate ${event.cancelled ? "text-gray-400" : "text-gray-900"}`}>
             {event.title}
           </h3>
-          {isNext && !event.cancelled && (
-            <span className="px-2 py-0.5 bg-team-500 text-white text-[10px] font-bold rounded-full">
-              다음
-            </span>
-          )}
-          {event.isRegular && (
-            <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">
-              정기
-            </span>
-          )}
-          {event.isFriendlyMatch && (
-            <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full">
-              친선
-            </span>
-          )}
-          {event.cancelled && (
-            <span className="px-2 py-0.5 bg-red-50 text-red-500 text-[10px] font-medium rounded-full">
-              취소됨
-            </span>
+          {(isNext || event.isRegular || event.isFriendlyMatch || event.cancelled) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              {isNext && !event.cancelled && (
+                <span className="px-2 py-0.5 bg-team-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap">
+                  다음
+                </span>
+              )}
+              {event.isRegular && (
+                <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full whitespace-nowrap">
+                  정기
+                </span>
+              )}
+              {event.isFriendlyMatch && (
+                <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full whitespace-nowrap">
+                  친선
+                </span>
+              )}
+              {event.cancelled && (
+                <span className="px-2 py-0.5 bg-red-50 text-red-500 text-[10px] font-medium rounded-full whitespace-nowrap">
+                  취소됨
+                </span>
+              )}
+            </div>
           )}
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-1">

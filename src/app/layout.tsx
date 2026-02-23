@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import Script from "next/script";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { teamColorCssVars } from "@/lib/team-color";
 import SessionProvider from "@/components/SessionProvider";
 import PWAManager from "@/components/PWAManager";
 import TeamColorProvider from "@/components/TeamColorProvider";
@@ -42,20 +46,25 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#967B5D",
+  themeColor: "#1D4237",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 서버사이드에서 팀 컬러를 미리 주입해 FOUC(컬러 깜빡임) 방지
+  const session = await getServerSession(authOptions);
+  const primaryColor = session?.user?.team?.primaryColor || "#1D4237";
+  const cssVars = teamColorCssVars(primaryColor);
+
   return (
-    <html lang="ko">
+    <html lang="ko" style={cssVars as React.CSSProperties}>
       <body
         className="antialiased bg-gray-50 min-h-screen"
       >
@@ -70,6 +79,13 @@ export default function RootLayout({
         </SessionProvider>
         {/* 모달 전용 루트 - 모든 containing block 밖에 위치 */}
         <div id="modal-root"></div>
+        {/* Google AdSense */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4077089301782274"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

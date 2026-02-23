@@ -469,7 +469,6 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                   width={48}
                   height={48}
                   className="w-full h-full object-cover"
-                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -632,7 +631,6 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                             width={32}
                             height={32}
                             className="w-full h-full object-cover"
-                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">

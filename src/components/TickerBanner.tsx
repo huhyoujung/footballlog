@@ -69,7 +69,7 @@ export default function TickerBanner({ messages }: Props) {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255, 184, 77, 0.06) 0.5px, transparent 0.5px), radial-gradient(circle, rgba(255, 255, 255, 0.08) 0.8px, transparent 0.8px)',
+          backgroundImage: `radial-gradient(circle, color-mix(in srgb, var(--color-team-300) 6%, transparent) 0.5px, transparent 0.5px), radial-gradient(circle, rgba(255, 255, 255, 0.08) 0.8px, transparent 0.8px)`,
           backgroundSize: '3px 3px, 6px 6px',
           backgroundPosition: '0 0, 1.5px 1.5px',
         }}
@@ -116,7 +116,7 @@ export default function TickerBanner({ messages }: Props) {
             style={{
               fontFamily: '"Umdot", monospace',
               color: '#ffffff',
-              textShadow: '0 0 16px rgba(150, 123, 93, 1), 0 0 8px rgba(150, 123, 93, 0.8), 0 0 4px rgba(150, 123, 93, 0.6), 0 1px 2px rgba(0, 0, 0, 0.8)',
+              textShadow: `0 0 16px var(--color-team-500), 0 0 8px color-mix(in srgb, var(--color-team-500) 80%, transparent), 0 0 4px color-mix(in srgb, var(--color-team-500) 60%, transparent), 0 1px 2px rgba(0, 0, 0, 0.8)`,
               filter: 'brightness(1)',
               animation: current.text.length > 50 ? 'ticker-scroll 15s linear infinite' : 'none',
             }}

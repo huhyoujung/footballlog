@@ -16,24 +16,33 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async session({ session, token }) {
+      // JWT에서 읽기만 함 — DB 쿼리 없음 (매 요청마다 DB hit 제거)
       if (session.user && token.sub) {
-        const user = await prisma.user.findUnique({
-          where: { id: token.sub },
-          include: { team: true },
-        });
-
-        if (user) {
-          session.user.id = user.id;
-          session.user.role = user.role;
-          session.user.teamId = user.teamId;
-          session.user.team = user.team;
-        }
+        session.user.id = token.sub;
+        session.user.role = (token.role as "ADMIN" | "MEMBER") ?? "MEMBER";
+        session.user.teamId = (token.teamId as string | null) ?? null;
+        session.user.team = (token.team as typeof session.user.team) ?? null;
       }
       return session;
     },
-    async jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id;
+    async jwt({ token, user, trigger }) {
+      // 로그인 최초 1회 또는 update() 호출 시에만 DB 조회
+      if (user || trigger === "update") {
+        const userId = (user?.id ?? token.sub) as string;
+        const dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            role: true,
+            teamId: true,
+            team: { select: { id: true, name: true, inviteCode: true, primaryColor: true } },
+          },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+          token.teamId = dbUser.teamId;
+          token.team = dbUser.team;
+        }
       }
       return token;
     },

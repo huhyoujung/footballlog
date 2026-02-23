@@ -45,7 +45,7 @@ export async function POST(
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    const event = await prisma.trainingEvent.findUnique({ where: { id } });
+    const event = await prisma.trainingEvent.findUnique({ where: { id }, include: { matchRules: true } });
     if (!event || event.teamId !== session.user.teamId) {
       return NextResponse.json({ error: "운동을 찾을 수 없습니다" }, { status: 404 });
     }
@@ -64,6 +64,13 @@ export async function POST(
     if ((status === "ABSENT" || status === "LATE") && !reason?.trim()) {
       return NextResponse.json({ error: "사유를 입력해주세요" }, { status: 400 });
     }
+
+    // 이전 RSVP 상태 확인 (인원 충족 감지용)
+    const prevRsvp = await prisma.rsvp.findUnique({
+      where: { trainingEventId_userId: { trainingEventId: id, userId: session.user.id } },
+      select: { status: true },
+    });
+    const wasAttend = prevRsvp?.status === "ATTEND";
 
     const rsvp = await prisma.rsvp.upsert({
       where: {
@@ -87,10 +94,14 @@ export async function POST(
       },
     });
 
-    // 운영진에게 알림 (응답 이후 비동기 처리)
+    // 운영진에게 알림 + 친선경기 인원 충족 알림 (응답 이후 비동기 처리)
     const teamId = session.user.teamId;
     const userId = session.user.id;
     const userName = session.user.name || "팀원";
+    const newlyAttend = status === "ATTEND" && !wasAttend;
+    const isFriendlyDraft = event.isFriendlyMatch && event.matchStatus === "DRAFT";
+    const matchRules = event.matchRules as { playersPerSide?: number } | null;
+    const requiredPlayers = matchRules?.playersPerSide ?? event.minimumPlayers ?? 0;
     after(async () => {
       try {
         const admins = await prisma.user.findMany({
@@ -106,6 +117,31 @@ export async function POST(
         }
       } catch {
         // 푸시 실패해도 무시
+      }
+
+      // 친선경기 DRAFT 상태에서 인원이 딱 충족된 순간 ATTEND 멤버 전원에게 알림
+      if (newlyAttend && isFriendlyDraft && requiredPlayers > 0) {
+        try {
+          const attendCount = await prisma.rsvp.count({
+            where: { trainingEventId: id, status: "ATTEND" },
+          });
+          if (attendCount === requiredPlayers) {
+            const attendRsvps = await prisma.rsvp.findMany({
+              where: { trainingEventId: id, status: "ATTEND" },
+              select: { userId: true },
+            });
+            await sendPushToUsers(
+              attendRsvps.map((r) => r.userId),
+              {
+                title: "인원 충족! ⚔️",
+                body: "도전장을 보낼 준비가 됐어요. 지금 바로 도전장을 보내세요!",
+                url: `/training/${id}`,
+              }
+            );
+          }
+        } catch {
+          // 푸시 실패해도 무시
+        }
       }
     });
 

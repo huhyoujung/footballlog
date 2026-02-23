@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// 팀 출석률 조회
+// 팀 출석률 조회 — 정참·늦참은 참여, 불참·노쇼는 미참여로 계산
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,11 +12,12 @@ export async function GET() {
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    // 팀의 모든 운동 이벤트 조회
+    // 팀의 정기운동 이벤트만 — 정참·늦참 RSVP만 포함
     const events = await prisma.trainingEvent.findMany({
-      where: { teamId: session.user.teamId },
+      where: { teamId: session.user.teamId, isRegular: true },
       include: {
-        checkIns: {
+        rsvps: {
+          where: { status: { in: ["ATTEND", "LATE"] } },
           select: { userId: true },
         },
       },
@@ -36,13 +37,13 @@ export async function GET() {
 
     const totalEvents = events.length;
 
-    // 각 멤버별 출석률 계산
+    // 각 멤버별 출석률 계산 (정참+늦참 기준)
     const attendanceRates = members.map((member) => {
-      const checkInCount = events.filter((event) =>
-        event.checkIns.some((checkIn) => checkIn.userId === member.id)
+      const attendedCount = events.filter((event) =>
+        event.rsvps.some((r) => r.userId === member.id)
       ).length;
 
-      const rate = totalEvents > 0 ? Math.round((checkInCount / totalEvents) * 100) : 0;
+      const rate = totalEvents > 0 ? Math.round((attendedCount / totalEvents) * 100) : 0;
 
       return {
         userId: member.id,
@@ -50,7 +51,7 @@ export async function GET() {
         image: member.image,
         position: member.position,
         number: member.number,
-        checkInCount,
+        attendedCount,
         totalEvents,
         rate,
       };

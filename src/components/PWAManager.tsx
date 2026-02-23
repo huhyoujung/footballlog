@@ -114,7 +114,7 @@ export default function PWAManager() {
       // 팀 정보 fetch
       let teamName = "네모의 꿈";
       let teamLogo: string | null = null;
-      let themeColor = "#967B5D";
+      let themeColor = "#1D4237";
 
       if (session?.user?.teamId) {
         try {
@@ -123,7 +123,7 @@ export default function PWAManager() {
             const data = await res.json();
             teamName = `${data.name}의 락커룸`;
             teamLogo = data.logoUrl;
-            themeColor = data.primaryColor || "#967B5D";
+            themeColor = data.primaryColor || "#1D4237";
           }
         } catch {
           // 실패 시 기본값 사용

@@ -19,7 +19,7 @@ export async function PUT(
       return NextResponse.json({ error: "운영진만 수정할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, memo, requiresTeams, formation, positions } = await req.json();
+    const { title, memo, requiresTeams, positions, sessionType } = await req.json();
 
     const updated = await prisma.trainingSession.update({
       where: { id: sessionId },
@@ -27,7 +27,7 @@ export async function PUT(
         ...(title !== undefined && { title: title || null }),
         ...(memo !== undefined && { memo: memo || null }),
         ...(requiresTeams !== undefined && { requiresTeams }),
-        ...(formation !== undefined && { formation: formation || null }),
+        ...(sessionType !== undefined && { sessionType }),
         ...(positions !== undefined && { positions: positions || undefined }),
       },
     });

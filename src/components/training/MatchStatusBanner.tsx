@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { TrainingEventDetail } from "@/types/training-event";
 
 interface Props {
@@ -55,18 +56,13 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
   const handleStartMatch = async () => {
     if (!onStartMatch) return;
     setStartingMatch(true);
-    try {
-      const res = await fetch(`/api/training-events/${event.id}/match-status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "IN_PROGRESS" }),
-      });
-      if (res.ok) {
-        onStartMatch();
-      }
-    } finally {
-      setStartingMatch(false);
-    }
+    // API는 백그라운드, 즉시 라이브 페이지로 이동
+    fetch(`/api/training-events/${event.id}/match-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "IN_PROGRESS" }),
+    });
+    onStartMatch();
   };
 
   // 경기 당일 여부
@@ -83,6 +79,16 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
     icon = "🏁";
     text = `경기 종료 · ${event.teamAScore} : ${event.teamBScore}`;
     bgColor = "bg-gray-50 text-gray-600 border-gray-200";
+    if (event.challengeToken) {
+      action = (
+        <Link
+          href={`/invite/${event.challengeToken}`}
+          className="text-xs px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-gray-600 font-medium whitespace-nowrap"
+        >
+          결과 보기
+        </Link>
+      );
+    }
   } else if (event.matchStatus === "CANCELLED") {
     icon = "❌";
     text = event.challengeRejectionReason
@@ -102,7 +108,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
   } else if (event.matchStatus === "CONFIRMED") {
     if (isMatchDay && hasEnoughPlayers) {
       icon = "⚽";
-      text = isAdmin ? "오늘 경기입니다! 경기를 시작하세요." : "오늘 경기입니다!";
+      text = "경기를 시작하세요.";
       bgColor = "bg-green-50 text-green-700 border-green-100";
       action = (
         <div className="flex gap-1.5 shrink-0">
@@ -114,7 +120,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
               경기 방식
             </button>
           )}
-          {isAdmin && onStartMatch && (
+          {onStartMatch && (
             <button
               onClick={handleStartMatch}
               disabled={startingMatch}
@@ -223,7 +229,7 @@ export default function MatchStatusBanner({ event, isAdmin, onSendChallenge, onC
 
   return (
     <>
-      <div className="max-w-2xl mx-auto px-4 mt-3">
+      <div className="max-w-2xl mx-auto px-4 mt-5">
         <div className={`px-4 py-3 rounded-xl border flex items-center justify-between gap-2 ${bgColor}`}>
           <div className="flex items-center gap-2 min-w-0">
             <span aria-hidden="true">{icon}</span>

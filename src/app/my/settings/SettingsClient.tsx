@@ -35,6 +35,7 @@ interface Profile {
   image: string | null;
   position: string | null;
   number: number | null;
+  phoneNumber: string | null;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -52,6 +53,7 @@ export default function SettingsClient() {
   const [name, setName] = useState("");
   const [position, setPosition] = useState("");
   const [number, setNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // 푸시 알림 상태
@@ -76,6 +78,7 @@ export default function SettingsClient() {
       setName(profileData.name || "");
       setPosition(profileData.position || "");
       setNumber(profileData.number !== null ? String(profileData.number) : "");
+      setPhoneNumber(profileData.phoneNumber || "");
       setImagePreview(profileData.image);
     }
   }, [profileData]);
@@ -147,6 +150,7 @@ export default function SettingsClient() {
           name: name.trim(),
           position: position || null,
           number: number ? parseInt(number) : null,
+          phoneNumber: phoneNumber.trim() || null,
         }),
       });
 
@@ -321,6 +325,21 @@ export default function SettingsClient() {
             value={number}
             onChange={(e) => setNumber(e.target.value.replace(/[^0-9]/g, ""))}
             placeholder="등번호를 입력하세요 (0~99)"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* 전화번호 */}
+        <div className="bg-white rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            전화번호 <span className="text-xs text-gray-400 font-normal">(팀원에게만 공개)</span>
+          </label>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="010-0000-0000"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
           />
         </div>

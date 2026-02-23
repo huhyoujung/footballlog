@@ -139,8 +139,16 @@ export default function TrainingEditClient({ eventId }: { eventId: string }) {
       throw new Error(body.error || "저장에 실패했습니다");
     }
 
-    await mutate(`/api/training-events/${eventId}`);
-    await mutate(`/api/training-events/${eventId}?includeSessions=true`);
+    // 수정된 이벤트 + 관련 목록 캐시 모두 무효화
+    await Promise.all([
+      mutate(`/api/training-events/${eventId}`),
+      mutate(`/api/training-events/${eventId}?edit=true`),
+      mutate(`/api/training-events/${eventId}?includeSessions=true`),
+      mutate(`/api/training-events/next`),
+      mutate(`/api/training-events`),
+      mutate(`/api/training-events?filter=upcoming`),
+      mutate(`/api/training-events?filter=past`),
+    ]);
     router.push(`/training/${eventId}?tab=info`);
   };
 

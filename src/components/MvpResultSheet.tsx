@@ -97,6 +97,10 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
     }
   })();
 
+  // 공유 카드용: /_next/image 프록시를 통해 same-origin으로 로드 → CORS 캐시 오염 방지
+  const getProxiedImageUrl = (src: string, size: number) =>
+    `/_next/image?url=${encodeURIComponent(src)}&w=${size}&q=75`;
+
   const getTeamColor = (shade: string) => {
     if (typeof window === "undefined") return "";
     return getComputedStyle(document.documentElement)
@@ -194,7 +198,6 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                           width={64}
                           height={64}
                           className="w-16 h-16 rounded-full object-cover"
-                          unoptimized
                         />
                       ) : (
                         <div className="w-16 h-16 rounded-full bg-team-200 flex items-center justify-center">
@@ -272,7 +275,6 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                             width={32}
                             height={32}
                             className="w-8 h-8 rounded-full object-cover"
-                            unoptimized
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
@@ -472,9 +474,8 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                     {result.user.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={result.user.image}
+                        src={getProxiedImageUrl(result.user.image, isSharedFirst ? 144 : 192)}
                         alt=""
-                        crossOrigin="anonymous"
                         style={{
                           width: isSharedFirst ? 72 : 96,
                           height: isSharedFirst ? 72 : 96,
@@ -628,9 +629,8 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                     {result.user.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={result.user.image}
+                        src={getProxiedImageUrl(result.user.image, 64)}
                         alt=""
-                        crossOrigin="anonymous"
                         style={{
                           width: 32,
                           height: 32,

@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import BackButton from "@/components/BackButton";
 import PageHeader from "@/components/PageHeader";
 import TrainingEventForm, {
@@ -45,6 +45,13 @@ export default function TrainingCreateClient() {
     }
 
     const event = await res.json();
+    // 신규 이벤트 생성 후 관련 목록 캐시 무효화
+    await Promise.all([
+      mutate(`/api/training-events/next`),
+      mutate(`/api/training-events`),
+      mutate(`/api/training-events?filter=upcoming`),
+      mutate(`/api/training-events?filter=past`),
+    ]);
     router.push(`/training/${event.id}`);
   };
 

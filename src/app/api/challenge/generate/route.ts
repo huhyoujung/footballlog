@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         }),
       ]);
       const baseUrl = process.env.NEXTAUTH_URL || 'https://lockerroom.team';
-      const challengeUrl = `${baseUrl}/invite/challenge/${event.challengeToken}`;
+      const challengeUrl = `${baseUrl}/invite/${event.challengeToken}`;
       return NextResponse.json({ token: event.challengeToken, challengeUrl, expiresAt: updatedExpiresAt });
     }
 
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
     });
 
     const baseUrl = process.env.NEXTAUTH_URL || 'https://lockerroom.team';
-    const challengeUrl = `${baseUrl}/invite/challenge/${token}`;
+    const challengeUrl = `${baseUrl}/invite/${token}`;
 
     return NextResponse.json({ token, challengeUrl, expiresAt });
   } catch (error) {

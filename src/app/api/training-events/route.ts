@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToTeam, sendPushToUsers } from "@/lib/push";
+import { revalidatePath } from "next/cache";
 
 // 구장 신발 추천 업데이트 (최근 1회 데이터 기반)
 async function updateVenueRecommendation(venueId: string, currentShoes: string[]) {
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
       minimumPlayers,
       rsvpDeadlineOffset,
       opponentTeam,
+      opponentTeamId,
     } = await req.json();
 
     if (!title || !date || !location || !rsvpDeadline) {
@@ -206,6 +208,7 @@ export async function POST(req: Request) {
         minimumPlayers: minimumPlayers || null,
         rsvpDeadlineOffset: rsvpDeadlineOffset || null,
         opponentTeamName: isFriendlyMatch ? (opponentTeam || null) : null,
+        opponentTeamId: isFriendlyMatch ? (opponentTeamId || null) : null,
       },
     });
 
@@ -262,6 +265,10 @@ export async function POST(req: Request) {
     } catch {
       // 푸시 실패해도 생성은 성공
     }
+
+    // 팀 운동 목록 캐시 무효화 (피드 + 팀 운동 페이지)
+    revalidatePath("/my/training-events");
+    revalidatePath("/");
 
     return NextResponse.json(event, { status: 201 });
   } catch (error) {

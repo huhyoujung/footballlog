@@ -16,6 +16,8 @@ interface Props {
   checkInCount: number;
   lateFeeCount: number;
   sessionCount: number;
+  isFriendlyMatch?: boolean;
+  onEditRules?: () => void;
 }
 
 export default function KebabMenu({
@@ -29,6 +31,8 @@ export default function KebabMenu({
   checkInCount,
   lateFeeCount,
   sessionCount,
+  isFriendlyMatch,
+  onEditRules,
 }: Props) {
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
@@ -134,6 +138,17 @@ export default function KebabMenu({
             >
               공유하기
             </button>
+            {isFriendlyMatch && onEditRules && (
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  onEditRules();
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors border-t border-gray-100 touch-manipulation"
+              >
+                경기 방식 수정
+              </button>
+            )}
             <button
               onClick={() => {
                 setShowMenu(false);

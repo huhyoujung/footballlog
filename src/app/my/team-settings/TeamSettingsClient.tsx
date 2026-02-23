@@ -23,7 +23,7 @@ interface TeamInfo {
 // 접근성을 고려한 프리셋 컬러 (모바일 친화적)
 // 비슷한 색상 제거하여 선택하기 쉽게
 const PRESET_COLORS = [
-  { name: "브라운", color: "#967B5D" },    // 기본 갈색
+  { name: "딥그린", color: "#1D4237" },    // 기본 딥그린
   { name: "그린", color: "#059669" },      // 초록
   { name: "블루", color: "#3B82F6" },      // 파랑
   { name: "레드", color: "#DC2626" },      // 빨강
@@ -40,7 +40,7 @@ export default function TeamSettingsClient() {
   const [uploading, setUploading] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [primaryColor, setPrimaryColor] = useState("#967B5D");
+  const [primaryColor, setPrimaryColor] = useState("#1D4237");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -61,7 +61,7 @@ export default function TeamSettingsClient() {
     if (team) {
       setTeamName(team.name || "");
       setLogoUrl(team.logoUrl || null);
-      setPrimaryColor(team.primaryColor || "#967B5D");
+      setPrimaryColor(team.primaryColor || "#1D4237");
     }
   }, [team]);
 
@@ -205,7 +205,7 @@ export default function TeamSettingsClient() {
                 <img
                   src={logoUrl}
                   alt="팀 로고"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.nextElementSibling?.classList.remove('hidden');

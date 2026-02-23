@@ -1,4 +1,4 @@
-export type RsvpStatus = "ATTEND" | "ABSENT" | "LATE";
+export type RsvpStatus = "ATTEND" | "ABSENT" | "LATE" | "NO_SHOW";
 export type LateFeeStatus = "PENDING" | "PAID";
 
 export interface TrainingEventSummary {

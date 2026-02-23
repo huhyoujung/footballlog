@@ -1,7 +1,6 @@
-import { ImageResponse } from "@vercel/og";
+import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 
-export const runtime = "edge";
 export const alt = "팀 운동";
 export const size = {
   width: 1200,
@@ -17,7 +16,6 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     where: { id: eventId },
     include: {
       team: { select: { name: true, logoUrl: true, primaryColor: true } },
-      rsvps: { select: { id: true } },
     },
   });
 
@@ -36,7 +34,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     minute: "2-digit",
   });
 
-  const rsvpCount = event.rsvps.length;
+  const teamColor = event.team.primaryColor || "#1D4237";
 
   return new ImageResponse(
     (
@@ -47,7 +45,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #967B5D 0%, #685643 100%)",
+          background: `linear-gradient(135deg, ${teamColor} 0%, ${teamColor}99 100%)`,
           padding: "60px",
         }}
       >
@@ -88,7 +86,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                     width: "60px",
                     height: "60px",
                     borderRadius: "50%",
-                    background: "#967B5D",
+                    background: teamColor,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -103,36 +101,13 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   style={{
                     fontSize: "24px",
                     fontWeight: "600",
-                    color: "#967B5D",
+                    color: teamColor,
                   }}
                 >
                   {event.team.name}
                 </div>
-                <div
-                  style={{
-                    fontSize: "18px",
-                    color: "#9CA3AF",
-                  }}
-                >
-                  라커룸
-                </div>
               </div>
             </div>
-            {/* 응답 인원 */}
-            {rsvpCount > 0 && (
-              <div
-                style={{
-                  fontSize: "20px",
-                  color: "#6B7280",
-                  background: "#F3F4F6",
-                  padding: "8px 20px",
-                  borderRadius: "12px",
-                  fontWeight: "500",
-                }}
-              >
-                {rsvpCount}명 응답
-              </div>
-            )}
           </div>
 
           {/* 운동 제목 */}
@@ -172,7 +147,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   fontWeight: "500",
                 }}
               >
-                {dateStr} {timeStr}
+                {`${dateStr} ${timeStr}`}
               </div>
             </div>
 

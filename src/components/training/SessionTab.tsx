@@ -31,7 +31,7 @@ interface User {
 interface RsvpEntry {
   id: string;
   userId: string;
-  status: "ATTEND" | "ABSENT" | "LATE";
+  status: "ATTEND" | "ABSENT" | "LATE" | "NO_SHOW";
   reason: string | null;
   user: User;
 }
@@ -58,6 +58,7 @@ interface Props {
   rsvps: RsvpEntry[];
   onRefresh: () => void | Promise<unknown>;
   onSessionDelete?: (sessionId: string) => void;
+  isFriendlyMatch?: boolean;
 }
 
 // 세션 타입 판별 (하위 호환)
@@ -77,7 +78,7 @@ const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   ALL: "전체",
 };
 
-export default function SessionTab({ eventId, sessions, rsvps, onRefresh, onSessionDelete }: Props) {
+export default function SessionTab({ eventId, sessions, rsvps, onRefresh, onSessionDelete, isFriendlyMatch }: Props) {
   // 세션 생성 상태
   const [showTypeSheet, setShowTypeSheet] = useState(false);
   const [creationStep, setCreationStep] = useState<"closed" | "form">("closed");
@@ -779,6 +780,11 @@ export default function SessionTab({ eventId, sessions, rsvps, onRefresh, onSess
         {/* LINEUP 읽기 */}
         {type === "LINEUP" && sess.positions && Object.keys(sess.positions).length > 0 && (
           <div className="mt-3">
+            {isFriendlyMatch && (
+              <p className="text-xs text-team-600 bg-team-50 rounded-lg px-3 py-2 mb-2">
+                ⚡ 여기서 수정한 내용이 라이브 화면에 바로 반영됩니다
+              </p>
+            )}
             <TacticsBoard
               mode="readonly"
               positions={sess.positions as FreePositionsMap}

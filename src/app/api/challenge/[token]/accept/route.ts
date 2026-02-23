@@ -121,7 +121,7 @@ export async function POST(
         venueId: hostEvent.venueId,
         shoes: hostEvent.shoes,
         uniform: hostEvent.uniform,
-        notes: message || `${hostEvent.team.name} 팀의 도전장을 수락`,
+        notes: message?.trim() || null,
         rsvpDeadline: hostEvent.rsvpDeadline,
         rsvpDeadlineOffset: hostEvent.rsvpDeadlineOffset,
         minimumPlayers: hostEvent.minimumPlayers,
@@ -137,9 +137,27 @@ export async function POST(
         linkedEventId: opponentEvent.id,
         opponentTeamId: user.teamId,
         matchStatus: 'CONFIRMED',
-        challengeToken: null,
-        challengeTokenExpiresAt: null,
+        // challengeToken은 유지 — 경기 중 라이브 기록 링크로 재사용
       },
+    });
+
+    // 쿼터별 세션 자동 동기화 (기존 세션 삭제 후 재생성 — quarterCount 변경 반영)
+    const quarterCount = hostEvent.matchRules?.quarterCount ?? 4;
+    const sessionData = Array.from({ length: quarterCount }, (_, i) => ({
+      orderIndex: i,
+      title: `${i + 1}Q`,
+      requiresTeams: false,
+      sessionType: 'LINEUP',
+    }));
+
+    await prisma.trainingSession.deleteMany({ where: { trainingEventId: hostEvent.id } });
+    await prisma.trainingSession.createMany({
+      data: sessionData.map((s) => ({ ...s, trainingEventId: hostEvent.id })),
+    });
+
+    await prisma.trainingSession.deleteMany({ where: { trainingEventId: opponentEvent.id } });
+    await prisma.trainingSession.createMany({
+      data: sessionData.map((s) => ({ ...s, trainingEventId: opponentEvent.id })),
     });
 
     return NextResponse.json({

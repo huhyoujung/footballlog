@@ -13,16 +13,16 @@
   --background: #f9fafb;
   --foreground: #171717;
 
-  /* Primary - Team Brand (기본값: Warm Brown) */
+  /* Primary - Team Brand (기본값: Deep Green #1D4237) */
   /* TeamColorProvider가 동적으로 덮어씀 */
-  --color-team-50: #F7F5F3;
-  --color-team-100: #EFEBE7;
-  --color-team-200: #DED7CE;
-  --color-team-300: #C6B9A9;
-  --color-team-400: #B3A089;
-  --color-team-500: #977C5E;
-  --color-team-600: #7D684F;
-  --color-team-700: #5E4E3B;
+  --color-team-50: #F2F8F6;
+  --color-team-100: #E4F1ED;
+  --color-team-200: #C9E3DB;
+  --color-team-300: #9FD0C1;
+  --color-team-400: #7AC2AC;
+  --color-team-500: #1E4338;
+  --color-team-600: #3E8E76;
+  --color-team-700: #2F6A58;
 }
 
 @theme inline {
@@ -53,7 +53,7 @@
 
 html {
   height: 100%;
-  background: var(--background);
+  background: #ffffff; /* iOS 오버스크롤 시 html 배경 노출 — 헤더(흰색)와 동일하게 유지 */
   overscroll-behavior: none;
   scroll-behavior: smooth;
 }

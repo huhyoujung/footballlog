@@ -241,6 +241,7 @@ export default function TeamEquipmentClient() {
                           width={32}
                           height={32}
                           className="w-full h-full object-cover"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-full h-full bg-team-50" />

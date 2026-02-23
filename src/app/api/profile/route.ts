@@ -20,6 +20,7 @@ export async function GET() {
         image: true,
         position: true,
         number: true,
+        phoneNumber: true,
       },
     });
 
@@ -43,7 +44,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { name, image, position, number } = body;
+    const { name, image, position, number, phoneNumber } = body;
 
     const updateData: Record<string, unknown> = {};
 
@@ -69,6 +70,10 @@ export async function PUT(req: Request) {
       updateData.number = number;
     }
 
+    if (phoneNumber !== undefined) {
+      updateData.phoneNumber = phoneNumber || null;
+    }
+
     const user = await prisma.user.update({
       where: { id: session.user.id },
       data: updateData,
@@ -79,6 +84,7 @@ export async function PUT(req: Request) {
         image: true,
         position: true,
         number: true,
+        phoneNumber: true,
       },
     });
 

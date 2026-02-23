@@ -13,7 +13,7 @@ interface User {
 interface RsvpEntry {
   id: string;
   userId: string;
-  status: "ATTEND" | "ABSENT" | "LATE";
+  status: "ATTEND" | "ABSENT" | "LATE" | "NO_SHOW";
   reason: string | null;
   user: User;
 }

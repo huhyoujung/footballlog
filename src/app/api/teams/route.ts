@@ -137,6 +137,7 @@ export async function GET() {
                 role: true,
                 position: true,
                 number: true,
+                phoneNumber: true,
               },
             },
           },

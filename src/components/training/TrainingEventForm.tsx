@@ -5,7 +5,8 @@ import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
-import { Shirt } from "lucide-react";
+import { Shirt, Users } from "lucide-react";
+import Image from "next/image";
 
 function debounce<T extends (...args: Parameters<T>) => void>(
   func: T,
@@ -53,6 +54,7 @@ export interface TrainingEventFormData {
   isRegular: boolean;
   isFriendlyMatch: boolean;
   opponentTeam: string | null;
+  opponentTeamId: string | null;
   minimumPlayers: number | null;
   enablePomVoting: boolean;
   pomVotingDeadline: string | null;
@@ -102,6 +104,7 @@ export interface InitialFormValues {
   rsvpDeadlineTime?: string;
   selectedVenue?: VenueOption | null;
   opponentTeam?: string;
+  opponentTeamId?: string | null;
 }
 
 interface Props {
@@ -152,6 +155,7 @@ export default function TrainingEventForm({
   const [rsvpDeadlineDate, setRsvpDeadlineDate] = useState(initialValues?.rsvpDeadlineDate ?? "");
   const [rsvpDeadlineTime, setRsvpDeadlineTime] = useState(initialValues?.rsvpDeadlineTime ?? "22:00");
   const [opponentTeam, setOpponentTeam] = useState(initialValues?.opponentTeam ?? "");
+  const [selectedOpponentTeamId, setSelectedOpponentTeamId] = useState<string | null>(initialValues?.opponentTeamId ?? null);
 
   // 상대팀 검색
   const [teamResults, setTeamResults] = useState<{ id: string; name: string; logoUrl: string | null; _count: { members: number } }[]>([]);
@@ -201,6 +205,7 @@ export default function TrainingEventForm({
     if (initialValues.rsvpDeadlineTime !== undefined) setRsvpDeadlineTime(initialValues.rsvpDeadlineTime);
     if (initialValues.selectedVenue !== undefined) setSelectedVenue(initialValues.selectedVenue);
     if (initialValues.opponentTeam !== undefined) setOpponentTeam(initialValues.opponentTeam);
+    if (initialValues.opponentTeamId !== undefined) setSelectedOpponentTeamId(initialValues.opponentTeamId ?? null);
   }, [initialValues]);
 
   // ── 유니폼 ──
@@ -259,11 +264,13 @@ export default function TrainingEventForm({
 
   const handleOpponentTeamChange = (value: string) => {
     setOpponentTeam(value);
+    setSelectedOpponentTeamId(null); // 직접 타이핑 시 선택된 팀 ID 초기화
     debouncedSearchTeams(value);
   };
 
-  const handleTeamSelect = (team: { name: string }) => {
+  const handleTeamSelect = (team: { id: string; name: string }) => {
     setOpponentTeam(team.name);
+    setSelectedOpponentTeamId(team.id);
     setShowTeamList(false);
   };
 
@@ -378,6 +385,7 @@ export default function TrainingEventForm({
         isRegular,
         isFriendlyMatch,
         opponentTeam: isFriendlyMatch ? (opponentTeam.trim() || null) : null,
+        opponentTeamId: isFriendlyMatch ? (selectedOpponentTeamId || null) : null,
         minimumPlayers: isFriendlyMatch ? minimumPlayers : null,
         enablePomVoting,
         pomVotingDeadline,
@@ -454,7 +462,7 @@ export default function TrainingEventForm({
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <label className="block text-sm font-medium text-gray-700 mb-2">시간</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">집결 시간</label>
                 <input
                   type="time"
                   value={time}
@@ -526,10 +534,19 @@ export default function TrainingEventForm({
                             key={team.id}
                             type="button"
                             onClick={() => handleTeamSelect(team)}
-                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 flex items-center gap-3"
                           >
-                            <div className="text-sm font-medium text-gray-900">{team.name}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{team._count.members}명</div>
+                            <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                              {team.logoUrl ? (
+                                <Image src={team.logoUrl} alt={team.name} width={32} height={32} className="w-full h-full object-cover" unoptimized />
+                              ) : (
+                                <Users className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{team.name}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{team._count.members}명</div>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -537,7 +554,7 @@ export default function TrainingEventForm({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">최소 인원</label>
+                  <label className="block text-xs text-gray-500 mb-1">경기 인원</label>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -556,9 +573,9 @@ export default function TrainingEventForm({
                     >
                       +
                     </button>
-                    <span className="text-xs text-gray-400">명</span>
+                    <span className="text-sm font-semibold text-gray-500">명</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">친선경기 진행을 위한 최소 인원입니다</p>
+                  <p className="text-xs text-gray-400 mt-1">{minimumPlayers}명을 입력하면 {minimumPlayers}:{minimumPlayers} 경기로 진행합니다</p>
                 </div>
               </div>
             )}

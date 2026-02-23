@@ -15,7 +15,7 @@ export default function TeamColorProvider() {
         const res = await fetch("/api/teams");
         if (res.ok) {
           const data = await res.json();
-          const primaryColor = data.primaryColor || "#967B5D";
+          const primaryColor = data.primaryColor || "#1D4237";
 
           // CSS 변수 생성
           const cssVars = teamColorCssVars(primaryColor);

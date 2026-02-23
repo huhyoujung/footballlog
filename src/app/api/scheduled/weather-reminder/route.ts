@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToTeam } from "@/lib/push";
-import { getAirQualityGrade } from "@/lib/weather";
+import { getAirQualityGrade, getWindGrade } from "@/lib/weather";
 
 // 내일 예정된 운동의 날씨 알림 발송 (스케줄러용 API)
 // 매일 저녁 8시에 실행되도록 Vercel Cron 설정 필요
@@ -59,6 +59,18 @@ export async function GET(req: Request) {
 
       const weatherText = event.weatherDescription || event.weather;
 
+      // 체감온도
+      const feelsLikeText = event.feelsLikeC !== null && event.feelsLikeC !== event.temperature
+        ? ` (체감 ${event.feelsLikeC}°)`
+        : "";
+
+      // 풍속
+      let windText = "";
+      if (event.windKph !== null) {
+        const wind = getWindGrade(event.windKph);
+        if (wind && wind.ms >= 4) windText = ` · 💨 ${wind.ms}m/s ${wind.label}`;
+      }
+
       // 대기질 정보 추가
       let aqText = "";
       if (event.airQualityIndex !== null) {
@@ -70,7 +82,7 @@ export async function GET(req: Request) {
         // 팀 전체에게 푸시 알림
         await sendPushToTeam("", event.teamId, {
           title: "내일 운동 날씨",
-          body: `${event.title} · ${dateStr} · ${weatherIcon} ${weatherText} ${event.temperature}°C${aqText}`,
+          body: `${event.title} · ${dateStr} · ${weatherIcon} ${weatherText} ${event.temperature}°C${feelsLikeText}${windText}${aqText}`,
           url: `/training/${event.id}`,
         });
 

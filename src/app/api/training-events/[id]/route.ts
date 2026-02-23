@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUsers } from "@/lib/push";
+import { revalidatePath } from "next/cache";
 
 const userSelect = { id: true, name: true, image: true, position: true, number: true };
 
@@ -253,8 +254,14 @@ export async function PUT(
       venueId = venue.id;
     }
 
-    // 조끼 당번 수정 시, 이후 운동에서 이미 설정되어 있으면 수정 불가
-    if (body.vestBringerId !== undefined || body.vestReceiverId !== undefined) {
+    // 조끼 당번이 다른 사람으로 변경될 때만 이후 운동 체크
+    // (같은 값 유지 or 선택안함으로 비우는 것은 허용)
+    const newVestBringerId = body.vestBringerId !== undefined ? (body.vestBringerId || null) : undefined;
+    const newVestReceiverId = body.vestReceiverId !== undefined ? (body.vestReceiverId || null) : undefined;
+    const vestBringerChanged = newVestBringerId !== undefined && newVestBringerId !== null && newVestBringerId !== event.vestBringerId;
+    const vestReceiverChanged = newVestReceiverId !== undefined && newVestReceiverId !== null && newVestReceiverId !== event.vestReceiverId;
+
+    if (vestBringerChanged || vestReceiverChanged) {
       const laterEventWithVest = await prisma.trainingEvent.findFirst({
         where: {
           teamId: event.teamId,
@@ -375,6 +382,8 @@ export async function PUT(
       // 푸시 실패해도 수정은 성공
     }
 
+    revalidatePath("/my/training-events");
+    revalidatePath("/");
     return NextResponse.json(updated);
   } catch (error) {
     console.error("팀 운동 수정 오류:", error);
@@ -404,6 +413,8 @@ export async function DELETE(
     }
 
     await prisma.trainingEvent.delete({ where: { id } });
+    revalidatePath("/my/training-events");
+    revalidatePath("/");
     return NextResponse.json({ message: "삭제되었습니다" });
   } catch (error) {
     console.error("팀 운동 삭제 오류:", error);

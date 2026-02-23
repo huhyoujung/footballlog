@@ -22,10 +22,8 @@ import { useToast } from "@/lib/useToast";
 const LateFeeTab = lazy(() => import("@/components/training/LateFeeTab"));
 const SessionTab = lazy(() => import("@/components/training/SessionTab"));
 const EquipmentTab = lazy(() => import("@/components/training/EquipmentTab"));
-const AttendanceTab = lazy(() => import("@/components/training/AttendanceTab"));
-const AttendanceManageSheet = lazy(() => import("@/components/training/AttendanceManageSheet"));
 
-type AdminTab = "info" | "latefee" | "session" | "equipment" | "attendance";
+type AdminTab = "info" | "latefee" | "session" | "equipment";
 
 export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const { data: session } = useSession();
@@ -34,7 +32,6 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const [showConvertSheet, setShowConvertSheet] = useState(false);
   const [converting, setConverting] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
-  const [showAttendanceManage, setShowAttendanceManage] = useState(false);
   const [sendingChallenge, setSendingChallenge] = useState(false);
   // 응답기한: 기본 30일 후
   const defaultDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -52,7 +49,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   // URL 쿼리 파라미터에서 탭 설정 + 체크인 토스트
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "info" || tabParam === "latefee" || tabParam === "session" || tabParam === "equipment" || tabParam === "attendance") {
+    if (tabParam === "info" || tabParam === "latefee" || tabParam === "session" || tabParam === "equipment") {
       setActiveTab(tabParam);
     }
     const checkinTime = searchParams.get("checkin");
@@ -382,7 +379,6 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     { key: "session", label: "세션" },
     { key: "latefee", label: "지각비" },
     { key: "equipment", label: "장비" },
-    { key: "attendance", label: "출석" },
   ];
 
   return (
@@ -402,6 +398,8 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
             checkInCount={event.checkIns.length}
             lateFeeCount={event.lateFees?.length || 0}
             sessionCount={event.sessions.length}
+            isFriendlyMatch={event.isFriendlyMatch}
+            onEditRules={event.isFriendlyMatch && event.matchStatus === "CONFIRMED" ? openSendDialog : undefined}
           />
         ) : (
           <button
@@ -435,8 +433,8 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
         </div>
       )}
 
-      {/* 친선경기 매치 상태 배너 */}
-      <MatchStatusBanner
+      {/* 친선경기 매치 상태 배너 (기본 정보 탭에서만 표시) */}
+      {(!isAdmin || activeTab === "info") && <MatchStatusBanner
         event={event}
         isAdmin={isAdmin}
         onSendChallenge={() => {
@@ -445,7 +443,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
         }}
         onCopyLink={handleCopyLink}
         onEditChallenge={handleEditChallenge}
-        onEditRules={event?.matchStatus === "CONFIRMED" ? openSendDialog : undefined}
+        onEditRules={undefined}
         onConvertToRegular={isAdmin ? () => setShowConvertSheet(true) : undefined}
         onStartMatch={() => {
           if (event?.challengeToken) {
@@ -455,7 +453,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
           }
         }}
         mutate={() => mutate()}
-      />
+      />}
 
       <main className="max-w-2xl mx-auto p-4 space-y-3">
         {!isAdmin && (
@@ -481,6 +479,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
               sessions={event.sessions}
               rsvps={event.rsvps}
               onRefresh={() => mutate()}
+              isFriendlyMatch={event.isFriendlyMatch}
               onSessionDelete={(sessionId) => {
                 mutate(
                   (data) => data ? { ...data, sessions: data.sessions.filter((s) => s.id !== sessionId) } : data,
@@ -510,30 +509,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
           </Suspense>
         )}
 
-        {isAdmin && activeTab === "attendance" && (
-          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-team-500" /></div>}>
-            <AttendanceTab
-              rsvps={event.rsvps}
-              checkIns={event.checkIns}
-              isAdmin={isAdmin}
-              onManageClick={() => setShowAttendanceManage(true)}
-            />
-          </Suspense>
-        )}
       </main>
-
-      {isAdmin && showAttendanceManage && (
-        <Suspense fallback={null}>
-          <AttendanceManageSheet
-            eventId={eventId}
-            teamId={event.teamId}
-            checkIns={event.checkIns}
-            isOpen={showAttendanceManage}
-            onClose={() => setShowAttendanceManage(false)}
-            onRefresh={() => mutate()}
-          />
-        </Suspense>
-      )}
 
       {/* 도전장 발송 다이얼로그 */}
       {showSendDialog && (

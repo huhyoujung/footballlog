@@ -15,13 +15,11 @@ interface TrainingEvent {
 interface TrainingCheckInCardProps {
   event: TrainingEvent;
   onCheckInSuccess?: () => void;
-  onShowToast?: (message: string) => void;
 }
 
 export default function TrainingCheckInCard({
   event,
   onCheckInSuccess,
-  onShowToast,
 }: TrainingCheckInCardProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -34,34 +32,29 @@ export default function TrainingCheckInCard({
     router.prefetch(`/training/${event.id}`);
   }, [router, event.id]);
 
-  const handleCheckIn = async (e: React.MouseEvent) => {
+  const handleCheckIn = (e: React.MouseEvent) => {
     e.preventDefault();
     if (submitting) return;
 
     setSubmitting(true);
+    playSound("whistle"); // 🎵 즉시 피드백 — 탭하자마자 소리
 
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
 
-    try {
-      const res = await fetch(`/api/training-events/${event.id}/check-in`, {
-        method: "POST",
-      });
+    // Optimistic: 즉시 이동 (99% 성공하므로), 백그라운드에서 API 처리
+    onCheckInSuccess?.();
+    router.push(`/training/${event.id}?checkin=${encodeURIComponent(timeStr)}`);
 
-      if (res.ok) {
-        playSound("whistle"); // 🎵 체크인 성공 - 휘슬 소리!
-        onCheckInSuccess?.();
-        // 체크인 완료 후 training 상세 페이지로 이동 (query param으로 토스트 전달)
-        router.push(`/training/${event.id}?checkin=${encodeURIComponent(timeStr)}`);
-      } else {
-        const data = await res.json();
-        onShowToast?.(data.error || "체크인에 실패했습니다");
-        setSubmitting(false);
-      }
-    } catch (error) {
-      onShowToast?.("체크인에 실패했습니다");
-      setSubmitting(false);
-    }
+    // 백그라운드 API 호출 — 실패해도 페이지 이동은 완료됨
+    fetch(`/api/training-events/${event.id}/check-in`, { method: "POST" })
+      .then((res) => {
+        if (!res.ok) {
+          // 드문 실패 케이스 — 체크인 안됨 (SWR 갱신 시 반영됨)
+          console.warn("체크인 실패 — 서버에서 거부됨");
+        }
+      })
+      .catch(() => {});
   };
 
   // 명확한 버튼이 있는 체크인 카드

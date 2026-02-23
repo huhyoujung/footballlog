@@ -18,6 +18,10 @@ const ConditionPicker = lazy(() => import("@/components/ConditionPicker"));
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+// KST (UTC+9) 기준 날짜 문자열 — 이벤트 날짜 자동입력 시 서버UTC와 불일치 방지
+const toKstDateString = (date: Date) =>
+  new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+
 export default function WriteClient() {
   return (
     <Suspense fallback={<WritePageSkeleton />}>
@@ -126,7 +130,7 @@ function WritePageContent() {
     logType: "personal",
     trainingEventId: null,
     title: "",
-    trainingDate: new Date().toISOString().split("T")[0],
+    trainingDate: toKstDateString(new Date()),
     condition: null,
     conditionReason: "",
     keyPoints: "",
@@ -326,7 +330,7 @@ function WritePageContent() {
                       title: "",
                       trainingEventId: selectedEvent?.id || null,
                       trainingDate: selectedEvent
-                        ? new Date(selectedEvent.date).toISOString().split("T")[0]
+                        ? toKstDateString(new Date(selectedEvent.date))
                         : formData.trainingDate,
                     });
                   }
@@ -355,7 +359,7 @@ function WritePageContent() {
                     ...formData,
                     trainingEventId: e.target.value || null,
                     trainingDate: selectedEvent
-                      ? new Date(selectedEvent.date).toISOString().split("T")[0]
+                      ? toKstDateString(new Date(selectedEvent.date))
                       : formData.trainingDate,
                   });
                 }}

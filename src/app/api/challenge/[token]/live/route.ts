@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const userSelect = { id: true, name: true, image: true };
+const userSelect = { id: true, name: true, image: true, position: true };
 
 // GET /api/challenge/[token]/live - 라이브 경기 데이터 (인증 불필요, token = 접근 권한)
 export async function GET(
@@ -50,6 +50,7 @@ export async function GET(
               select: {
                 orderIndex: true,
                 title: true,
+                positions: true,
                 teamAssignments: {
                   select: {
                     teamLabel: true,
@@ -65,6 +66,7 @@ export async function GET(
           select: {
             orderIndex: true,
             title: true,
+            positions: true,
             teamAssignments: {
               select: {
                 teamLabel: true,

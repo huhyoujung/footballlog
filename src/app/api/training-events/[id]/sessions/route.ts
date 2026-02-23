@@ -51,7 +51,7 @@ export async function POST(
       return NextResponse.json({ error: "운영진만 생성할 수 있습니다" }, { status: 403 });
     }
 
-    const { title, memo, requiresTeams } = await req.json();
+    const { title, memo, requiresTeams, sessionType } = await req.json();
 
     // 다음 orderIndex 계산
     const lastSession = await prisma.trainingSession.findFirst({
@@ -59,12 +59,15 @@ export async function POST(
       orderBy: { orderIndex: "desc" },
     });
 
+    const type = sessionType || (requiresTeams ? "TEAMS" : "ALL");
+
     const trainingSession = await prisma.trainingSession.create({
       data: {
         trainingEventId: id,
         title: title || null,
         memo: memo || null,
-        requiresTeams: requiresTeams ?? false,
+        requiresTeams: type === "TEAMS",
+        sessionType: type,
         orderIndex: (lastSession?.orderIndex ?? -1) + 1,
       },
       include: {

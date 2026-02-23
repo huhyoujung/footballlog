@@ -90,7 +90,7 @@ export default function MatchRulesBottomSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={saving ? undefined : onClose} />
       <div className="relative w-full bg-white rounded-t-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 className="font-semibold text-gray-900">경기 방식 수정</h3>
 
@@ -248,7 +248,8 @@ export default function MatchRulesBottomSheet({
         <div className="flex gap-2 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium"
+            disabled={saving}
+            className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium disabled:opacity-50"
           >
             취소
           </button>

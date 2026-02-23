@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import Image from "next/image";
 
 interface TeamMember {
@@ -25,6 +26,7 @@ interface TeamInfo {
 
 export default function VestClient() {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [loading, setLoading] = useState(true);
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [vestOrder, setVestOrder] = useState<string[]>([]);
@@ -127,6 +129,9 @@ export default function VestClient() {
       });
 
       if (res.ok) {
+        // 팀 운동 생성/수정 페이지에서 최신 조끼 순서를 사용하도록 캐시 무효화
+        await mutate("/api/teams");
+        await mutate("/api/training-events/vest-suggestion");
         setSuccess("조끼 순서가 저장되었습니다");
         setTimeout(() => {
           router.push("/my/team-admin");
@@ -199,6 +204,7 @@ export default function VestClient() {
                           width={32}
                           height={32}
                           className="w-full h-full object-cover"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-full h-full bg-team-50" />

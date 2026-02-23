@@ -15,7 +15,7 @@ interface PageHeaderProps {
  */
 export default function PageHeader({ title, left, right, sticky = true, className = "" }: PageHeaderProps) {
   return (
-    <header className={`bg-white border-b border-gray-200 ${sticky ? "sticky top-0 z-10" : ""} ${className}`.trim()}>
+    <header className={`bg-white border-b border-gray-200 ${sticky ? "sticky top-0 z-30" : ""} ${className}`.trim()}>
       <div className="max-w-2xl mx-auto px-4 h-10 flex items-center justify-between relative">
         <div className="z-[1] flex items-center shrink-0">{left ?? <div className="w-10" />}</div>
         {title && (

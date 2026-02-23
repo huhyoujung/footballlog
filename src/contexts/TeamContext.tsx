@@ -12,6 +12,7 @@ interface TeamMember {
   role: string;
   position: string | null;
   number: number | null;
+  phoneNumber: string | null;
   attendanceRate: number;
 }
 

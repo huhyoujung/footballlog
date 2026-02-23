@@ -9,6 +9,7 @@ interface TeamMember {
   role: string;
   position?: string | null;
   number?: number | null;
+  phoneNumber?: string | null;
   attendanceRate?: number;
 }
 
@@ -63,7 +64,6 @@ export default function TeamMemberList({
                     width={24}
                     height={24}
                     className="w-full h-full object-cover"
-                    unoptimized
                   />
                 ) : (
                   <div className="w-full h-full bg-team-50" />

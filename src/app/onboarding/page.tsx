@@ -193,7 +193,10 @@ export default function OnboardingPage() {
 
             <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-100">
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={async () => {
+                  await signOut({ redirect: false });
+                  window.location.href = "/login";
+                }}
                 className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
               >
                 로그아웃

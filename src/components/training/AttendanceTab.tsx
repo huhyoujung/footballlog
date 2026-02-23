@@ -5,7 +5,7 @@ import type { CheckInEntry } from "@/types/training-event";
 interface RsvpEntry {
   id: string;
   userId: string;
-  status: "ATTEND" | "ABSENT" | "LATE";
+  status: "ATTEND" | "ABSENT" | "LATE" | "NO_SHOW";
   reason: string | null;
   user: { id: string; name: string | null; image: string | null };
 }

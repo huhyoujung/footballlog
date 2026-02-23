@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+// 소셜 미디어 크롤러 User-Agent (OG 미리보기 생성용)
+const CRAWLER_UA_REGEX = /facebookexternalhit|Twitterbot|KakaoTalk|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot|bingbot|Googlebot|YandexBot|Applebot/i;
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const userAgent = req.headers.get("user-agent") || "";
 
   // 공개 경로는 통과
   if (
     pathname === "/login" ||
     pathname.startsWith("/invite/") ||
-    pathname === "/test-modal"
+    pathname === "/test-modal" ||
+    pathname.endsWith("/opengraph-image") || // OG 이미지는 크롤러가 접근해야 함
+    CRAWLER_UA_REGEX.test(userAgent) // 소셜 미디어 크롤러는 OG 태그 읽도록 통과
   ) {
     return NextResponse.next();
   }

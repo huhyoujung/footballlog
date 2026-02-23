@@ -10,7 +10,7 @@ interface AttendanceRate {
   image: string | null;
   position: string | null;
   number: number | null;
-  checkInCount: number;
+  attendedCount: number;
   totalEvents: number;
   rate: number;
 }
@@ -146,7 +146,7 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
                             : "text-gray-400"
                       }`}
                     >
-                      {item.checkInCount}회 ({item.rate}%)
+                      {item.attendedCount}회 ({item.rate}%)
                     </span>
                   </div>
                 </div>

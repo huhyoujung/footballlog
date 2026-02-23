@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildPhases } from "@/lib/match-phases";
 
-type TimerAction = "start" | "pause" | "next" | "prev";
+type TimerAction = "start" | "pause" | "next" | "prev" | "setPhase";
 
 // POST /api/challenge/[token]/timer - 쿼터 타이머 제어 (start/pause/next/prev)
 export async function POST(
@@ -85,8 +85,8 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action } = body as { action: unknown };
-    const validActions = ["start", "pause", "next", "prev"];
+    const { action, phase: targetPhase } = body as { action: unknown; phase?: number };
+    const validActions = ["start", "pause", "next", "prev", "setPhase"];
     if (!action || !validActions.includes(action as string)) {
       return NextResponse.json({ error: "유효하지 않은 action" }, { status: 400 });
     }
@@ -161,6 +161,24 @@ export async function POST(
           timerElapsedSec: 0,
           timerStartedAt: now,
           currentPhase: prevPhase,
+        };
+        break;
+      }
+
+      case "setPhase": {
+        const phases = buildPhases(
+          rules.quarterCount,
+          rules.quarterMinutes,
+          rules.quarterBreak,
+          rules.halftime
+        );
+        if (typeof targetPhase !== "number" || targetPhase < 1 || targetPhase > phases.length) {
+          return NextResponse.json({ error: "유효하지 않은 페이즈 번호" }, { status: 400 });
+        }
+        updateData = {
+          timerElapsedSec: 0,
+          timerStartedAt: now,
+          currentPhase: targetPhase,
         };
         break;
       }
