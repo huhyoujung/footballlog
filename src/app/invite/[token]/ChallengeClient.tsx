@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Calendar, Clock, Shield, Footprints, Download, Shirt, ChevronDown, Play, Trophy, Pencil } from "lucide-react";
+import { MapPin, Calendar, Clock, Shield, Footprints, Share2, Shirt, ChevronDown, Play, Pencil } from "lucide-react";
 import dynamic from "next/dynamic";
 import MatchRulesBottomSheet from "@/components/training/MatchRulesBottomSheet";
 import type { MatchRulesPayload } from "@/components/training/MatchRulesBottomSheet";
@@ -62,6 +62,9 @@ interface ChallengeEvent {
   opponentTeamName: string | null;
   teamAScore: number;
   teamBScore: number;
+  weather: string | null;
+  weatherDescription: string | null;
+  temperature: number | null;
   matchRules: MatchRules | null;
   goalRecords: GoalRecord[];
   cardRecords: CardRecord[];
@@ -73,6 +76,7 @@ interface Props {
   token: string;
   event: ChallengeEvent | null;
   isLoggedIn: boolean;
+  userId: string | null;
   hasTeam: boolean;
   isSameTeam: boolean;
   isAdmin: boolean;
@@ -99,6 +103,20 @@ function ConfirmedView({
 }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
+
+  // 다른 관전자가 경기 시작 대기 중일 때 자동 감지 (3초 폴링)
+  // /live 엔드포인트가 200 반환 = IN_PROGRESS 됐다는 뜻
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/challenge/${token}/live`);
+        if (res.ok) {
+          onStarted();
+        }
+      } catch { /* 무시 */ }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [token, onStarted]);
 
   const handleStart = async () => {
     setStarting(true);
@@ -161,151 +179,235 @@ function ConfirmedView({
   );
 }
 
+function getWeatherIcon(weather: string | null): string {
+  if (!weather) return "🌤️";
+  if (weather === "Clear") return "☀️";
+  if (weather === "Clouds") return "☁️";
+  if (weather === "Rain") return "🌧️";
+  if (weather === "Snow") return "❄️";
+  return "🌤️";
+}
+
 function MatchResultView({
   event,
   opponentTeam,
   opponentTeamName,
+  userId,
 }: {
   event: ChallengeEvent;
   opponentTeam: TeamInfo | null;
   opponentTeamName: string | null;
+  userId: string | null;
 }) {
+  const router = useRouter();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+
   const teamAColor = event.team.primaryColor;
   const teamBColor = opponentTeam?.primaryColor ?? "#374151";
   const teamAName = event.team.name;
   const teamBName = opponentTeam?.name ?? opponentTeamName ?? "상대팀";
+  const winner =
+    event.teamAScore > event.teamBScore ? "A" :
+    event.teamBScore > event.teamAScore ? "B" : null;
 
-  const quarterSet = Array.from(new Set([
-    ...event.goalRecords.map((g) => g.quarter),
-    ...event.cardRecords.map((c) => c.quarter),
-  ])).sort((a, b) => a - b);
+  // 팀별 득점자 분류
+  const teamAScorers = event.goalRecords.filter((g) =>
+    g.isOwnGoal ? g.scoringTeam === "TEAM_B" : g.scoringTeam === "TEAM_A"
+  );
+  const teamBScorers = event.goalRecords.filter((g) =>
+    g.isOwnGoal ? g.scoringTeam === "TEAM_A" : g.scoringTeam === "TEAM_B"
+  );
 
-  const hasEvents = event.goalRecords.length > 0 || event.cardRecords.length > 0;
+  const proxiedLogo = (url: string) =>
+    `/_next/image?url=${encodeURIComponent(url)}&w=128&q=75`;
+
+  const TeamAvatar = ({ team }: { team: { logoUrl: string | null; name: string; primaryColor: string } }) =>
+    team.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={proxiedLogo(team.logoUrl)}
+        alt={team.name}
+        className="w-14 h-14 rounded-full object-cover border-2 border-white/80 shadow mx-auto"
+        crossOrigin="anonymous"
+      />
+    ) : (
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center font-black text-white text-2xl border-2 border-white/80 shadow mx-auto"
+        style={{ backgroundColor: team.primaryColor }}
+      >
+        {team.name[0]}
+      </div>
+    );
+
+  const handleShare = async () => {
+    if (!cardRef.current || sharing) return;
+    setSharing(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dateStr = new Date(event.date)
+        .toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+        .replace(/\.\s*/g, "-").replace(/-$/, "");
+      const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 2 });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `경기결과-${dateStr}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `${teamAName} ${event.teamAScore} - ${event.teamBScore} ${teamBName}` });
+      } else {
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = `경기결과-${dateStr}.png`;
+        link.click();
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.error(err);
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-8">
       <div className="max-w-sm w-full space-y-3">
-        {/* 스코어 카드 */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 text-center" style={{ background: `linear-gradient(135deg, ${teamAColor}18, ${teamBColor}18)` }}>
-            <div className="flex items-center justify-between gap-3 mb-4">
-              {/* 팀 A */}
-              <div className="flex-1 text-center">
-                {event.team.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={event.team.logoUrl} alt={teamAName} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow mx-auto mb-1.5" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shadow mx-auto mb-1.5" style={{ backgroundColor: teamAColor }}>
-                    {teamAName[0]}
-                  </div>
-                )}
-                <p className="text-sm font-bold text-gray-900 truncate">{teamAName}</p>
-              </div>
-              {/* 스코어 */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-4xl font-black" style={{ color: teamAColor }}>{event.teamAScore}</span>
-                <span className="text-2xl font-light text-gray-300">:</span>
-                <span className="text-4xl font-black" style={{ color: teamBColor }}>{event.teamBScore}</span>
-              </div>
-              {/* 팀 B */}
-              <div className="flex-1 text-center">
-                {opponentTeam?.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={opponentTeam.logoUrl} alt={teamBName} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow mx-auto mb-1.5" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shadow mx-auto mb-1.5" style={{ backgroundColor: teamBColor }}>
-                    {teamBName[0]}
-                  </div>
-                )}
-                <p className="text-sm font-bold text-gray-900 truncate">{teamBName}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-1.5">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs font-semibold text-gray-500">
-                {event.teamAScore > event.teamBScore ? `${teamAName} 승리` :
-                 event.teamBScore > event.teamAScore ? `${teamBName} 승리` : "무승부"}
-              </span>
-            </div>
-          </div>
+        {/* 카드 wrapper — 공유 버튼은 카드 밖 (캡처 제외) */}
+        <div className="relative">
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-white/70 hover:bg-white/95 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            title="결과 공유하기"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
 
-          {/* 날짜/장소 */}
-          <div className="px-6 py-3 border-t border-gray-100 space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
-              <span>{new Date(event.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</span>
+          {/* 캡처 대상 카드 */}
+          <div ref={cardRef} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+
+            {/* 그라디언트 헤더 */}
+            <div
+              className="relative px-6 pt-7 pb-7"
+              style={{ background: `linear-gradient(135deg, ${teamAColor}18 0%, ${teamBColor}18 100%)` }}
+            >
+              <p className="text-[11px] font-bold tracking-widest text-gray-400 uppercase text-center mb-7">Match Result</p>
+
+              {/* 팀 A — 스코어 — 팀 B */}
+              <div className="flex items-start justify-between gap-2">
+                {/* 팀 A */}
+                <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                  <TeamAvatar team={event.team} />
+                  <p className="text-sm font-bold text-gray-900 text-center leading-tight line-clamp-1">{teamAName}</p>
+                  {/* 팀A 득점자 */}
+                  {teamAScorers.length > 0 && (
+                    <div className="w-full space-y-0.5">
+                      {teamAScorers.map((g, idx) => (
+                        <p key={idx} className="text-[11px] text-center text-gray-500 truncate">
+                          ⚽ {g.scorer?.name ?? "자책골"}{g.isOwnGoal ? " OG" : ""} {g.quarter}Q{g.minute != null ? ` ${g.minute}′` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 스코어 + 결과 배지 */}
+                <div className="shrink-0 flex flex-col items-center gap-2 pt-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-5xl font-black tabular-nums" style={{ color: teamAColor }}>{event.teamAScore}</span>
+                    <span className="text-4xl font-black text-gray-300">:</span>
+                    <span className="text-5xl font-black tabular-nums" style={{ color: teamBColor }}>{event.teamBScore}</span>
+                  </div>
+                  <div
+                    className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+                    style={
+                      winner === "A"
+                        ? { backgroundColor: teamAColor + "22", color: teamAColor }
+                        : winner === "B"
+                        ? { backgroundColor: teamBColor + "22", color: teamBColor }
+                        : { backgroundColor: "#f3f4f6", color: "#9ca3af" }
+                    }
+                  >
+                    {winner ? "🏆 승리" : "🤝 무승부"}
+                  </div>
+                </div>
+
+                {/* 팀 B */}
+                <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                  <TeamAvatar team={opponentTeam ?? { id: null as unknown as string, name: teamBName, primaryColor: teamBColor, logoUrl: null }} />
+                  <p className="text-sm font-bold text-gray-900 text-center leading-tight line-clamp-1">{teamBName}</p>
+                  {/* 팀B 득점자 */}
+                  {teamBScorers.length > 0 && (
+                    <div className="w-full space-y-0.5">
+                      {teamBScorers.map((g, idx) => (
+                        <p key={idx} className="text-[11px] text-center text-gray-500 truncate">
+                          ⚽ {g.scorer?.name ?? "자책골"}{g.isOwnGoal ? " OG" : ""} {g.quarter}Q{g.minute != null ? ` ${g.minute}′` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <MapPin className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{event.location}</span>
+
+            {/* 카드 이벤트 (경고/퇴장) */}
+            {event.cardRecords.length > 0 && (
+              <div className="mx-4 mt-3 mb-1 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                {Array.from(new Set(event.cardRecords.map((c) => c.quarter))).sort((a, b) => a - b).map((quarter, qi) => {
+                  const cards = event.cardRecords.filter((c) => c.quarter === quarter);
+                  return (
+                    <div key={quarter} className={qi > 0 ? "border-t border-gray-100" : ""}>
+                      <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold text-gray-400 tracking-widest">{quarter}Q</p>
+                      <div className="px-4 pb-2.5 space-y-1.5">
+                        {cards.map((c, idx) => {
+                          const isTeamA = c.teamSide === "TEAM_A";
+                          return (
+                            <div key={idx} className={`flex items-center gap-2 ${isTeamA ? "" : "flex-row-reverse"}`}>
+                              <span className="text-sm shrink-0">{c.cardType === "YELLOW" ? "🟨" : "🟥"}</span>
+                              <div className={`flex-1 min-w-0 ${isTeamA ? "" : "text-right"}`}>
+                                <span className="text-xs text-gray-700">{c.player?.name ?? "—"}</span>
+                              </div>
+                              {c.minute != null && <span className="text-xs text-gray-400 shrink-0">{c.minute}′</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 하단 날짜/장소/날씨 */}
+            <div className="px-5 py-4 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>📅</span>
+                <span>{new Date(event.date).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" })}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>📍</span>
+                <span className="truncate">{event.location}</span>
+              </div>
+              {event.weather && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>{getWeatherIcon(event.weather)}</span>
+                  <span>
+                    {event.weatherDescription ?? event.weather}
+                    {event.temperature != null && ` · ${event.temperature}°C`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* 이벤트 타임라인 */}
-        {hasEvents && (
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">경기 기록</p>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {quarterSet.map((quarter) => {
-                const goals = event.goalRecords.filter((g) => g.quarter === quarter);
-                const cards = event.cardRecords.filter((c) => c.quarter === quarter);
-                const allEvents = [
-                  ...goals.map((g) => ({ type: "goal" as const, data: g, minute: g.minute ?? 999 })),
-                  ...cards.map((c) => ({ type: "card" as const, data: c, minute: c.minute ?? 999 })),
-                ].sort((a, b) => a.minute - b.minute);
-
-                return (
-                  <div key={quarter} className="px-4 py-3">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">{quarter}쿼터</p>
-                    <div className="space-y-2">
-                      {allEvents.map((ev, idx) => {
-                        if (ev.type === "goal") {
-                          const g = ev.data as GoalRecord;
-                          const isTeamA = g.isOwnGoal ? g.scoringTeam === "TEAM_B" : g.scoringTeam === "TEAM_A";
-                          const color = isTeamA ? teamAColor : teamBColor;
-                          return (
-                            <div key={`g-${idx}`} className={`flex items-center gap-2 ${isTeamA ? "" : "flex-row-reverse"}`}>
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: color }}>⚽</div>
-                              <div className={`flex-1 ${isTeamA ? "" : "text-right"}`}>
-                                <span className="text-sm font-semibold text-gray-900">
-                                  {g.scorer?.name ?? "알 수 없음"}
-                                  {g.isOwnGoal && <span className="text-xs text-gray-400 ml-1">(OG)</span>}
-                                </span>
-                                {g.assistant && (
-                                  <span className="text-xs text-gray-400 ml-1">도 {g.assistant.name}</span>
-                                )}
-                              </div>
-                              {g.minute != null && (
-                                <span className="text-[10px] text-gray-400 shrink-0">{g.minute}&apos;</span>
-                              )}
-                            </div>
-                          );
-                        } else {
-                          const c = ev.data as CardRecord;
-                          const isTeamA = c.teamSide === "TEAM_A";
-                          return (
-                            <div key={`c-${idx}`} className={`flex items-center gap-2 ${isTeamA ? "" : "flex-row-reverse"}`}>
-                              <div className={`w-3.5 h-5 rounded-sm shrink-0 ${c.cardType === "YELLOW" ? "bg-yellow-400" : "bg-red-500"}`} />
-                              <div className={`flex-1 ${isTeamA ? "" : "text-right"}`}>
-                                <span className="text-sm text-gray-700">{c.player?.name ?? "알 수 없음"}</span>
-                              </div>
-                              {c.minute != null && (
-                                <span className="text-[10px] text-gray-400 shrink-0">{c.minute}&apos;</span>
-                              )}
-                            </div>
-                          );
-                        }
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* 팀 운동 페이지로 돌아가기 */}
+        <div className="pt-6">
+          <button
+            onClick={() => router.push(`/training/${event.id}`)}
+            className="w-full py-3.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg"
+          >
+            📋 팀 운동 페이지로
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -337,6 +439,7 @@ export default function ChallengeClient({
   token,
   event,
   isLoggedIn,
+  userId,
   hasTeam,
   isSameTeam,
   isAdmin,
@@ -395,16 +498,11 @@ export default function ChallengeClient({
   if (event.matchStatus === "IN_PROGRESS") {
     return (
       <>
-        <ChallengeLiveMode token={token} isLoggedIn={isLoggedIn} />
-        {isAdmin && (
-          <button
-            onClick={() => setShowRulesSheet(true)}
-            className="fixed bottom-20 right-4 z-50 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200 active:scale-95 transition-transform"
-            title="경기 방식 수정"
-          >
-            <Pencil className="w-5 h-5 text-gray-600" />
-          </button>
-        )}
+        <ChallengeLiveMode
+          token={token}
+          isLoggedIn={isLoggedIn}
+          onEditRules={isAdmin ? () => setShowRulesSheet(true) : undefined}
+        />
         {isAdmin && (
           <MatchRulesBottomSheet
             isOpen={showRulesSheet}
@@ -428,6 +526,7 @@ export default function ChallengeClient({
         event={event}
         opponentTeam={opponentTeam}
         opponentTeamName={opponentTeamName}
+        userId={userId}
       />
     );
   }
@@ -504,12 +603,19 @@ export default function ChallengeClient({
     try {
       const { toPng } = await import("html-to-image");
       const dataUrl = await toPng(cardRef.current, { cacheBust: true, pixelRatio: 2 });
-      const link = document.createElement("a");
-      link.download = `도전장-${event.team.name}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch {
-      // 실패 시 조용히 무시
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `도전장-${event.team.name}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `⚽ ${event.team.name} 도전장` });
+      } else {
+        const link = document.createElement("a");
+        link.download = `도전장-${event.team.name}.png`;
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.error(err);
     }
   };
 
@@ -603,9 +709,9 @@ export default function ChallengeClient({
             <button
               onClick={handleSaveImage}
               className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/60 hover:bg-white/90 text-gray-400 hover:text-gray-600 transition-colors"
-              title="이미지로 저장"
+              title="도전장 공유하기"
             >
-              <Download className="w-4 h-4" />
+              <Share2 className="w-4 h-4" />
             </button>
             <p className="text-xs font-semibold text-gray-400 text-center tracking-widest mb-5">⚽ 도전장</p>
             <div className="flex items-center justify-between gap-2">

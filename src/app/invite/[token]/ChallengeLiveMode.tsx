@@ -7,11 +7,13 @@ import { useToast } from "@/lib/useToast";
 import Toast from "@/components/Toast";
 import { MoreVertical, ChevronDown } from "lucide-react";
 import { buildPhases, getPhaseInfo, calcElapsed } from "@/lib/match-phases";
+import TacticsBoard, { FreePositionsMap } from "@/components/training/TacticsBoard";
 
 interface Attendee {
   id: string;
   name: string | null;
   image: string | null;
+  position?: string | null;
 }
 
 interface TeamInfo {
@@ -60,6 +62,7 @@ interface SessionAssignment {
 interface HostSession {
   orderIndex: number;
   title: string | null;
+  positions: Record<string, { x: number; y: number }> | null;
   teamAssignments: SessionAssignment[];
 }
 
@@ -97,13 +100,25 @@ type TimelineItem =
 interface Props {
   token: string;
   isLoggedIn: boolean;
+  onEditRules?: () => void;
 }
 
-export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
-  const { data, mutate } = useSWR<LiveData>(
+export default function ChallengeLiveMode({ token, isLoggedIn, onEditRules }: Props) {
+  // 에러 시에도 재시도 (경기 시작 직후 IN_PROGRESS 전환 대기)
+  // 경기 종료(COMPLETED) 감지 시 자동 reload → MatchResultView로 전환
+  const liveFetcher = async (url: string) => {
+    const res = await fetch(url);
+    if (res.ok) return res.json();
+    const body = await res.json().catch(() => ({}));
+    if (body?.matchStatus === "COMPLETED") {
+      window.location.reload();
+    }
+    return null;
+  };
+  const { data, mutate } = useSWR<LiveData | null>(
     `/api/challenge/${token}/live`,
-    fetcher,
-    { refreshInterval: 5000, revalidateOnFocus: true }
+    liveFetcher,
+    { refreshInterval: 3000, revalidateOnFocus: true }
   );
 
   const [currentQuarter, setCurrentQuarter] = useState(1);
@@ -114,9 +129,10 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const [ending, setEnding] = useState(false);
   const [showLineup, setShowLineup] = useState(false);
   const [tick, setTick] = useState(0);
-  const [timerLoading, setTimerLoading] = useState(false);
+  const [phaseConfirm, setPhaseConfirm] = useState<"next" | "prev" | null>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
   const prevRemainingRef = useRef<number>(Infinity);
+  const timerPendingRef = useRef(false);
   const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
@@ -161,6 +177,16 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, timerPhaseForHook]);
 
+  // 타이머 페이즈가 쿼터로 바뀌면 기록 쿼터도 자동 동기화
+  useEffect(() => {
+    const phases = buildPhases(quarterCountForHook, quarterMinutesForHook, quarterBreakForHook, halftimeForHook);
+    const info = timerPhaseForHook > 0 ? phases[timerPhaseForHook - 1] : null;
+    if (info?.type === "QUARTER" && info.quarterNumber != null) {
+      setCurrentQuarter(info.quarterNumber);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerPhaseForHook]);
+
   // Goal sheet
   const [goalTeam, setGoalTeam] = useState<TeamSide>("TEAM_A");
   const [scorerId, setScorerId] = useState("");
@@ -180,6 +206,9 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const [cardPlayerId, setCardPlayerId] = useState("");
   const [cardMinute, setCardMinute] = useState("");
 
+  // 공통: 시트 열릴 때 초기화되는 쿼터
+  const [sheetQuarter, setSheetQuarter] = useState(1);
+
   if (!data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -191,8 +220,12 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const { teamA, teamB, teamAAttendees, teamBAttendees, quarterCount, canRecord, canEnd, myTeamSessions,
           quarterMinutes, quarterBreak, halftime, timerPhase, timerRunning, timerStartedAt, timerElapsedSec } = data;
 
-  // 현재 쿼터 세션 (orderIndex = quarter - 1)
+  // 현재 쿼터 세션 (기록 중인 쿼터, orderIndex = quarter - 1)
   const currentSession = myTeamSessions.find((s: HostSession) => s.orderIndex === currentQuarter - 1) ?? null;
+  // 현재 탭(뷰)에 해당하는 세션
+  const viewSession = viewQuarter !== "all"
+    ? (myTeamSessions.find((s: HostSession) => s.orderIndex === (viewQuarter as number) - 1) ?? null)
+    : null;
 
   // 타이머 계산
   const phases = buildPhases(quarterCount, quarterMinutes, quarterBreak, halftime);
@@ -204,24 +237,56 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const remainingMin = Math.floor(remaining / 60);
   const remainingSec = remaining % 60;
   const isUrgent = remaining < 60 && timerPhase > 0;
+  const isLastPhaseEnded = timerPhase === phases.length && timerPhase > 0 && remaining === 0;
+  // 마지막 쿼터에 진입한 순간부터 종료 버튼 표시 (타이머 0 불필요)
+  const isOnLastPhase = timerPhase === phases.length && timerPhase > 0;
 
-  const handleTimer = async (action: "start" | "pause" | "next" | "prev") => {
-    setTimerLoading(true);
-    try {
-      const res = await fetch(`/api/challenge/${token}/timer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      if (res.ok) {
-        mutate();
-      } else {
-        const d = await res.json();
-        showToast(d.error || "타이머 조작에 실패했습니다");
-      }
-    } finally {
-      setTimerLoading(false);
-    }
+  // 모든 타이머 액션에 낙관적 업데이트 적용 → 즉각 반응
+  const handleTimer = (action: "start" | "pause" | "next" | "prev" | "setPhase", phase?: number) => {
+    if (timerPendingRef.current) return;
+    timerPendingRef.current = true;
+
+    const now = new Date().toISOString();
+    mutate(
+      (cur) => {
+        if (!cur) return cur;
+        if (action === "start") {
+          return { ...cur, timerRunning: true, timerStartedAt: now };
+        } else if (action === "pause") {
+          const currentElapsed = calcElapsed(cur.timerElapsedSec, cur.timerRunning ? cur.timerStartedAt : null);
+          return { ...cur, timerRunning: false, timerStartedAt: null, timerElapsedSec: currentElapsed };
+        } else {
+          let newPhase = cur.timerPhase;
+          if (action === "next") newPhase = cur.timerPhase + 1;
+          else if (action === "prev") newPhase = cur.timerPhase - 1;
+          else if (phase !== undefined) newPhase = phase;
+          return {
+            ...cur,
+            timerPhase: Math.max(0, Math.min(newPhase, phases.length)),
+            timerElapsedSec: 0,
+            timerRunning: false,
+            timerStartedAt: null,
+          };
+        }
+      },
+      { revalidate: false }
+    );
+
+    fetch(`/api/challenge/${token}/timer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...(phase !== undefined ? { phase } : {}) }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const d = await res.json();
+          showToast(d.error || "타이머 조작에 실패했습니다");
+          mutate(); // 롤백
+        } else {
+          mutate(); // 서버와 동기화
+        }
+      })
+      .finally(() => { timerPendingRef.current = false; });
   };
 
   const handleEndMatch = async () => {
@@ -261,6 +326,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
     viewQuarter === "all" ? allEvents : allEvents.filter((e) => e.data.quarter === viewQuarter);
 
   const openSheet = (sheet: Sheet) => {
+    setSheetQuarter(currentQuarter);
     if (sheet === "goal") { setGoalTeam("TEAM_A"); setScorerId(""); setAssistId(""); setIsOwnGoal(false); setGoalMinute(""); }
     else if (sheet === "substitution") { setSubTeam("TEAM_A"); setPlayerOutId(""); setPlayerInId(""); setSubMinute(""); }
     else if (sheet === "card") { setCardType("YELLOW"); setCardTeam("TEAM_A"); setCardPlayerId(""); setCardMinute(""); }
@@ -285,7 +351,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const handleGoalSubmit = async () => {
     setSubmitting(true);
     const body = {
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: goalMinute ? parseInt(goalMinute) : null,
       scoringTeam: goalTeam,
       scorerId: !isOwnGoal && scorerId ? scorerId : null,
@@ -296,7 +362,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
     setActiveSheet(null);
     const optimisticGoal: GoalRecord = {
       id: `opt-${Date.now()}`,
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: body.minute,
       scoringTeam: goalTeam,
       isOwnGoal,
@@ -335,7 +401,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const handleSubSubmit = async () => {
     setSubmitting(true);
     const body = {
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: subMinute ? parseInt(subMinute) : null,
       teamSide: subTeam,
       playerOutId: playerOutId || null,
@@ -344,7 +410,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
     setActiveSheet(null);
     const optimisticSub: SubstitutionRecord = {
       id: `opt-${Date.now()}`,
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: body.minute,
       teamSide: subTeam,
       playerOut: playerOutId ? findAttendee(playerOutId) : null,
@@ -365,7 +431,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
   const handleCardSubmit = async () => {
     setSubmitting(true);
     const body = {
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: cardMinute ? parseInt(cardMinute) : null,
       cardType,
       teamSide: cardTeam,
@@ -374,7 +440,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
     setActiveSheet(null);
     const optimisticCard: CardRecord = {
       id: `opt-${Date.now()}`,
-      quarter: currentQuarter,
+      quarter: sheetQuarter,
       minute: body.minute,
       cardType,
       teamSide: cardTeam,
@@ -431,12 +497,31 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
     );
   };
 
-  const MinuteInput = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <input
-      type="number" min="1" max="120" placeholder="분 입력 (선택사항)"
-      value={value} onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900"
-    />
+  const QuarterMinuteRow = ({ minute, setMinute }: { minute: string; setMinute: (v: string) => void }) => (
+    <div>
+      <label className="block text-sm text-gray-600 mb-1.5">쿼터 / 분 (선택)</label>
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1">
+          {Array.from({ length: quarterCount }, (_, i) => i + 1).map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => setSheetQuarter(q)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                sheetQuarter === q ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {q}Q
+            </button>
+          ))}
+        </div>
+        <input
+          type="number" min="1" max="120" placeholder="분"
+          value={minute} onChange={(e) => setMinute(e.target.value)}
+          className="flex-1 min-w-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-center text-gray-900"
+        />
+      </div>
+    </div>
   );
 
   return (
@@ -444,32 +529,47 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
       {/* Score header */}
       <div className="bg-white border-b border-gray-100 px-4 py-5">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-center mb-4 relative">
+          <div className="flex items-center justify-between mb-4">
+            <div className="min-w-[80px]" />
+
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               경기 진행 중
             </span>
-            {canEnd && (
-              <div ref={kebabRef} className="absolute right-0">
-                <button
-                  onClick={() => setShowKebab((v) => !v)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-                {showKebab && (
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-36 z-30">
-                    <button
-                      onClick={handleEndMatch}
-                      disabled={ending}
-                      className="w-full px-4 py-2.5 text-sm text-red-600 font-medium text-left hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {ending ? "종료 중..." : "경기 종료"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+
+            <div ref={kebabRef} className="relative min-w-[80px] flex justify-end">
+              {(canEnd || !!onEditRules) && (
+                <>
+                  <button
+                    onClick={() => setShowKebab((v) => !v)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  {showKebab && (
+                    <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-40 z-30">
+                      {onEditRules && (
+                        <button
+                          onClick={() => { setShowKebab(false); onEditRules(); }}
+                          className="w-full px-4 py-2.5 text-sm text-gray-700 font-medium text-left hover:bg-gray-50"
+                        >
+                          경기 방식 수정
+                        </button>
+                      )}
+                      {canEnd && (
+                        <button
+                          onClick={handleEndMatch}
+                          disabled={ending}
+                          className="w-full px-4 py-2.5 text-sm text-red-600 font-medium text-left hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {ending ? "종료 중..." : "경기 종료"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 text-center">
@@ -478,53 +578,58 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
             </div>
             <div className="text-center shrink-0">
               <p className="text-2xl text-gray-300 font-light">:</p>
-              <p className="text-xs text-gray-400 mt-1">{currentQuarter}Q</p>
             </div>
             <div className="flex-1 text-center">
               <p className="text-xs text-gray-500 mb-1 truncate font-medium">{teamB.name}</p>
               <p className="text-5xl font-bold tabular-nums" style={{ color: teamB.primaryColor }}>{data.teamBScore}</p>
             </div>
           </div>
-          {/* 쿼터 이동 (기록 권한 있는 사용자) */}
-          {canRecord && (
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <button onClick={() => setCurrentQuarter((q) => Math.max(1, q - 1))} disabled={currentQuarter <= 1}
-                className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 text-lg disabled:opacity-30 active:scale-90">‹</button>
-              <span className="text-sm font-medium text-gray-600 w-24 text-center">{currentQuarter}쿼터 기록 중</span>
-              <button onClick={() => setCurrentQuarter((q) => Math.min(quarterCount, q + 1))} disabled={currentQuarter >= quarterCount}
-                className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 text-lg disabled:opacity-30 active:scale-90">›</button>
-            </div>
-          )}
           {/* 타이머 */}
           {timerPhase > 0 ? (
             <div className="mt-4 text-center">
-              <div className={`text-2xl font-mono font-bold tabular-nums ${isUrgent ? "text-red-500" : "text-gray-900"}`}>
-                {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
+              <div className="flex items-center justify-center gap-2 mb-1">
+                {canRecord && (
+                  <button
+                    onClick={() => setPhaseConfirm("prev")}
+                    disabled={timerPhase <= 1}
+                    className="px-1.5 py-0.5 text-gray-400 text-2xl disabled:opacity-30 active:scale-90"
+                  >‹</button>
+                )}
+                <span className="text-base font-semibold text-gray-700">
+                  {currentPhaseInfo?.type === "QUARTER"
+                    ? `${currentPhaseInfo.quarterNumber}쿼터`
+                    : (currentPhaseInfo?.label ?? "")}
+                </span>
+                {canRecord && (
+                  isOnLastPhase && canEnd ? (
+                    <button
+                      onClick={handleEndMatch}
+                      disabled={ending}
+                      className="px-3 py-1.5 rounded-full bg-red-500 text-white text-xs font-bold shadow-md active:scale-95 disabled:opacity-50"
+                    >
+                      {ending ? "종료 중..." : "🏁 경기 종료하기"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setPhaseConfirm("next")}
+                      disabled={timerPhase >= phases.length}
+                      className="px-1.5 py-0.5 text-gray-400 text-2xl disabled:opacity-30 active:scale-90"
+                    >›</button>
+                  )
+                )}
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">{currentPhaseInfo?.label ?? ""}</p>
-              {canRecord && (
-                <div className="flex items-center justify-center gap-2 mt-3">
+              <p className={`font-mono font-bold tabular-nums text-2xl ${isUrgent ? "text-red-500" : "text-gray-900"}`}>
+                {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
+              </p>
+              {canRecord && !isLastPhaseEnded && (
+                <div className="flex flex-col items-center gap-1.5 mt-3">
                   <button
                     onClick={() => handleTimer(timerRunning ? "pause" : "start")}
-                    disabled={timerLoading}
-                    className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-600 text-base disabled:opacity-40 active:scale-90"
+                    className="w-14 h-14 rounded-full bg-gray-900 flex items-center justify-center text-white text-xl active:scale-90 shadow-md"
                   >
                     {timerRunning ? "⏸" : "▶"}
                   </button>
-                  <button
-                    onClick={() => handleTimer("prev")}
-                    disabled={timerLoading || timerPhase <= 1}
-                    className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium disabled:opacity-30 active:scale-90"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() => handleTimer("next")}
-                    disabled={timerLoading}
-                    className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium disabled:opacity-30 active:scale-90"
-                  >
-                    ›
-                  </button>
+                  <p className="text-xs text-gray-400">심판이 직접 관리하는 것을 권장합니다</p>
                 </div>
               )}
             </div>
@@ -534,8 +639,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
               <div className="mt-4 text-center">
                 <button
                   onClick={() => handleTimer("next")}
-                  disabled={timerLoading}
-                  className="px-5 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold disabled:opacity-50 active:scale-95"
+                  className="px-5 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold active:scale-95"
                 >
                   1Q 시작
                 </button>
@@ -547,7 +651,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
 
       {/* Quarter filter */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto flex overflow-x-auto">
+        <div className="max-w-2xl mx-auto flex justify-center overflow-x-auto">
           {["all", ...Array.from({ length: quarterCount }, (_, i) => i + 1)].map((q) => (
             <button key={q} onClick={() => setViewQuarter(q as number | "all")}
               className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -559,8 +663,8 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
         </div>
       </div>
 
-      {/* 선발 라인업 (호스트팀 세션 기반) */}
-      {currentSession && currentSession.teamAssignments.length > 0 && (
+      {/* 선발 라인업 (쿼터 탭 선택 시에만, 해당 쿼터 세션) */}
+      {viewSession && viewSession.teamAssignments.length > 0 && (
         <div className="bg-white border-b border-gray-100">
           <div className="max-w-2xl mx-auto">
             <button
@@ -568,21 +672,32 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
               className="w-full flex items-center justify-between px-4 py-3"
             >
               <span className="text-xs font-semibold text-gray-500">
-                내 팀 {currentQuarter}Q 선발
-                {currentSession.title && (
-                  <span className="ml-1.5 text-gray-400 font-normal">· {currentSession.title}</span>
-                )}
-                <span className="ml-1.5 text-gray-400 font-normal">({currentSession.teamAssignments.length}명)</span>
+                우리 팀 {viewQuarter}Q 라인업
+                <span className="ml-1.5 text-gray-400 font-normal">({viewSession.teamAssignments.length}명)</span>
               </span>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showLineup ? "rotate-180" : ""}`} />
             </button>
             {showLineup && (
-              <div className="px-4 pb-3 flex flex-wrap gap-2">
-                {currentSession.teamAssignments.map((a, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 rounded-full text-xs text-gray-700 font-medium border border-gray-100">
-                    {a.user.name ?? "이름없음"}
-                  </span>
-                ))}
+              <div className="px-4 pb-4">
+                {viewSession.positions && Object.keys(viewSession.positions).length > 0 ? (
+                  <TacticsBoard
+                    mode="readonly"
+                    positions={viewSession.positions as FreePositionsMap}
+                    players={viewSession.teamAssignments.map((a) => ({
+                      userId: a.user.id,
+                      name: a.user.name,
+                      position: a.user.position ?? null,
+                    }))}
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {viewSession.teamAssignments.map((a, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 rounded-full text-xs text-gray-700 font-medium border border-gray-100">
+                        {a.user.name ?? "이름없음"}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -686,7 +801,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
                       <MemberSelect value={scorerId} onChange={setScorerId} side={goalTeam} exclude={assistId} />
                     </div>
                   )}
-                  {!isOwnGoal && scorerId && (
+                  {!isOwnGoal && (
                     <div>
                       <label className="block text-sm text-gray-600 mb-1.5">어시스트 (선택)</label>
                       <MemberSelect value={assistId} onChange={setAssistId} side={goalTeam} exclude={scorerId} />
@@ -698,10 +813,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
                       className="w-4 h-4 rounded" />
                     <span className="text-sm text-gray-700">자책골</span>
                   </label>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">분 (선택)</label>
-                    <MinuteInput value={goalMinute} onChange={setGoalMinute} />
-                  </div>
+                  <QuarterMinuteRow minute={goalMinute} setMinute={setGoalMinute} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => setActiveSheet(null)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium">취소</button>
@@ -734,10 +846,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
                   ) : (
                     <p className="text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">이 팀의 참석 확정 멤버 정보가 없습니다.</p>
                   )}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">분 (선택)</label>
-                    <MinuteInput value={subMinute} onChange={setSubMinute} />
-                  </div>
+                  <QuarterMinuteRow minute={subMinute} setMinute={setSubMinute} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => setActiveSheet(null)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium">취소</button>
@@ -777,10 +886,7 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
                   ) : (
                     <p className="text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">이 팀의 참석 확정 멤버 정보가 없습니다.</p>
                   )}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">분 (선택)</label>
-                    <MinuteInput value={cardMinute} onChange={setCardMinute} />
-                  </div>
+                  <QuarterMinuteRow minute={cardMinute} setMinute={setCardMinute} />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => setActiveSheet(null)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium">취소</button>
@@ -793,6 +899,55 @@ export default function ChallengeLiveMode({ token, isLoggedIn }: Props) {
           </div>
         </div>
       )}
+
+      {/* 페이즈 전환 확인 바텀시트 */}
+      {phaseConfirm && (() => {
+        const targetPhaseInfo = phaseConfirm === "next"
+          ? (timerPhase < phases.length ? phases[timerPhase] : null)
+          : (timerPhase > 1 ? phases[timerPhase - 2] : null);
+        const fromLabel = currentPhaseInfo?.label ?? "";
+        const toLabel = targetPhaseInfo?.label ?? "";
+        const toDuration = targetPhaseInfo ? Math.floor(targetPhaseInfo.durationSec / 60) : 0;
+        return (
+          <div className="fixed inset-0 z-50 flex items-end">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setPhaseConfirm(null)} />
+            <div className="relative w-full bg-white rounded-t-2xl p-6 space-y-4">
+              <h3 className="font-semibold text-gray-900">
+                {phaseConfirm === "next" ? "다음 페이즈로 이동할까요?" : "이전 페이즈로 돌아갈까요?"}
+              </h3>
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-xl">
+                <span className="text-sm text-gray-500">{fromLabel}</span>
+                <span className="text-gray-300">→</span>
+                <span className="text-sm font-semibold text-gray-900">{toLabel}</span>
+                <span className="text-xs text-gray-400">({toDuration}분)</span>
+              </div>
+              {phaseConfirm === "prev" && (
+                <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                  ⚠️ 타이머가 초기화됩니다. 이미 기록된 이벤트는 유지됩니다.
+                </p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setPhaseConfirm(null)}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => {
+                    const action = phaseConfirm;
+                    setPhaseConfirm(null);
+                    handleTimer(action);
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-gray-900 text-white font-medium disabled:opacity-50"
+                >
+                  {phaseConfirm === "next" ? "다음으로 ›" : "‹ 이전으로"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <Toast message={toast?.message ?? ""} visible={!!toast} onHide={hideToast} />
     </div>
