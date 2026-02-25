@@ -44,6 +44,7 @@ interface Props {
   disableNoteOpen?: boolean;
   currentUserId?: string;
   mvpEventId?: string;
+  prioritizeFirst?: boolean;
 }
 
 export default function PolaroidDateGroup({
@@ -60,6 +61,7 @@ export default function PolaroidDateGroup({
   disableNoteOpen = false,
   currentUserId,
   mvpEventId,
+  prioritizeFirst,
 }: Props) {
   return (
     <div className="transition-all duration-300 ease-out">
@@ -82,6 +84,7 @@ export default function PolaroidDateGroup({
           disableNoteOpen={disableNoteOpen}
           currentUserId={currentUserId}
           mvpEventId={mvpEventId}
+          prioritizeFirst={prioritizeFirst}
         />
       )}
     </div>

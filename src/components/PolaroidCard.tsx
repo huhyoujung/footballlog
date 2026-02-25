@@ -11,6 +11,7 @@ interface Props {
   log: TrainingLog;
   variant: "stack" | "full";
   onLikeToggle?: (logId: string) => void;
+  priority?: boolean;
 }
 
 function TeamLogoFallback({ size }: { size: "sm" | "lg" }) {
@@ -42,7 +43,7 @@ function TeamLogoFallback({ size }: { size: "sm" | "lg" }) {
   );
 }
 
-export default function PolaroidCard({ log, variant, onLikeToggle }: Props) {
+export default function PolaroidCard({ log, variant, onLikeToggle, priority }: Props) {
   if (variant === "stack") {
     return (
       <div className="w-36 h-44 bg-white rounded-sm p-1.5 pb-4 border border-gray-100/50" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -54,6 +55,7 @@ export default function PolaroidCard({ log, variant, onLikeToggle }: Props) {
               fill
               className="object-cover"
               sizes="144px"
+              priority={priority}
             />
           </div>
         ) : (

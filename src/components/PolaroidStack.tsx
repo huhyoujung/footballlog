@@ -46,6 +46,7 @@ interface Props {
   disableNoteOpen?: boolean; // 쪽지 클릭 비활성화 (피드용)
   currentUserId?: string; // From 표시용 (내가 쓴 쪽지만 표시)
   mvpEventId?: string; // 이 날짜에 MVP가 선출된 이벤트 ID (로그와 무관하게 트로피 표시)
+  prioritizeFirst?: boolean;
 }
 
 // 날짜 문자열을 seed로 한 결정론적 난수 (같은 날짜 → 항상 같은 배치)
@@ -85,7 +86,7 @@ function generateStackConfigs(date: string) {
   ];
 }
 
-export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding, notes = [], hideCount = false, disableNoteOpen = false, currentUserId, mvpEventId }: Props) {
+export default function PolaroidStack({ logs, date, displayDate, onClick, isExpanding, notes = [], hideCount = false, disableNoteOpen = false, currentUserId, mvpEventId, prioritizeFirst }: Props) {
   const router = useRouter();
   const visibleLogs = logs.slice(0, 3);
   const configs = useMemo(() => generateStackConfigs(date), [date]);
@@ -115,55 +116,39 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
     return i * spacing - center;
   };
 
-  // 흩뿌리기 위치 (날짜 seed → 같은 날짜 = 같은 배치, 좌우 교대)
+  // 포스트잇 슬롯 — 폴라로이드 아래 3열 그리드
+  // 컨테이너 280px, 포스트잇 64px: (280 - 3*64) / 4 = 22px 마진/간격
+  // 3열 x 위치: 22, 108, 194
   const scatterSlots = useMemo(() => {
     const rand = seededRandom(date + "-scatter");
-    // 컨테이너 280px 기준, 폴라로이드 left=52 (w=176)
-    // 좌우 바깥 + 아래쪽으로 확장, 최대 12슬롯
-    // 폴라로이드 중앙 높이(y≈100)를 기준으로 좌우부터 채우고 위아래로 퍼지는 순서
-    const bases = [
-      { x: -8, y: 110 },   // 0: left-center  (폴라로이드 세로 중앙 옆)
-      { x: 218, y: 100 },  // 1: right-center (대칭)
-      { x: 98, y: 245 },   // 2: bottom-center
-      { x: -5, y: 35 },    // 3: left-upper
-      { x: 215, y: 18 },   // 4: right-upper
-      { x: -5, y: 195 },   // 5: left-lower
-      { x: 215, y: 172 },  // 6: right-lower
-      { x: 40, y: 295 },   // 7: bottom-left
-      { x: 168, y: 305 },  // 8: bottom-right
-      { x: -8, y: 275 },   // 9: left-extra
-      { x: 215, y: 248 },  // 10: right-extra
-      { x: 98, y: 328 },   // 11: very-bottom
-    ];
+    const cols = [22, 108, 194];
+    const rowStart = 248; // 폴라로이드 하단(~236) + 12px 여백
+    const rowGap = 72;    // 64px 노트 + 8px 간격
+    const bases = Array.from({ length: 12 }, (_, i) => ({
+      x: cols[i % 3],
+      y: rowStart + Math.floor(i / 3) * rowGap,
+    }));
     return bases.map(base => ({
-      x: base.x + Math.floor(rand(14)),
-      y: base.y + Math.floor(rand(10)),
-      rot: -18 + Math.floor(rand(36)),  // -18° ~ +18° 자유 회전
+      x: base.x + Math.floor(rand(9)) - 4,  // ±4px 미세 변화
+      y: base.y + Math.floor(rand(9)) - 4,
+      rot: 0, // note.rotation 사용하므로 미사용
     }));
   }, [date]);
 
-  // 폴라로이드 없을 때 전용 scatter 슬롯 — 컨테이너 중앙(x=108) 기준으로 흩뿌림
-  // PostItNote 너비 64px → 중앙정렬 기준 x = (280-64)/2 = 108
+  // 폴라로이드 없을 때 슬롯 — 상단부터 동일한 3열 그리드
   const noLogScatterSlots = useMemo(() => {
     const rand = seededRandom(date + "-nolog-scatter");
-    const bases = [
-      { x: 108, y: 10 },   // 0: 중앙-상단 (1개일 때 여기)
-      { x: 58, y: 15 },    // 1: 좌상단
-      { x: 158, y: 12 },   // 2: 우상단
-      { x: 20, y: 95 },    // 3: 좌중단
-      { x: 196, y: 88 },   // 4: 우중단
-      { x: 108, y: 120 },  // 5: 중앙-중단
-      { x: 58, y: 190 },   // 6: 좌하단
-      { x: 158, y: 183 },  // 7: 우하단
-      { x: 108, y: 265 },  // 8: 중앙-하단
-      { x: 20, y: 248 },   // 9: 좌-하단
-      { x: 196, y: 242 },  // 10: 우-하단
-      { x: 108, y: 338 },  // 11: 최하단
-    ];
+    const cols = [22, 108, 194];
+    const rowStart = 10;
+    const rowGap = 72;
+    const bases = Array.from({ length: 12 }, (_, i) => ({
+      x: cols[i % 3],
+      y: rowStart + Math.floor(i / 3) * rowGap,
+    }));
     return bases.map(base => ({
-      x: base.x + Math.floor(rand(14)),
-      y: base.y + Math.floor(rand(10)),
-      rot: -18 + Math.floor(rand(36)),
+      x: base.x + Math.floor(rand(9)) - 4,
+      y: base.y + Math.floor(rand(9)) - 4,
+      rot: 0,
     }));
   }, [date]);
 
@@ -267,7 +252,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                         zIndex: config.zIndex,
                       }}
                     >
-                      <PolaroidCard log={log} variant="stack" />
+                      <PolaroidCard log={log} variant="stack" priority={prioritizeFirst} />
                     </div>
                   );
                 })}
@@ -316,7 +301,7 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                   <PostItNote
                     content={note.content}
                     color={note.color}
-                    rotation={slot.rot}
+                    rotation={note.rotation}
                     recipientId={note.recipient?.id || ""}
                     recipientName={note.recipient?.name || "팀원"}
                     tags={note.tags}

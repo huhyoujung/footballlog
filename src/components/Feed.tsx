@@ -89,13 +89,8 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-// 쪽지의 날짜 추출 (순수함수, 컴포넌트 밖)
+// 쪽지의 날짜 추출 — 쓴 날짜 기준 (순수함수, 컴포넌트 밖)
 const getNoteDateString = (note: LockerNote): string => {
-  if (note.trainingLog?.trainingDate) {
-    return getLocalDateString(new Date(note.trainingLog.trainingDate));
-  } else if (note.trainingEvent?.date) {
-    return getLocalDateString(new Date(note.trainingEvent.date));
-  }
   return getLocalDateString(new Date(note.createdAt));
 };
 
@@ -519,7 +514,7 @@ export default function Feed() {
           </div>
         ) : (
           <div className={expandedDate ? "" : "flex flex-col items-center gap-12 px-4 py-8"}>
-            {groupedLogs.map((group) => {
+            {groupedLogs.map((group, index) => {
               const isThisExpanded = expandedDate === group.displayDate;
               if (expandedDate && !isThisExpanded) return null;
 
@@ -537,6 +532,7 @@ export default function Feed() {
                     disableNoteOpen
                     currentUserId={session?.user?.id}
                     mvpEventId={group.date === mvpDateStr ? (mvpEventId ?? undefined) : undefined}
+                    prioritizeFirst={index === 0}
                   />
                 </div>
               );
