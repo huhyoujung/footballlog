@@ -385,7 +385,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     <div className="min-h-screen bg-white pb-8">
       <PageHeader
         title={event?.title || "팀 운동"}
-        left={<BackButton href="/" />}
+        left={<BackButton />}
         right={isAdmin ? (
           <KebabMenu
             eventId={eventId}

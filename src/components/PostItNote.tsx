@@ -71,16 +71,25 @@ export default function PostItNote({
           )}
         </div>
 
-        {/* 접힌 종이 뒷면 — clip된 모서리 위에 올라오는 어두운 삼각형 */}
+        {/* 접힌 종이 뒷면 — 포스트잇 색상 + 균일 어두운 오버레이 (모든 색상 동일하게 적용) */}
         {isMine && (
-          <div
-            className="absolute bottom-0 right-0 w-0 h-0"
-            style={{
-              borderTop: `${FOLD}px solid ${color}`,
-              borderRight: `${FOLD}px solid transparent`,
-              filter: "brightness(0.72) drop-shadow(-1px -1px 2px rgba(0,0,0,0.18))",
-            }}
-          />
+          <>
+            <div
+              className="absolute bottom-0 right-0 w-0 h-0"
+              style={{
+                borderTop: `${FOLD}px solid ${color}`,
+                borderRight: `${FOLD}px solid transparent`,
+                filter: "drop-shadow(-1px -1px 2px rgba(0,0,0,0.2))",
+              }}
+            />
+            <div
+              className="absolute bottom-0 right-0 w-0 h-0"
+              style={{
+                borderTop: `${FOLD}px solid rgba(0,0,0,0.22)`,
+                borderRight: `${FOLD}px solid transparent`,
+              }}
+            />
+          </>
         )}
       </div>
     </div>

@@ -57,7 +57,7 @@ export default function TrainingCreateClient() {
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      <PageHeader title="팀 운동" left={<BackButton href="/" />} />
+      <PageHeader title="팀 운동" left={<BackButton />} />
 
       <main className="max-w-2xl mx-auto p-4">
         {!vestLoading && (
