@@ -47,26 +47,23 @@ export default async function HomePage() {
   const userId = session.user.id;
 
   // 훈련 로그 서버 프리페치 — 이벤트 조회와 병렬 실행 (독립적)
-  const [teamEvents, [prefetchedLogs, totalLogs]] = await Promise.all([
+  const [teamEvents, prefetchedLogs] = await Promise.all([
     getTeamUpcomingEvents(teamId),
-    Promise.all([
-      prisma.trainingLog.findMany({
-        where: { user: { teamId } },
-        include: {
-          user: {
-            select: { id: true, name: true, image: true, position: true, number: true },
-          },
-          trainingEvent: {
-            select: { id: true, title: true, date: true },
-          },
-          _count: { select: { comments: true, likes: true } },
-          likes: { where: { userId }, select: { id: true } },
+    prisma.trainingLog.findMany({
+      where: { user: { teamId } },
+      include: {
+        user: {
+          select: { id: true, name: true, image: true, position: true, number: true },
         },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      }),
-      prisma.trainingLog.count({ where: { user: { teamId } } }),
-    ]),
+        trainingEvent: {
+          select: { id: true, title: true, date: true },
+        },
+        _count: { select: { comments: true, likes: true } },
+        likes: { where: { userId }, select: { id: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
   ]);
 
   const eventIds = teamEvents.map((e) => e.id);
@@ -109,12 +106,6 @@ export default async function HomePage() {
         isLiked: log.likes.length > 0,
         likes: undefined, // 클라이언트에 원시 likes 배열 노출 불필요
       })),
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: totalLogs,
-        totalPages: Math.ceil(totalLogs / 20),
-      },
     })
   );
 
