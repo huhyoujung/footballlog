@@ -26,8 +26,8 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async jwt({ token, user, trigger }) {
-      // 로그인 최초 1회 또는 update() 호출 시에만 DB 조회
-      if (user || trigger === "update") {
+      // 로그인 최초 1회, update() 호출, 또는 구버전 토큰(teamId 미보유) 마이그레이션 시 DB 조회
+      if (user || trigger === "update" || token.teamId === undefined) {
         const userId = (user?.id ?? token.sub) as string;
         const dbUser = await prisma.user.findUnique({
           where: { id: userId },
