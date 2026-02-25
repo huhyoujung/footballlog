@@ -46,8 +46,29 @@ export default async function HomePage() {
   const teamId = session.user.teamId;
   const userId = session.user.id;
 
-  // 캐시 히트 ~10ms / 미스 ~100-200ms
-  const teamEvents = await getTeamUpcomingEvents(teamId);
+  // 훈련 로그 서버 프리페치 — 이벤트 조회와 병렬 실행 (독립적)
+  const [teamEvents, [prefetchedLogs, totalLogs]] = await Promise.all([
+    getTeamUpcomingEvents(teamId),
+    Promise.all([
+      prisma.trainingLog.findMany({
+        where: { user: { teamId } },
+        include: {
+          user: {
+            select: { id: true, name: true, image: true, position: true, number: true },
+          },
+          trainingEvent: {
+            select: { id: true, title: true, date: true },
+          },
+          _count: { select: { comments: true, likes: true } },
+          likes: { where: { userId }, select: { id: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.trainingLog.count({ where: { user: { teamId } } }),
+    ]),
+  ]);
+
   const eventIds = teamEvents.map((e) => e.id);
 
   // 유저별 RSVP + CheckIn: 행 수가 적어 병렬 조회해도 ~20-50ms
@@ -77,6 +98,23 @@ export default async function HomePage() {
         myRsvp: rsvpMap.get(event.id) ?? null,
         myCheckIn: checkInMap.get(event.id) ?? null,
       })),
+    })
+  );
+
+  // 훈련 로그 SWR fallback — 클라이언트 데이터 페치 없이 즉시 이미지 로딩 가능
+  fallback["/api/training-logs?limit=20"] = JSON.parse(
+    JSON.stringify({
+      logs: prefetchedLogs.map((log) => ({
+        ...log,
+        isLiked: log.likes.length > 0,
+        likes: undefined, // 클라이언트에 원시 likes 배열 노출 불필요
+      })),
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: totalLogs,
+        totalPages: Math.ceil(totalLogs / 20),
+      },
     })
   );
 
