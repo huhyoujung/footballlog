@@ -468,6 +468,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                   alt={log.user.name || ""}
                   width={48}
                   height={48}
+                  sizes="48px"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -630,6 +631,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                             alt={c.user.name || ""}
                             width={32}
                             height={32}
+                            sizes="32px"
                             className="w-full h-full object-cover"
                           />
                         ) : (

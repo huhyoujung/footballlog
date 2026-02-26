@@ -53,6 +53,7 @@ export default function TrainingLogCard({ log, onLikeToggle }: Props) {
               alt={log.user.name || ""}
               width={40}
               height={40}
+              sizes="40px"
               className="w-full h-full object-cover"
             />
           ) : (

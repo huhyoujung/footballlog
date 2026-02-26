@@ -114,6 +114,7 @@ export default function AttendanceRateModal({ isOpen, onClose }: Props) {
                         alt={item.name || ""}
                         width={32}
                         height={32}
+                        sizes="32px"
                         className="w-full h-full object-cover"
                       />
                     ) : (

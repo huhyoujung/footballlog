@@ -134,6 +134,7 @@ export default function CommentsSection({ eventId }: Props) {
                     alt={session.user.name || "사용자"}
                     width={32}
                     height={32}
+                    sizes="32px"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -174,6 +175,7 @@ export default function CommentsSection({ eventId }: Props) {
                       alt={comment.author.name || "사용자"}
                       width={32}
                       height={32}
+                      sizes="32px"
                       className="w-full h-full object-cover"
                     />
                   ) : (

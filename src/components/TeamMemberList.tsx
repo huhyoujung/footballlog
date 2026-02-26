@@ -63,6 +63,7 @@ export default function TeamMemberList({
                     alt={member.name || ""}
                     width={24}
                     height={24}
+                    sizes="24px"
                     className="w-full h-full object-cover"
                   />
                 ) : (

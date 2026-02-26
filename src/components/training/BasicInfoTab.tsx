@@ -313,7 +313,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
           <div className="flex items-center gap-2 text-sm text-gray-600">
             {event.opponentTeam?.logoUrl ? (
               <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0">
-                <Image src={event.opponentTeam.logoUrl} alt={event.opponentTeamName} width={16} height={16} className="w-full h-full object-cover" />
+                <Image src={event.opponentTeam.logoUrl} alt={event.opponentTeamName} width={16} height={16} sizes="16px" className="w-full h-full object-cover" />
               </div>
             ) : (
               <Users className="w-4 h-4 text-gray-500 flex-shrink-0" strokeWidth={1.5} />
@@ -717,6 +717,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             alt={r.user.name || ""}
                             width={24}
                             height={24}
+                            sizes="24px"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -855,6 +856,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             alt={r.user.name || ""}
                             width={24}
                             height={24}
+                            sizes="24px"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -986,6 +988,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                             alt={r.user.name || ""}
                             width={24}
                             height={24}
+                            sizes="24px"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -1125,6 +1128,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                         alt={r.user.name || ""}
                         width={24}
                         height={24}
+                        sizes="24px"
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -1201,6 +1205,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                           alt={member.name || ""}
                           width={24}
                           height={24}
+                          sizes="24px"
                           className="w-full h-full object-cover"
                         />
                       ) : (

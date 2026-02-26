@@ -262,7 +262,7 @@ export default function OnboardingPage() {
                       className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {team.logoUrl ? (
-                        <Image src={team.logoUrl} alt={team.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+                        <Image src={team.logoUrl} alt={team.name} width={48} height={48} sizes="48px" className="w-12 h-12 rounded-full object-cover" />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
                           <span className="text-team-600 font-semibold">{team.name[0]}</span>
@@ -280,7 +280,7 @@ export default function OnboardingPage() {
               <form onSubmit={handleJoinTeam} className="space-y-4">
                 <div className="flex items-center gap-3 p-4 bg-team-50 rounded-lg">
                   {selectedTeam.logoUrl ? (
-                    <Image src={selectedTeam.logoUrl} alt={selectedTeam.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+                    <Image src={selectedTeam.logoUrl} alt={selectedTeam.name} width={48} height={48} sizes="48px" className="w-12 h-12 rounded-full object-cover" />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-team-100 flex items-center justify-center">
                       <span className="text-team-600 font-semibold">{selectedTeam.name[0]}</span>

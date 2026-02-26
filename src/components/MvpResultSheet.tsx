@@ -197,6 +197,7 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                           alt={result.user.name || ""}
                           width={64}
                           height={64}
+                          sizes="64px"
                           className="w-16 h-16 rounded-full object-cover"
                         />
                       ) : (
@@ -274,6 +275,7 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
                             alt={result.user.name || ""}
                             width={32}
                             height={32}
+                            sizes="32px"
                             className="w-8 h-8 rounded-full object-cover"
                           />
                         ) : (

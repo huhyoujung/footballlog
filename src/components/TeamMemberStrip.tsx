@@ -43,6 +43,7 @@ export default function TeamMemberStrip({ members, activeUserIds }: Props) {
                       alt={member.name || ""}
                       width={56}
                       height={56}
+                      sizes="56px"
                       className="w-full h-full object-cover"
                     />
                   ) : (

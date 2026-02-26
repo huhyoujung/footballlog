@@ -278,6 +278,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
                           alt=""
                           width={24}
                           height={24}
+                          sizes="24px"
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -459,6 +460,7 @@ function VotingSheet({
                         alt={checkIn.user.name || ""}
                         width={36}
                         height={36}
+                        sizes="36px"
                         className="w-9 h-9 rounded-full object-cover"
                       />
                     ) : (
@@ -543,6 +545,7 @@ function ClosedResultsInline({ results, onShowDetails }: { results: PomResult[];
               alt={winner.user.name || ""}
               width={56}
               height={56}
+              sizes="56px"
               className="w-14 h-14 rounded-full object-cover"
             />
           ) : (

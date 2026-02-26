@@ -434,7 +434,7 @@ export default function Feed() {
         left={teamLoading ? (
           <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
         ) : teamLogoUrl ? (
-          <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} className="w-8 h-8 object-cover rounded-full" priority />
+          <Image src={teamLogoUrl} alt="팀 로고" width={32} height={32} sizes="32px" className="w-8 h-8 object-cover rounded-full" priority />
         ) : (
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
             <circle cx="16" cy="16" r="15" className="fill-team-500" />

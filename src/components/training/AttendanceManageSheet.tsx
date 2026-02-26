@@ -118,6 +118,7 @@ export default function AttendanceManageSheet({
                           alt={member.name || ""}
                           width={32}
                           height={32}
+                          sizes="32px"
                           className="rounded-full object-cover"
                         />
                       ) : (
