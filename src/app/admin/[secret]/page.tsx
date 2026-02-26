@@ -44,6 +44,8 @@ export default async function SuperAdminPage({ params }: Props) {
     inactiveUsers,
     recentFeedbacks,
     recentSignups,
+    aiAggregate,
+    aiDailyUsage,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
@@ -118,6 +120,24 @@ export default async function SuperAdminPage({ params }: Props) {
       FROM "User"
       WHERE "createdAt" >= ${sevenDaysAgo}
       GROUP BY DATE("createdAt")
+    `,
+    // 전체 누적 AI 토큰 집계
+    prisma.aIInsight.aggregate({
+      _sum: { promptTokens: true, completionTokens: true },
+      _count: { id: true },
+      where: { promptTokens: { not: null } },
+    }),
+    // 7일 일별 AI 사용량 집계
+    prisma.$queryRaw<{ date_only: string; calls: number; prompt: number; completion: number }[]>`
+      SELECT "dateOnly" as date_only,
+             COUNT(*)::int as calls,
+             COALESCE(SUM("promptTokens"), 0)::int as prompt,
+             COALESCE(SUM("completionTokens"), 0)::int as completion
+      FROM "AIInsight"
+      WHERE "promptTokens" IS NOT NULL
+        AND "dateOnly" >= ${sevenDaysAgo.toISOString().split("T")[0]}
+      GROUP BY "dateOnly"
+      ORDER BY "dateOnly"
     `,
   ]);
 
@@ -286,6 +306,74 @@ export default async function SuperAdminPage({ params }: Props) {
     </>
   );
 
+  const totalPrompt = aiAggregate._sum.promptTokens ?? 0;
+  const totalCompletion = aiAggregate._sum.completionTokens ?? 0;
+  const totalCalls = aiAggregate._count.id;
+  const totalCost = calcCost(totalPrompt, totalCompletion);
+
+  const aiByDate: Record<string, { calls: number; prompt: number; completion: number }> = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    aiByDate[d.toISOString().split("T")[0]] = { calls: 0, prompt: 0, completion: 0 };
+  }
+  aiDailyUsage.forEach((row) => {
+    if (row.date_only in aiByDate) {
+      aiByDate[row.date_only] = {
+        calls: row.calls,
+        prompt: row.prompt,
+        completion: row.completion,
+      };
+    }
+  });
+
+  const aiUsage = (
+    <>
+      <section>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase mb-3">GPT API 사용량 요약</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "총 호출 수", value: `${totalCalls}회` },
+            { label: "총 입력 토큰", value: totalPrompt.toLocaleString() },
+            { label: "총 출력 토큰", value: totalCompletion.toLocaleString() },
+            { label: "누적 비용", value: `$${totalCost.toFixed(4)}` },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div className="text-2xl font-bold text-gray-900">{value}</div>
+              <div className="text-xs text-gray-500 mt-1">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <Section title="최근 7일 일별 비용">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(aiByDate).map(([date, d]) => ({
+              label: date.slice(5),
+              value: parseFloat(calcCost(d.prompt, d.completion).toFixed(5)),
+            }))}
+            unit="$"
+            color="#f97316"
+            valueFormatter={(v) => `$${v.toFixed(5)}`}
+          />
+        </div>
+      </Section>
+
+      <Section title="최근 7일 상세">
+        <Table
+          headers={["날짜", "호출 수", "입력 토큰", "출력 토큰", "비용"]}
+          rows={Object.entries(aiByDate).map(([date, d]) => [
+            date,
+            `${d.calls}회`,
+            d.prompt.toLocaleString(),
+            d.completion.toLocaleString(),
+            `$${calcCost(d.prompt, d.completion).toFixed(5)}`,
+          ])}
+        />
+      </Section>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <PageHeader title="슈퍼어드민 대시보드" />
@@ -295,6 +383,7 @@ export default async function SuperAdminPage({ params }: Props) {
           users={users}
           teams={teams}
           feedbacks={feedbacks}
+          aiUsage={aiUsage}
         />
       </div>
     </div>
@@ -353,4 +442,9 @@ function formatDate(date: Date) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+// gpt-4o-mini 기준: 입력 $0.15/1M, 출력 $0.60/1M
+function calcCost(promptTokens: number, completionTokens: number): number {
+  return (promptTokens / 1_000_000) * 0.15 + (completionTokens / 1_000_000) * 0.6;
 }
