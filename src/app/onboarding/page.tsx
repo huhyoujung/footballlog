@@ -371,7 +371,7 @@ export default function OnboardingPage() {
         {mode === "profile" && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-2">프로필 설정</h2>
-            <p className="text-sm text-gray-500 mb-6">나중에 수정할 수 있습니다</p>
+            <p className="text-sm text-gray-500 mb-6">나중에 설정에서 수정할 수 있습니다</p>
 
             <div className="space-y-4">
               <div>
@@ -406,15 +406,40 @@ export default function OnboardingPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  전화번호 (선택)
+                </label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="010-0000-0000"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-1">팀 비상연락망으로 활용됩니다</p>
+              </div>
+
               {error && <p className="text-red-500 text-sm">{error}</p>}
 
-              <button
-                onClick={handleProfileSubmit}
-                disabled={loading}
-                className="w-full py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
-              >
-                {loading ? "저장 중..." : "시작하기"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={completeOnboarding}
+                  disabled={loading}
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  건너뛰기
+                </button>
+                <button
+                  onClick={handleProfileSubmit}
+                  disabled={loading}
+                  className="flex-1 py-3 bg-team-500 text-white rounded-lg font-semibold hover:bg-team-600 transition-colors disabled:opacity-50"
+                >
+                  {loading ? "저장 중..." : "저장하고 시작하기"}
+                </button>
+              </div>
             </div>
           </div>
         )}
