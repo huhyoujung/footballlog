@@ -88,6 +88,8 @@ export async function POST() {
       myPomVotes,
       myLockerNotes,
       teamMemberCount,
+      pastInsights,
+      rsvpData,
     ] = await Promise.all([
       // 사용자 정보
       prisma.user.findUnique({
@@ -161,26 +163,42 @@ export async function POST() {
       }),
       // 팀 인원
       prisma.user.count({ where: { teamId } }),
+      // 과거 AI 코칭 기록 (최근 3개, 오늘 제외 — 변화 추적용)
+      prisma.aIInsight.findMany({
+        where: { userId, type: "PERSONAL", dateOnly: { not: dateOnly } },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { content: true, dateOnly: true },
+      }),
+      // 나의 RSVP 패턴 (최근 10개 — 참석 의향 vs 실제 참석 비교)
+      prisma.rsvp.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { status: true, trainingEvent: { select: { date: true } } },
+      }),
     ]);
 
     // 5. 프롬프트 구성
-    const systemPrompt = `당신은 한국 아마추어 축구/풋살 팀의 AI 코치입니다.
-선수의 훈련 일지, MVP 투표, 칭찬 쪽지, 출석 데이터를 종합 분석하여 개인화된 인사이트를 제공합니다.
+    const systemPrompt = `당신은 한국 아마추어 축구/풋살 팀의 현장 코치입니다.
+선수 데이터를 바탕으로 "지금 이 선수에게 무엇을 시킬지"를 중심으로 코칭합니다.
 
-역할:
-- 선수의 컨디션 패턴을 분석하고 트렌드를 파악
-- 개선점을 구체적으로 제안 (실제 훈련 내용 기반)
-- 팀 내에서의 역할과 기여도를 평가
-- 팀원들의 칭찬과 MVP 선정 데이터로 강점을 강화
-- 격려와 동기부여를 포함하되, 구체적 데이터에 근거
+코칭 원칙:
+- 보고하지 말고 지시해라: "컨디션이 낮았어" 대신 "이렇게 해봐"
+- 데이터에서 패턴을 찾아 개인화된 처방을 내려라
+- 이론 기반: 주기화(periodization), 자기결정이론(SDT), 성장형 마인드셋 적용
+- 강점은 더 강화하고, 약점은 실행 가능한 작은 과제로 쪼개라
+- 과거 코칭 기록이 있으면 반드시 참조해, 그때와 지금을 비교하고 아직 안 된 과제는 다시 강조해
+- 단기(이번 훈련)와 장기(이번 달) 목표를 동시에 제시해라
+- RSVP 패턴이 있으면 참석 의향 vs 실제 참석을 비교해 헌신도(commitment)를 짚어라
 
 응답 형식:
-- 마크다운 형식
-- 이모지를 적절히 사용
-- 섹션별로 구분하되 자연스러운 코칭 톤
-- 한국어로 응답
-- 최대 600자 내외로 간결하게
-- 반말(친근한 코칭 톤) 사용`;
+- 마크다운 형식, 이모지를 섹션 레이블이 아닌 강조 용도로 활용
+- 섹션 헤더(##) 없이 코치가 선수에게 직접 말하는 흐르는 텍스트
+- 반말 (친근한 코칭 톤)
+- 1000~1500자 내외
+- 구조: 핵심 발견(데이터 기반, 2-3문장) → 지금 당장 실행 과제(1-2개, 매우 구체적) → 장기 성장 방향
+- 한국어로 응답`;
 
     const myLogsText = myLogs
       .map((log, i) => {
@@ -211,7 +229,7 @@ export async function POST() {
     const notesText = myLockerNotes.length > 0
       ? myLockerNotes
           .map((n) => {
-            const from = n.isAnonymous ? "익명" : (n.author?.name || "팀원");
+            const from = n.author?.name ?? "팀원";
             const tags = (n.tags as string[])?.join(", ") || "";
             return `- ${from}: "${n.content}"${tags ? ` [${tags}]` : ""}`;
           })
@@ -228,6 +246,21 @@ export async function POST() {
       })
       .join("\n");
 
+    const pastInsightsText = pastInsights.length > 0
+      ? pastInsights
+          .map((ins) => `[${ins.dateOnly}]\n${ins.content}`)
+          .join("\n\n---\n\n")
+      : "없음";
+
+    const rsvpText = rsvpData.length > 0
+      ? rsvpData
+          .map((r) => {
+            const date = r.trainingEvent.date.toLocaleDateString("ko-KR");
+            return `- [${date}]: ${r.status}`;
+          })
+          .join("\n")
+      : "없음";
+
     const userPrompt = `## 선수 정보
 - 이름: ${userInfo?.name || "선수"}
 - 포지션: ${userInfo?.position || "미정"}
@@ -239,6 +272,9 @@ ${myLogsText || "없음"}
 ## 내 통계
 - 출석률: ${attendanceRate}% (${myCheckInCount}/${totalEventCount} 이벤트 체크인)
 - MVP 득표: 총 ${myPomVotes.length}표
+
+## 나의 RSVP 패턴 (최근 ${rsvpData.length}개)
+${rsvpText}
 
 ## 팀원들이 나를 MVP로 뽑은 이유 (최근 ${myPomVotes.length}개)
 ${mvpReasonsText}
@@ -254,7 +290,12 @@ ${notesText}
 ## 최근 훈련 이벤트
 ${eventsText || "없음"}
 
-위 데이터를 바탕으로 이 선수에게 개인화된 AI 코치 인사이트를 작성해줘.`;
+## 과거 코칭 기록 (최근 ${pastInsights.length}회)
+${pastInsightsText}
+
+위 데이터를 바탕으로, 현장 코치로서 이 선수에게 직접 말하듯이 코칭 피드백을 작성해줘.
+단순 현황 보고가 아니라, 선수가 다음 훈련에서 바로 실행할 수 있는 구체적인 과제 중심으로 써줘.
+과거 코칭 기록이 있다면 그때와 지금을 비교해서 성장을 짚어주고, 아직 안 된 과제가 있으면 다시 강조해줘.`;
 
     // 6. OpenAI 호출
     const completion = await getOpenAI().chat.completions.create({
@@ -263,7 +304,7 @@ ${eventsText || "없음"}
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 1000,
+      max_tokens: 2500,
       temperature: 0.7,
     });
 
