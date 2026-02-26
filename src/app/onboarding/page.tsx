@@ -375,10 +375,11 @@ export default function OnboardingPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="profile-position" className="block text-sm font-medium text-gray-700 mb-2">
                   포지션 (선택)
                 </label>
                 <select
+                  id="profile-position"
                   value={position}
                   onChange={(e) => setPosition(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
@@ -391,10 +392,11 @@ export default function OnboardingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="profile-number" className="block text-sm font-medium text-gray-700 mb-2">
                   등번호 (선택)
                 </label>
                 <input
+                  id="profile-number"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -407,10 +409,11 @@ export default function OnboardingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700 mb-2">
                   전화번호 (선택)
                 </label>
                 <input
+                  id="profile-phone"
                   type="tel"
                   inputMode="tel"
                   value={phoneNumber}
