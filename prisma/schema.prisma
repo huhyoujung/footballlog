@@ -591,9 +591,12 @@ model AIInsight {
   userId    String?
   teamId    String?
   dateOnly  String
-  createdAt DateTime    @default(now())
-  team      Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime    @default(now())
+  promptTokens     Int?
+  completionTokens Int?
+  model            String?
+  team             Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user             User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, dateOnly])
   @@unique([teamId, dateOnly])
