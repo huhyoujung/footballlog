@@ -335,7 +335,7 @@ export default function Feed() {
       });
     }
 
-    // MVP 메시지 (24시간 이내)
+    // MVP 메시지 (7일 이내, API에서 필터링)
     if (recentMvp) {
       const mvpName = recentMvp.user.name || "팀원";
       const whenText = recentMvp.isToday ? "오늘" : recentMvp.isYesterday ? "어제" : "최근";

@@ -19,12 +19,14 @@ export async function GET() {
     }
 
     const now = new Date();
+    // 7일 이내 MVP만 전광판에 표시
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // 투표가 존재하는 이벤트를 최신순으로 조회
     const recentEvents = await prisma.trainingEvent.findMany({
       where: {
         teamId: session.user.teamId,
-        date: { lte: now },
+        date: { gte: sevenDaysAgo, lte: now },
         enablePomVoting: true,
         pomVotes: { some: {} },
       },
