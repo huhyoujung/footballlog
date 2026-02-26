@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>내 스탯 - 네모의 꿈</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: #FAFAF8;
+    max-width: 390px;
+    margin: 0 auto;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 40px; padding: 0 16px;
+    background: #fff; border-bottom: 1px solid #E5E2DD;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header svg { width: 24px; height: 24px; color: #967B5D; }
+  .header h1 { font-size: 16px; font-weight: 600; color: #1A1A1A; }
+  .header .spacer { width: 24px; }
+
+  /* Profile Card */
+  .profile-card {
+    margin: 16px; padding: 20px;
+    background: #fff; border-radius: 16px;
+    border: 1px solid #E5E2DD;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #967B5D, #C4A882);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px; font-weight: 700;
+  }
+  .profile-info h2 { font-size: 18px; font-weight: 700; color: #1A1A1A; }
+  .profile-info .meta {
+    font-size: 13px; color: #8B7E74; margin-top: 2px;
+    display: flex; gap: 8px;
+  }
+  .profile-info .meta span {
+    background: #F5F0EB; padding: 2px 8px; border-radius: 10px;
+    font-weight: 500; font-size: 12px; color: #967B5D;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin: 0 16px;
+  }
+  .stat-card {
+    background: #fff; border-radius: 12px; padding: 12px 8px;
+    text-align: center; border: 1px solid #E5E2DD;
+  }
+  .stat-card .value {
+    font-size: 22px; font-weight: 700; color: #967B5D;
+    line-height: 1.2;
+  }
+  .stat-card .label {
+    font-size: 11px; color: #8B7E74; margin-top: 4px;
+    font-weight: 500;
+  }
+
+  /* Section */
+  .section {
+    margin: 20px 16px 0;
+    background: #fff; border-radius: 16px;
+    border: 1px solid #E5E2DD; padding: 20px;
+  }
+  .section-title {
+    font-size: 15px; font-weight: 700; color: #1A1A1A;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* Radar Chart */
+  .radar-wrap { position: relative; width: 100%; aspect-ratio: 1; max-height: 260px; }
+  .radar-wrap canvas { width: 100% !important; height: 100% !important; }
+
+  /* Condition Chart */
+  .condition-wrap { width: 100%; height: 180px; }
+  .condition-wrap canvas { width: 100% !important; height: 100% !important; }
+
+  /* Recent Praise */
+  .praise-list { display: flex; flex-direction: column; gap: 10px; }
+  .praise-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px; border-radius: 12px;
+    position: relative;
+  }
+  .praise-item .note-emoji { font-size: 20px; }
+  .praise-item .note-text {
+    font-size: 13px; color: #1A1A1A; line-height: 1.5;
+    flex: 1;
+  }
+  .praise-item .note-from {
+    font-size: 11px; color: #8B7E74; margin-top: 4px;
+  }
+
+  /* Bottom padding */
+  .bottom-pad { height: 40px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+  <h1>내 스탯</h1>
+  <div class="spacer"></div>
+</div>
+
+<!-- Profile -->
+<div class="profile-card">
+  <div class="avatar">유</div>
+  <div class="profile-info">
+    <h2>허유정</h2>
+    <div class="meta">
+      <span>CM</span>
+      <span>#10</span>
+      <span>운영진</span>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="value">92%</div>
+    <div class="label">출석률</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">18</div>
+    <div class="label">총 훈련</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">3</div>
+    <div class="label">MVP</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">12</div>
+    <div class="label">받은 칭찬</div>
+  </div>
+</div>
+
+<!-- Radar Chart -->
+<div class="section">
+  <div class="section-title">능력치</div>
+  <div class="radar-wrap">
+    <canvas id="radarChart"></canvas>
+  </div>
+</div>
+
+<!-- Condition Trend -->
+<div class="section">
+  <div class="section-title">컨디션 추이</div>
+  <div class="condition-wrap">
+    <canvas id="conditionChart"></canvas>
+  </div>
+</div>
+
+<!-- Recent Praise -->
+<div class="section">
+  <div class="section-title">최근 받은 칭찬</div>
+  <div class="praise-list">
+    <div class="praise-item" style="background: #FFF8E1;">
+      <div class="note-emoji">🔥</div>
+      <div>
+        <div class="note-text">오늘 중원 장악 미쳤다! 패스 연결 진짜 좋았어</div>
+        <div class="note-from">김정우 · 2일 전</div>
+      </div>
+    </div>
+    <div class="praise-item" style="background: #F3E5F5;">
+      <div class="note-emoji">👏</div>
+      <div>
+        <div class="note-text">매주 팀 운영해줘서 진심 감사해요! 유정이 없으면 팀이 안 돌아감</div>
+        <div class="note-from">박태현 · 5일 전</div>
+      </div>
+    </div>
+    <div class="praise-item" style="background: #E8F5E9;">
+      <div class="note-emoji">⚽</div>
+      <div>
+        <div class="note-text">프리킥 연습 같이 했는데 진짜 많이 늘었다 ㅋㅋ</div>
+        <div class="note-from">윤재석 · 1주 전</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-pad"></div>
+
+<script>
+// 황토색 팔레트
+const teamColor = '#967B5D';
+const teamColorLight = 'rgba(150, 123, 93, 0.15)';
+const teamColorMid = 'rgba(150, 123, 93, 0.5)';
+
+// 레이더 차트
+new Chart(document.getElementById('radarChart'), {
+  type: 'radar',
+  data: {
+    labels: ['패스', '슈팅', '드리블', '체력', '수비', '리더십'],
+    datasets: [{
+      data: [85, 62, 70, 78, 72, 95],
+      backgroundColor: teamColorLight,
+      borderColor: teamColor,
+      borderWidth: 2,
+      pointBackgroundColor: teamColor,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 5,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      r: {
+        beginAtZero: true,
+        max: 100,
+        ticks: { stepSize: 25, display: false },
+        grid: { color: '#E5E2DD' },
+        angleLines: { color: '#E5E2DD' },
+        pointLabels: {
+          font: { family: 'Pretendard', size: 13, weight: '600' },
+          color: '#5A5048'
+        }
+      }
+    }
+  }
+});
+
+// 컨디션 추이 차트
+new Chart(document.getElementById('conditionChart'), {
+  type: 'line',
+  data: {
+    labels: ['1/26', '2/2', '2/9', '2/16'],
+    datasets: [{
+      data: [7, 8, 6, 9],
+      borderColor: teamColor,
+      backgroundColor: teamColorLight,
+      borderWidth: 2.5,
+      tension: 0.35,
+      fill: true,
+      pointBackgroundColor: teamColor,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 6,
+      pointHoverRadius: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `컨디션: ${ctx.raw}/10`
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: false, min: 0, max: 10,
+        ticks: {
+          stepSize: 2,
+          font: { family: 'Pretendard', size: 11 },
+          color: '#8B7E74'
+        },
+        grid: { color: '#F0EDE8' }
+      },
+      x: {
+        ticks: {
+          font: { family: 'Pretendard', size: 12, weight: '500' },
+          color: '#5A5048'
+        },
+        grid: { display: false }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
