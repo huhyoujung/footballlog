@@ -67,12 +67,8 @@ export default async function RootLayout({
   return (
     <html lang="ko" style={cssVars as React.CSSProperties}>
       <head>
-        {/* Pretendard 폰트: @import(직렬) → <link>(HTML 파싱과 병렬 로딩) */}
-        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
-        />
+        {/* Pretendard 폰트: self-host + font-display:optional → FOUT 없음, CDN 의존 제거 */}
+        <link rel="stylesheet" href="/fonts/pretendard.css" />
         {/* 훈련 이미지 / 프로필 사진 도메인 preconnect (DNS+TLS 미리 맺기) */}
         <link rel="preconnect" href="https://dssyfyurslaopejnioqx.supabase.co" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://lh3.googleusercontent.com" crossOrigin="anonymous" />
