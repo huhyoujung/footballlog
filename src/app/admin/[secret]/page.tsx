@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/PageHeader";
 import DashboardTabs from "./DashboardTabs";
+import AdminChart from "./AdminChart";
 
 // 대시보드 데이터는 1분마다 갱신 (실시간 불필요)
 export const revalidate = 60;
@@ -42,6 +43,7 @@ export default async function SuperAdminPage({ params }: Props) {
     recentLogs,
     inactiveUsers,
     recentFeedbacks,
+    recentSignups,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
@@ -111,6 +113,12 @@ export default async function SuperAdminPage({ params }: Props) {
         status: true,
       },
     }),
+    prisma.$queryRaw<{ date: string; count: number }[]>`
+      SELECT DATE("createdAt") as date, COUNT(*)::int as count
+      FROM "User"
+      WHERE "createdAt" >= ${sevenDaysAgo}
+      GROUP BY DATE("createdAt")
+    `,
   ]);
 
   const dau = dauSessions.length;
@@ -126,11 +134,28 @@ export default async function SuperAdminPage({ params }: Props) {
     if (dateKey in logsByDate) logsByDate[dateKey] = row.count;
   });
 
+  // 날짜별 신규 가입자 집계
+  const signupsByDate: Record<string, number> = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    signupsByDate[d.toISOString().split("T")[0]] = 0;
+  }
+  recentSignups.forEach((row) => {
+    const dateKey = String(row.date);
+    if (dateKey in signupsByDate) signupsByDate[dateKey] = row.count;
+  });
+
+  // 피드백 유형별 집계
+  const feedbackByType: Record<string, number> = {};
+  recentFeedbacks.forEach((f) => {
+    feedbackByType[f.type] = (feedbackByType[f.type] ?? 0) + 1;
+  });
+
   // --- 탭별 콘텐츠 ---
 
   const overview = (
     <>
-      {/* 요약 카드 */}
+      {/* 요약 카드 — 기존 코드 그대로 유지 */}
       <section>
         <h2 className="text-xs font-semibold text-gray-500 uppercase mb-3">현황 요약</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -148,12 +173,33 @@ export default async function SuperAdminPage({ params }: Props) {
           ))}
         </div>
       </section>
-      {/* 최근 7일 훈련 로그 */}
+
+      {/* 신규: 7일 신규 가입자 차트 */}
+      <Section title="최근 7일 신규 가입자">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(signupsByDate).map(([date, count]) => ({
+              label: date.slice(5),
+              value: count,
+            }))}
+            unit="명"
+            color="#10b981"
+          />
+        </div>
+      </Section>
+
+      {/* 기존 훈련 로그 → 테이블 제거, 차트로 교체 */}
       <Section title="최근 7일 훈련 로그">
-        <Table
-          headers={["날짜", "로그 수"]}
-          rows={Object.entries(logsByDate).map(([date, count]) => [date, String(count)])}
-        />
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(logsByDate).map(([date, count]) => ({
+              label: date.slice(5),
+              value: count,
+            }))}
+            unit="개"
+            color="#6366f1"
+          />
+        </div>
       </Section>
     </>
   );
@@ -187,6 +233,17 @@ export default async function SuperAdminPage({ params }: Props) {
 
   const teams = (
     <Section title="팀별 인원 현황">
+      <div className="p-4 border-b border-gray-100">
+        <AdminChart
+          data={teamsWithStats.map((t) => ({
+            label: t.name.length > 6 ? t.name.slice(0, 6) + "…" : t.name,
+            value: t._count.members,
+          }))}
+          unit="명"
+          color="#f59e0b"
+          height={180}
+        />
+      </div>
       <Table
         headers={["팀명", "인원", "최근 훈련"]}
         rows={teamsWithStats.map((t) => [
@@ -199,19 +256,34 @@ export default async function SuperAdminPage({ params }: Props) {
   );
 
   const feedbacks = (
-    <Section title="최근 피드백">
-      <Table
-        headers={["유형", "제목", "내용", "작성자", "날짜", "상태"]}
-        rows={recentFeedbacks.map((f) => [
-          f.type,
-          f.title,
-          f.content.length > 50 ? f.content.slice(0, 50) + "…" : f.content,
-          f.userName ?? f.userEmail ?? "-",
-          formatDate(f.createdAt),
-          f.status,
-        ])}
-      />
-    </Section>
+    <>
+      <Section title="피드백 유형별 분포">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(feedbackByType).map(([type, count]) => ({
+              label: type,
+              value: count,
+            }))}
+            unit="건"
+            color="#ec4899"
+            height={160}
+          />
+        </div>
+      </Section>
+      <Section title="최근 피드백">
+        <Table
+          headers={["유형", "제목", "내용", "작성자", "날짜", "상태"]}
+          rows={recentFeedbacks.map((f) => [
+            f.type,
+            f.title,
+            f.content.length > 50 ? f.content.slice(0, 50) + "…" : f.content,
+            f.userName ?? f.userEmail ?? "-",
+            formatDate(f.createdAt),
+            f.status,
+          ])}
+        />
+      </Section>
+    </>
   );
 
   return (
