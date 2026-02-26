@@ -244,9 +244,16 @@ export default function OnboardingPage() {
 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {searchResults.length === 0 && searchQuery.trim() && (
-                    <p className="text-center text-gray-400 py-8">
-                      검색 결과가 없습니다
-                    </p>
+                    <div className="text-center py-8 space-y-3">
+                      <p className="text-gray-400">검색 결과가 없습니다</p>
+                      <button
+                        type="button"
+                        onClick={() => { setMode("create"); setSearchQuery(""); setError(""); }}
+                        className="text-sm text-team-600 font-medium hover:underline"
+                      >
+                        직접 팀 만들기 →
+                      </button>
+                    </div>
                   )}
                   {searchResults.map((team) => (
                     <button
