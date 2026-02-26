@@ -311,6 +311,24 @@ export async function POST() {
       }),
     ]);
 
+    // 팀 분석 시스템 프롬프트
+    const TEAM_SYSTEM_PROMPT = `당신은 한국 아마추어 축구/풋살 팀의 팀 코치입니다.
+팀 전체 데이터를 분석해 팀의 현재 상태와 다음 훈련 방향을 제시합니다.
+
+코칭 원칙:
+- 선수 이름 절대 금지. 포지션 익명 ID(FW1, MF2 등)만 사용
+- 정량 데이터(컨디션 수치, 출석률, 골 기록, RSVP 분포) + 정성 데이터(일지 키워드, MVP 이유, 칭찬 태그) 모두 활용
+- 보고가 아닌 처방: "~했다" 대신 "~해보자", "~이 필요하다"
+- 지각비 건수, RSVP NO_SHOW 비율 등으로 팀 헌신도(commitment) 언급
+- 다음 훈련에서 팀 전체가 집중해야 할 과제 1-2개를 구체적으로 제시해라
+
+응답 형식:
+- ## 팀 현황 분석 으로 시작
+- 1000자 내외, 마크다운, 이모지 강조 용도
+- 반말 (팀원에게 직접 말하는 코치 톤)
+- 구조: 이번 주 팀 상태 요약(수치 기반) → 주목할 포지션/패턴 → 다음 훈련 집중 과제
+- 한국어로 응답`;
+
     // 5. 프롬프트 구성
     const systemPrompt = `당신은 한국 아마추어 축구/풋살 팀의 현장 코치입니다.
 선수 데이터를 바탕으로 "지금 이 선수에게 무엇을 시킬지"를 중심으로 코칭합니다.
@@ -392,6 +410,85 @@ export async function POST() {
           })
           .join("\n")
       : "없음";
+
+    // 팀 분석 데이터 포매팅
+    const positionStatsText = calcPositionStats(teamLogs);
+
+    const anonymizedTeamLogsText = anonymizeTeamLogs(teamLogs);
+
+    const teamMvpText =
+      teamMvpVotes.length > 0
+        ? teamMvpVotes
+            .map(
+              (v) =>
+                `- ${v.nominee.position?.toUpperCase() || "선수"}: "${v.reason}"${(v.tags as string[]).length > 0 ? ` [${(v.tags as string[]).join(", ")}]` : ""}`
+            )
+            .join("\n")
+        : "없음";
+
+    const matchResultsText =
+      recentMatches.length > 0
+        ? recentMatches
+            .map((m) => {
+              const date = m.date.toLocaleDateString("ko-KR");
+              return `- [${date}] vs ${m.opponentTeamName || "상대팀"}: ${m.teamAScore}-${m.teamBScore}`;
+            })
+            .join("\n")
+        : "없음";
+
+    const activeLoggerRate =
+      teamMemberCount > 0
+        ? `${activeLoggers.length}/${teamMemberCount}명 (${Math.round((activeLoggers.length / teamMemberCount) * 100)}%)`
+        : "없음";
+
+    const rsvpDistText =
+      teamRsvpDistribution.length > 0
+        ? teamRsvpDistribution
+            .map((r) => `${r.status}: ${r._count.status}건`)
+            .join(" / ")
+        : "없음";
+
+    const teamTagFreqText = buildTeamTagFrequency(teamLockerTags);
+
+    const ownGoals = recentGoals.filter((g) => g.isOwnGoal).length;
+    const goalsText =
+      recentGoals.length > 0
+        ? `총 ${recentGoals.length}골 (자책골 ${ownGoals}개)`
+        : "없음";
+
+    const teamUserPrompt = `## 팀 기본 현황
+- 팀 인원: ${teamMemberCount}명
+- 최근 30일 일지 작성 참여: ${activeLoggerRate}
+- 팀 평균 컨디션: ${teamAvgCondition}/10 (최근 30개 일지)
+- 미납 지각비: ${pendingLateFeeCount}건
+
+## 포지션별 컨디션 분포
+${positionStatsText}
+
+## 팀 RSVP 현황
+${rsvpDistText}
+
+## 팀원 훈련 일지 (익명, ${teamLogs.length}개)
+${anonymizedTeamLogsText || "없음"}
+
+## 팀 전체 MVP 투표 이유 (포지션 익명, ${teamMvpVotes.length}개)
+${teamMvpText}
+
+## 팀 칭찬쪽지 태그 빈도 (상위 10개)
+${teamTagFreqText}
+
+## 최근 친선전 결과
+${matchResultsText}
+
+## 최근 골 기록
+${goalsText}
+
+## 최근 훈련 이벤트 (날씨 포함)
+${eventsText || "없음"}
+
+위 데이터를 바탕으로, 팀 코치로서 팀원 전체에게 말하듯이 팀 현황 분석 리포트를 작성해줘.
+선수 이름은 절대 언급하지 말고, 포지션 익명 ID(FW1, MF2 등)만 사용해줘.
+다음 훈련에서 팀 전체가 집중해야 할 구체적인 과제를 포함해줘.`;
 
     const userPrompt = `## 선수 정보
 - 이름: ${userInfo?.name || "선수"}
