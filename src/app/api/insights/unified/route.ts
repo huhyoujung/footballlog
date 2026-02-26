@@ -421,7 +421,7 @@ export async function POST() {
         ? teamMvpVotes
             .map(
               (v) =>
-                `- ${v.nominee.position?.toUpperCase() || "선수"}: "${v.reason}"${(v.tags as string[]).length > 0 ? ` [${(v.tags as string[]).join(", ")}]` : ""}`
+                `- ${v.nominee.position?.toUpperCase() || "선수"}: "${v.reason}"${v.tags.length > 0 ? ` [${v.tags.join(", ")}]` : ""}`
             )
             .join("\n")
         : "없음";
