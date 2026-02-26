@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
         positionX: true,
         positionY: true,
         tags: true,
-        isAnonymous: true,
         createdAt: true,
         recipient: {
           select: {
