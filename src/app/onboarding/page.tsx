@@ -161,6 +161,7 @@ export default function OnboardingPage() {
         throw new Error("프로필 저장에 실패했습니다");
       }
 
+      setLoading(false);
       await completeOnboarding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
