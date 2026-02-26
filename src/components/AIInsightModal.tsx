@@ -70,7 +70,6 @@ export default function AIInsightModal({
       .then((data) => {
         setInsight(data.insight.content);
         setCached(data.cached);
-        localStorage.setItem("aiInsightViewed", "1");
       })
       .catch((err) => {
         if (err.name === "AbortError") return;

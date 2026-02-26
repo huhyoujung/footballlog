@@ -591,10 +591,10 @@ export default function LogDetailClient({ logId }: { logId: string }) {
                   <span className="text-2xl">✨</span>
                   <div>
                     <h3 className="text-gray-800 font-semibold text-sm">
-                      {localStorage.getItem("aiInsightViewed") === "1" ? "AI 코치 피드백 다시 보기" : "AI 코치 피드백 받기"}
+                      AI 코치 피드백 보기
                     </h3>
                     <p className="text-gray-600 text-xs">
-                      {localStorage.getItem("aiInsightViewed") === "1" ? "이전 분석 결과를 확인해보세요" : "내 훈련 데이터를 분석해드려요"}
+                      내 훈련 데이터를 분석해드려요
                     </p>
                   </div>
                 </div>
