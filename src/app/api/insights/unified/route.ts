@@ -530,6 +530,10 @@ ${pastInsightsText}
     // 6. GPT 2회 병렬 호출 (캐시 HIT인 경우 해당 호출 스킵)
     const teamFallbackContent = `## 팀 현황 분석\n\n팀 인사이트는 잠시 생성 중이야. 조금 있다가 다시 확인해봐.`;
 
+    let personalUsage: { promptTokens: number | null; completionTokens: number | null; model: string | null } = {
+      promptTokens: null, completionTokens: null, model: null,
+    };
+
     const [personalContent, teamContent] = await Promise.all([
       personalHit
         ? Promise.resolve(personalCache!.content)
@@ -543,7 +547,14 @@ ${pastInsightsText}
               max_tokens: 1800,
               temperature: 0.7,
             })
-            .then((r) => r.choices[0]?.message?.content ?? ""),
+            .then((r) => {
+              personalUsage = {
+                promptTokens: r.usage?.prompt_tokens ?? null,
+                completionTokens: r.usage?.completion_tokens ?? null,
+                model: r.model ?? "gpt-4o-mini",
+              };
+              return r.choices[0]?.message?.content ?? "";
+            }),
 
       teamHit
         ? Promise.resolve(teamCache!.content)
@@ -579,8 +590,21 @@ ${pastInsightsText}
       saveOps.push(
         prisma.aIInsight.upsert({
           where: { userId_dateOnly: { userId, dateOnly } },
-          create: { type: "PERSONAL", content: personalContent, userId, dateOnly },
-          update: { content: personalContent, createdAt: new Date() },
+          create: {
+            type: "PERSONAL",
+            content: personalContent,
+            userId,
+            dateOnly,
+            promptTokens: personalUsage.promptTokens,
+            completionTokens: personalUsage.completionTokens,
+            model: personalUsage.model,
+          },
+          update: {
+            content: personalContent,
+            createdAt: new Date(),
+            promptTokens: personalUsage.promptTokens,
+            completionTokens: personalUsage.completionTokens,
+          },
         })
       );
     }
