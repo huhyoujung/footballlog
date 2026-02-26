@@ -24,7 +24,7 @@ function anonymizeTeamLogs(
     keyPoints: string;
     improvement: string;
     trainingDate: Date;
-    user: { name: string; position: string | null };
+    user: { name: string | null; position: string | null };
   }>
 ): string {
   const nameToAnon = new Map<string, string>();
@@ -32,7 +32,7 @@ function anonymizeTeamLogs(
 
   return logs
     .map((log) => {
-      const name = log.user.name;
+      const name = log.user.name ?? `__unnamed_${nameToAnon.size}`;
       if (!nameToAnon.has(name)) {
         const pos = log.user.position?.toUpperCase() || "선수";
         posCounters[pos] = (posCounters[pos] ?? 0) + 1;
