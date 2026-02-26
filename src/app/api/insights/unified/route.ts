@@ -8,6 +8,81 @@ import { getOpenAI } from "@/lib/openai";
 // 동일 유저 동시 생성 방지 (프로세스 단위 잠금, 크로스 인스턴스는 P2002로 처리)
 const generatingUsers = new Set<string>();
 
+// 동일 팀 동시 생성 방지 (팀원 여럿이 동시 요청해도 팀 GPT 1번만 호출)
+const generatingTeams = new Set<string>();
+
+// 개인 + 팀 인사이트를 하나의 마크다운 문자열로 합산
+function mergeContent(personal: string, team: string): string {
+  return `## 나의 코칭 피드백\n\n${personal}\n\n---\n\n${team}`;
+}
+
+// 팀 일지 배열을 포지션 기반 익명 ID로 변환해 문자열 반환
+// 이름 → ID 매핑은 이번 호출 내에서만 일관성 유지
+function anonymizeTeamLogs(
+  logs: Array<{
+    condition: number;
+    keyPoints: string;
+    improvement: string;
+    trainingDate: Date;
+    user: { name: string; position: string | null };
+  }>
+): string {
+  const nameToAnon = new Map<string, string>();
+  const posCounters: Record<string, number> = {};
+
+  return logs
+    .map((log) => {
+      const name = log.user.name;
+      if (!nameToAnon.has(name)) {
+        const pos = log.user.position?.toUpperCase() || "선수";
+        posCounters[pos] = (posCounters[pos] ?? 0) + 1;
+        nameToAnon.set(name, `${pos}${posCounters[pos]}`);
+      }
+      const anon = nameToAnon.get(name)!;
+      const date = log.trainingDate.toLocaleDateString("ko-KR");
+      return `- [${date}] ${anon} 컨디션:${log.condition}/10 | 핵심:"${log.keyPoints}" | 개선:"${log.improvement}"`;
+    })
+    .join("\n");
+}
+
+// 포지션별 평균 컨디션 집계
+function calcPositionStats(
+  logs: Array<{ condition: number; user: { position: string | null } }>
+): string {
+  const stats: Record<string, { sum: number; count: number }> = {};
+  for (const log of logs) {
+    const pos = log.user.position?.toUpperCase() || "미정";
+    if (!stats[pos]) stats[pos] = { sum: 0, count: 0 };
+    stats[pos].sum += log.condition;
+    stats[pos].count += 1;
+  }
+  return (
+    Object.entries(stats)
+      .map(
+        ([pos, { sum, count }]) =>
+          `- ${pos}: 평균 ${(sum / count).toFixed(1)}/10 (${count}개 일지)`
+      )
+      .join("\n") || "없음"
+  );
+}
+
+// 칭찬쪽지 태그 빈도 집계 (상위 10개)
+function buildTeamTagFrequency(notes: Array<{ tags: string[] }>): string {
+  const freq: Record<string, number> = {};
+  for (const note of notes) {
+    for (const tag of note.tags) {
+      freq[tag] = (freq[tag] ?? 0) + 1;
+    }
+  }
+  return (
+    Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag, count]) => `"${tag}": ${count}회`)
+      .join(", ") || "없음"
+  );
+}
+
 export async function POST() {
   let userId: string | undefined;
   try {
