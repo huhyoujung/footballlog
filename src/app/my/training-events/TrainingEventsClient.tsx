@@ -161,11 +161,14 @@ function EventCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             {event.isRegular && (
-              <span className="shrink-0 px-1.5 py-0.5 bg-team-100 text-team-600 text-[10px] font-semibold rounded">
+              <span className="shrink-0 px-2 py-0.5 bg-team-100 text-team-600 text-[10px] font-medium rounded-full whitespace-nowrap" aria-hidden="true">
                 정기
               </span>
             )}
-            <h3 className={`text-base font-semibold truncate ${event.cancelled ? "text-gray-400" : "text-gray-900"}`}>
+            <h3
+              className={`text-base font-semibold truncate ${event.cancelled ? "text-gray-400" : "text-gray-900"}`}
+              aria-label={event.isRegular ? `[정기] ${event.title}` : event.title}
+            >
               {event.title}
             </h3>
           </div>
