@@ -109,6 +109,11 @@ export default function TrainingEventsClient({
                 <p className="text-xs font-medium text-team-500 px-1">예정된 운동</p>
                 {upcomingEvents.map((event, index) => (
                   <div key={event.id} ref={index === 0 ? nextEventRef : undefined}>
+                    {index === 0 && !event.cancelled && (
+                      <p className="text-xs font-semibold text-team-500 px-1 mb-1.5">
+                        📌 다음 운동
+                      </p>
+                    )}
                     <EventCard event={event} formatDate={formatDate} past={false} isNext={index === 0} />
                   </div>
                 ))}
@@ -172,13 +177,8 @@ function EventCard({
               {event.title}
             </h3>
           </div>
-          {(isNext || event.isFriendlyMatch || event.cancelled) && (
+          {(event.isFriendlyMatch || event.cancelled) && (
             <div className="flex items-center gap-1.5 flex-wrap mt-1">
-              {isNext && !event.cancelled && (
-                <span className="px-2 py-0.5 bg-team-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap">
-                  다음
-                </span>
-              )}
               {event.isFriendlyMatch && (
                 <span className="px-2 py-0.5 bg-team-50 text-team-600 text-[10px] font-medium rounded-full whitespace-nowrap">
                   친선
