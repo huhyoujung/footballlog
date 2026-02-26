@@ -85,6 +85,7 @@ function buildTeamTagFrequency(notes: Array<{ tags: string[] }>): string {
 
 export async function POST() {
   let userId: string | undefined;
+  let teamId: string | undefined;
   try {
     const session = await getServerSession(authOptions);
 
@@ -96,7 +97,7 @@ export async function POST() {
     }
 
     userId = session.user.id;
-    const teamId = session.user.teamId;
+    teamId = session.user.teamId;
 
     if (generatingUsers.has(userId)) {
       return NextResponse.json(
@@ -573,35 +574,63 @@ ${pastInsightsText}
     }
 
     // 7. 개인 + 팀 병렬 저장
-    await Promise.all(
-      [
-        !personalHit &&
-          prisma.aIInsight.upsert({
-            where: { userId_dateOnly: { userId, dateOnly } },
-            create: { type: "PERSONAL", content: personalContent, userId, dateOnly },
-            update: { content: personalContent, createdAt: new Date() },
-          }),
-        !teamHit &&
-          !teamAlreadyGenerating &&
-          teamLogs.length > 0 &&
-          prisma.aIInsight.upsert({
-            where: { teamId_dateOnly: { teamId, dateOnly } },
-            create: { type: "TEAM", content: teamContent, teamId, dateOnly },
-            update: { content: teamContent, createdAt: new Date() },
-          }),
-      ].filter(Boolean)
-    );
+    const saveOps: Promise<unknown>[] = [];
+    if (!personalHit) {
+      saveOps.push(
+        prisma.aIInsight.upsert({
+          where: { userId_dateOnly: { userId, dateOnly } },
+          create: { type: "PERSONAL", content: personalContent, userId, dateOnly },
+          update: { content: personalContent, createdAt: new Date() },
+        })
+      );
+    }
+    if (!teamHit && !teamAlreadyGenerating && teamLogs.length > 0) {
+      saveOps.push(
+        prisma.aIInsight.upsert({
+          where: { teamId_dateOnly: { teamId, dateOnly } },
+          create: { type: "TEAM", content: teamContent, teamId, dateOnly },
+          update: { content: teamContent, createdAt: new Date() },
+        })
+      );
+    }
+    if (saveOps.length > 0) {
+      await Promise.all(saveOps);
+    }
 
     return NextResponse.json({
       insight: { content: mergeContent(personalContent, teamContent) },
       cached: false,
     });
   } catch (error) {
-    if (userId) generatingUsers.delete(userId);
+    // P2002 — 크로스 인스턴스 경쟁으로 팀 캐시 중복 저장 시도
+    // 이미 저장된 캐시를 재조회해서 반환
+    const prismaError = error as { code?: string };
+    if (prismaError.code === "P2002" && userId && teamId) {
+      try {
+        const now2 = new Date();
+        const kst2 = new Date(now2.getTime() + 9 * 60 * 60 * 1000);
+        const dateOnly2 = `${kst2.getUTCFullYear()}-${String(kst2.getUTCMonth() + 1).padStart(2, "0")}-${String(kst2.getUTCDate()).padStart(2, "0")}`;
+        const [p, t] = await Promise.all([
+          prisma.aIInsight.findUnique({ where: { userId_dateOnly: { userId, dateOnly: dateOnly2 } } }),
+          prisma.aIInsight.findUnique({ where: { teamId_dateOnly: { teamId, dateOnly: dateOnly2 } } }),
+        ]);
+        if (p && t) {
+          return NextResponse.json({
+            insight: { content: mergeContent(p.content, t.content) },
+            cached: true,
+          });
+        }
+      } catch {
+        // 재조회도 실패하면 아래 500 반환으로 fall-through
+      }
+    }
     console.error("인사이트 생성 실패:", error);
     return NextResponse.json(
       { error: "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요." },
       { status: 500 }
     );
+  } finally {
+    if (userId) generatingUsers.delete(userId);
+    if (teamId) generatingTeams.delete(teamId);
   }
 }
