@@ -150,8 +150,14 @@ export async function POST() {
       });
     }
 
-    // 4. 데이터 수집 (병렬) — 여기서부터 OpenAI 호출까지 잠금
+    // 데이터 수집 (병렬) — 여기서부터 OpenAI 호출까지 잠금
+    const teamAlreadyGenerating = generatingTeams.has(teamId);
     generatingUsers.add(userId);
+    if (!teamHit && !teamAlreadyGenerating) {
+      generatingTeams.add(teamId);
+    }
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const [
       userInfo,
       myLogs,
@@ -164,6 +170,14 @@ export async function POST() {
       teamMemberCount,
       pastInsights,
       rsvpData,
+      // 팀 분석용 추가 데이터
+      teamMvpVotes,
+      recentMatches,
+      activeLoggers,
+      teamRsvpDistribution,
+      teamLockerTags,
+      pendingLateFeeCount,
+      recentGoals,
     ] = await Promise.all([
       // 사용자 정보
       prisma.user.findUnique({
@@ -193,6 +207,7 @@ export async function POST() {
           condition: true,
           conditionReason: true,
           keyPoints: true,
+          improvement: true,
           trainingDate: true,
           user: { select: { name: true, position: true } },
         },
@@ -249,6 +264,50 @@ export async function POST() {
         orderBy: { createdAt: "desc" },
         take: 10,
         select: { status: true, trainingEvent: { select: { date: true } } },
+      }),
+      // [팀 분석] 팀 전체 MVP 투표 (포지션만 — 이름 제외)
+      prisma.pomVote.findMany({
+        where: { trainingEvent: { teamId } },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: { reason: true, tags: true, nominee: { select: { position: true } } },
+      }),
+      // [팀 분석] 최근 친선전 결과
+      prisma.trainingEvent.findMany({
+        where: { teamId, isFriendlyMatch: true, matchStatus: "COMPLETED" },
+        orderBy: { date: "desc" },
+        take: 5,
+        select: { date: true, teamAScore: true, teamBScore: true, opponentTeamName: true },
+      }),
+      // [팀 분석] 최근 30일 일지 작성 참여 인원
+      prisma.trainingLog.findMany({
+        where: { user: { teamId }, trainingDate: { gte: thirtyDaysAgo } },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      // [팀 분석] 팀 전체 RSVP 상태 분포
+      prisma.rsvp.groupBy({
+        by: ["status"],
+        where: { trainingEvent: { teamId } },
+        _count: { status: true },
+      }),
+      // [팀 분석] 팀원 수신 칭찬쪽지 태그 (최근 50개)
+      prisma.lockerNote.findMany({
+        where: { recipient: { teamId } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: { tags: true },
+      }),
+      // [팀 분석] 미납 지각비 건수
+      prisma.lateFee.count({
+        where: { trainingEvent: { teamId }, status: "PENDING" },
+      }),
+      // [팀 분석] 최근 경기 골 기록
+      prisma.goalRecord.findMany({
+        where: { trainingEvent: { teamId } },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: { scoringTeam: true, isOwnGoal: true, minute: true },
       }),
     ]);
 
@@ -398,10 +457,15 @@ ${pastInsightsText}
         content,
         userId,
         dateOnly,
+        promptTokens: completion.usage?.prompt_tokens ?? null,
+        completionTokens: completion.usage?.completion_tokens ?? null,
+        model: completion.model ?? "gpt-4o-mini",
       },
       update: {
         content,
         createdAt: new Date(),
+        promptTokens: completion.usage?.prompt_tokens ?? null,
+        completionTokens: completion.usage?.completion_tokens ?? null,
       },
     });
 
