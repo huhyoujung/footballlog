@@ -105,50 +105,49 @@ export async function POST() {
       );
     }
 
-    // 1. 일지 존재 여부 확인
-    const latestLog = await prisma.trainingLog.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    });
+    // KST 기준 오늘 날짜 (Vercel은 UTC이므로 +9시간)
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const dateOnly = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 
-    if (!latestLog) {
+    // 개인/팀 캐시 + 최신 일지 4-way 병렬 조회
+    const [personalCache, teamCache, latestMyLog, latestTeamLog] = await Promise.all([
+      prisma.aIInsight.findUnique({ where: { userId_dateOnly: { userId, dateOnly } } }),
+      prisma.aIInsight.findUnique({ where: { teamId_dateOnly: { teamId, dateOnly } } }),
+      prisma.trainingLog.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      prisma.trainingLog.findFirst({
+        where: { user: { teamId } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    // 개인 일지 없으면 인사이트 불가
+    if (!latestMyLog) {
       return NextResponse.json(
         { error: "일지를 작성하면 AI 코치가 인사이트를 제공해요" },
         { status: 400 }
       );
     }
 
-    // 2. KST 기준 오늘 날짜 (Vercel은 UTC이므로 +9시간)
-    const now = new Date();
-    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    const dateOnly = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+    // 캐시 유효 판단
+    const personalHit =
+      personalCache !== null && personalCache.createdAt >= latestMyLog.createdAt;
+    const teamHit =
+      teamCache !== null &&
+      latestTeamLog !== null &&
+      teamCache.createdAt >= latestTeamLog.createdAt;
 
-    // 3. 오늘 인사이트 존재 + 그 이후 새 일지 없으면 캐시 반환
-    const existingToday = await prisma.aIInsight.findUnique({
-      where: { userId_dateOnly: { userId, dateOnly } },
-    });
-
-    if (existingToday && latestLog.createdAt <= existingToday.createdAt) {
+    // 둘 다 캐시 HIT → 합산 즉시 반환
+    if (personalHit && teamHit) {
       return NextResponse.json({
-        insight: { content: existingToday.content },
+        insight: { content: mergeContent(personalCache!.content, teamCache!.content) },
         cached: true,
       });
-    }
-
-    // 4. 새 데이터 없으면 마지막 인사이트 반환
-    if (!existingToday) {
-      const latestInsight = await prisma.aIInsight.findFirst({
-        where: { userId, type: "PERSONAL" },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (latestInsight && latestLog.createdAt <= latestInsight.createdAt) {
-        return NextResponse.json({
-          insight: { content: latestInsight.content },
-          cached: true,
-        });
-      }
     }
 
     // 4. 데이터 수집 (병렬) — 여기서부터 OpenAI 호출까지 잠금
