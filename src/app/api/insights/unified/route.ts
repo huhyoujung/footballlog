@@ -157,7 +157,6 @@ export async function POST() {
           content: true,
           tags: true,
           createdAt: true,
-          isAnonymous: true,
           author: { select: { name: true } },
         },
       }),
