@@ -41,6 +41,7 @@ export default function OnboardingPage() {
   // 프로필
   const [position, setPosition] = useState("");
   const [number, setNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -105,7 +106,8 @@ export default function OnboardingPage() {
       }
 
       await update();
-      await completeOnboarding();
+      setMode("profile");
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
@@ -132,7 +134,8 @@ export default function OnboardingPage() {
       }
 
       await update();
-      await completeOnboarding();
+      setMode("profile");
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
@@ -150,6 +153,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           position: position || null,
           number: number ? parseInt(number) : null,
+          phoneNumber: phoneNumber.trim() || null,
         }),
       });
 
@@ -157,8 +161,7 @@ export default function OnboardingPage() {
         throw new Error("프로필 저장에 실패했습니다");
       }
 
-      router.push("/");
-      router.refresh();
+      await completeOnboarding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
