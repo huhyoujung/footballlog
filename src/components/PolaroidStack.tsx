@@ -18,7 +18,6 @@ interface LockerNote {
   positionY: number;
   tags: string[];
   createdAt: string;
-  isAnonymous: boolean;
   recipient: {
     id: string;
     name: string | null;
@@ -389,14 +388,14 @@ export default function PolaroidStack({ logs, date, displayDate, onClick, isExpa
                 {note?.content}
               </p>
 
-              {/* 보낸 사람: currentUserId가 있으면 내가 쓴 것만, 없으면 익명 아닌 것 모두 */}
+              {/* 보낸 사람: currentUserId가 있으면 내가 쓴 것만, 없으면 이름 있는 것 모두 */}
               {currentUserId
                 ? note?.author?.id === currentUserId && (
                     <p className="text-sm text-gray-500 text-center mt-4">
                       From. {note?.author?.name}
                     </p>
                   )
-                : !note?.isAnonymous && note?.author?.name && (
+                : note?.author?.name && (
                     <p className="text-sm text-gray-500 text-center mt-4">
                       From. {note.author.name}
                     </p>

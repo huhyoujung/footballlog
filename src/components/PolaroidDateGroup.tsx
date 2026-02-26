@@ -13,7 +13,6 @@ interface LockerNote {
   positionY: number;
   tags: string[];
   createdAt: string;
-  isAnonymous: boolean;
   recipient: {
     id: string;
     name: string | null;

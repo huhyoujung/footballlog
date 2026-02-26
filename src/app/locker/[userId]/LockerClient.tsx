@@ -24,7 +24,6 @@ interface LockerNote {
   rotation: number;
   positionX: number;
   positionY: number;
-  isAnonymous: boolean;
   tags: string[];
   author: {
     id: string;
@@ -109,11 +108,9 @@ export default function LockerClient({ userId }: { userId: string }) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
   const [noteColor, setNoteColor] = useState(STICKY_COLORS[0].value);
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<string>("");
   const [selectedActivityType, setSelectedActivityType] = useState<"event" | "log" | "">("");
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
-  const [showAuthor, setShowAuthor] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
@@ -192,6 +189,16 @@ export default function LockerClient({ userId }: { userId: string }) {
   );
 
   const recentActivities = activitiesData?.activities || [];
+
+  // POM 투표 수신 데이터 (스탯 차트 확장용) — 프로필 탭일 때만 페치
+  const { data: pomData } = useSWR<{ pomVotes: { tags: string[] }[]; mvpCount: number }>(
+    userId && activeTab === "profile" ? `/api/pom/user/${userId}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 300000, // 5분 캐시
+    }
+  );
 
   // Profile data fetching (only for own locker)
   const isMyLocker = session?.user?.id === userId;
@@ -415,7 +422,6 @@ export default function LockerClient({ userId }: { userId: string }) {
           rotation: Math.random() * 6 - 3, // -3 ~ +3도 랜덤 회전
           positionX: 0,
           positionY: 0,
-          isAnonymous,
           trainingEventId: selectedActivityType === "event" ? selectedActivityId : null,
           trainingLogId: selectedActivityType === "log" ? selectedActivityId : null,
           tags: selectedTags,
@@ -426,7 +432,6 @@ export default function LockerClient({ userId }: { userId: string }) {
         showToast("쪽지를 남겼습니다!");
         setNoteContent("");
         setNoteColor(STICKY_COLORS[0].value);
-        setIsAnonymous(false);
         setSelectedActivityId("");
         setSelectedActivityType("");
         setSelectedTags([]);
@@ -538,7 +543,7 @@ export default function LockerClient({ userId }: { userId: string }) {
     // 좋아요 기능은 나중에 구현
   }, []);
 
-  // 스탯 집계 (태그별 카운트)
+  // 스탯 집계 (쪽지 태그 + POM 투표 태그 합산)
   const { stats, statEntries, maxStatValue, hasEnoughNotes } = useMemo(() => {
     const s: Record<string, number> = {};
     for (const note of notes) {
@@ -546,10 +551,16 @@ export default function LockerClient({ userId }: { userId: string }) {
         s[tag] = (s[tag] || 0) + 1;
       }
     }
+    for (const vote of (pomData?.pomVotes ?? [])) {
+      for (const tag of vote.tags) {
+        s[tag] = (s[tag] || 0) + 1;
+      }
+    }
     const entries = Object.entries(s).sort((a, b) => b[1] - a[1]);
     const maxVal = Math.max(...Object.values(s), 0);
-    return { stats: s, statEntries: entries, maxStatValue: maxVal, hasEnoughNotes: notes.length >= 5 };
-  }, [notes]);
+    const totalDataPoints = notes.length + (pomData?.pomVotes?.length ?? 0);
+    return { stats: s, statEntries: entries, maxStatValue: maxVal, hasEnoughNotes: totalDataPoints >= 5 };
+  }, [notes, pomData]);
 
   // loading.tsx와 동일한 스켈레톤 (이중 전환 방지)
   if (!notes || !user) {
@@ -823,7 +834,11 @@ export default function LockerClient({ userId }: { userId: string }) {
                     아직 스탯을 볼 수 없어요
                   </p>
                   <p className="text-xs text-center text-gray-500">
-                    쪽지를 <span className="font-semibold text-team-600">{notes.length}/5</span>개 받았어요
+                    쪽지와 MVP 투표 합산{" "}
+                    <span className="font-semibold text-team-600">
+                      {notes.length + (pomData?.pomVotes?.length ?? 0)}/5
+                    </span>
+                    개 받았어요
                   </p>
                   <p className="text-xs text-center text-gray-500 mt-3 leading-relaxed">
                     팀 운동에 열심히 참여하고<br />쪽지를 더 받아보세요!
@@ -837,9 +852,20 @@ export default function LockerClient({ userId }: { userId: string }) {
                     </div>
                   ) : (
                     <>
-                      <p className="text-xs text-gray-500 text-center">
-                        총 <span className="font-semibold text-team-600">{notes.length}개</span>의 쪽지 분석 결과
-                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <p className="text-xs text-gray-500">
+                          쪽지 <span className="font-semibold text-team-600">{notes.length}</span>장
+                          {(pomData?.pomVotes?.length ?? 0) > 0 && (
+                            <> · MVP투표 <span className="font-semibold text-team-600">{pomData!.pomVotes.length}</span>회</>
+                          )}{" "}
+                          분석 결과
+                        </p>
+                        {(pomData?.mvpCount ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-50 text-yellow-700 text-xs font-medium rounded-full border border-yellow-200">
+                            🏆 MVP 수상 {pomData!.mvpCount}회
+                          </span>
+                        )}
+                      </div>
 
                       {/* 레이더 차트 */}
                       <div className="flex justify-center py-4">
@@ -1115,7 +1141,6 @@ export default function LockerClient({ userId }: { userId: string }) {
             setShowAddModal(false);
             setNoteContent("");
             setNoteColor(STICKY_COLORS[0].value);
-            setIsAnonymous(false);
             setSelectedActivityId("");
             setSelectedActivityType("");
             setSelectedTags([]);
@@ -1215,37 +1240,6 @@ export default function LockerClient({ userId }: { userId: string }) {
               </div>
             </div>
 
-            {/* 익명 옵션 - 토글 */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">보내는 사람</span>
-                <div className="inline-flex bg-gray-200 rounded-full p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsAnonymous(false)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      !isAnonymous
-                        ? "bg-team-500 text-white shadow-sm"
-                        : "text-gray-600"
-                    }`}
-                  >
-                    드러냄
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAnonymous(true)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      isAnonymous
-                        ? "bg-gray-400 text-white shadow-sm"
-                        : "text-gray-600"
-                    }`}
-                  >
-                    숨김
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* 경고 문구 */}
             <p className="text-xs text-gray-500 text-center mt-5">
               ⚠️ 작성 후에는 수정할 수 없어요
@@ -1258,7 +1252,6 @@ export default function LockerClient({ userId }: { userId: string }) {
                   setShowAddModal(false);
                   setNoteContent("");
                   setNoteColor(STICKY_COLORS[0].value);
-                  setIsAnonymous(false);
                   setSelectedActivityId("");
                   setSelectedActivityType("");
                   setSelectedTags([]);
@@ -1287,7 +1280,6 @@ export default function LockerClient({ userId }: { userId: string }) {
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
             onClick={() => {
               setExpandedNoteId(null);
-              setShowAuthor(false);
             }}
           >
             <div
@@ -1303,20 +1295,8 @@ export default function LockerClient({ userId }: { userId: string }) {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-gray-600">
-                    {note?.isAnonymous
-                      ? showAuthor
-                        ? note.author.name
-                        : "익명의 팀원"
-                      : note?.author.name}
+                    {note?.author.name}
                   </p>
-                  {isMyLocker && note?.isAnonymous && (
-                    <button
-                      onClick={() => setShowAuthor(!showAuthor)}
-                      className="text-xs text-gray-500 hover:text-gray-700 underline"
-                    >
-                      {showAuthor ? "숨기기" : "보기"}
-                    </button>
-                  )}
                 </div>
                 {isMyLocker && (
                   <button
