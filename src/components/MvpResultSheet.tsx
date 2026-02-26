@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
-import { toPng } from "html-to-image";
 
 interface MvpUser {
   id: string;
@@ -110,6 +109,7 @@ export default function MvpResultSheet({ eventId, isOpen, onClose }: Props) {
 
   const captureCard = useCallback(async () => {
     if (!shareCardRef.current) return null;
+    const { toPng } = await import("html-to-image");
     const dataUrl = await toPng(shareCardRef.current, { pixelRatio: 2, cacheBust: true });
     const res = await fetch(dataUrl);
     const blob = await res.blob();

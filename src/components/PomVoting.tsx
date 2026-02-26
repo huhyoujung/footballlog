@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import confetti from "canvas-confetti";
 import { useSWRConfig } from "swr";
 import { getPomVotingStatus, isPomVotingClosed } from "@/lib/pom";
 import { STAT_TAGS } from "@/lib/stat-tags";
@@ -73,8 +72,10 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
     if (showResults && results.length > 0 && isClosed) {
       const confettiKey = `pom-confetti-${eventId}`;
       if (!localStorage.getItem(confettiKey)) {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         localStorage.setItem(confettiKey, "true");
+        void import("canvas-confetti").then(({ default: confetti }) => {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        });
       }
     }
   }, [showResults, results.length, isClosed, eventId]);
