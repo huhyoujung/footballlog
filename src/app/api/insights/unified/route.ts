@@ -526,49 +526,74 @@ ${pastInsightsText}
 단순 현황 보고가 아니라, 선수가 다음 훈련에서 바로 실행할 수 있는 구체적인 과제 중심으로 써줘.
 과거 코칭 기록이 있다면 그때와 지금을 비교해서 성장을 짚어주고, 아직 안 된 과제가 있으면 다시 강조해줘.`;
 
-    // 6. OpenAI 호출
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 2500,
-      temperature: 0.7,
-    });
+    // 6. GPT 2회 병렬 호출 (캐시 HIT인 경우 해당 호출 스킵)
+    const teamFallbackContent = `## 팀 현황 분석\n\n팀 인사이트는 잠시 생성 중이야. 조금 있다가 다시 확인해봐.`;
 
-    const content = completion.choices[0]?.message?.content;
+    const [personalContent, teamContent] = await Promise.all([
+      personalHit
+        ? Promise.resolve(personalCache!.content)
+        : getOpenAI()
+            .chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              max_tokens: 1800,
+              temperature: 0.7,
+            })
+            .then((r) => r.choices[0]?.message?.content ?? ""),
 
-    if (!content) {
+      teamHit
+        ? Promise.resolve(teamCache!.content)
+        : teamAlreadyGenerating
+        ? Promise.resolve(teamFallbackContent)
+        : teamLogs.length === 0
+        ? Promise.resolve(
+            `## 팀 현황 분석\n\n팀 훈련 일지가 아직 없어. 팀원들이 일지를 작성하면 팀 단위 분석을 시작할 수 있어.`
+          )
+        : getOpenAI()
+            .chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: TEAM_SYSTEM_PROMPT },
+                { role: "user", content: teamUserPrompt },
+              ],
+              max_tokens: 1500,
+              temperature: 0.7,
+            })
+            .then((r) => r.choices[0]?.message?.content ?? ""),
+    ]);
+
+    if (!personalContent) {
       return NextResponse.json(
         { error: "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요." },
         { status: 500 }
       );
     }
 
-    // 7. 저장 (upsert: 오늘 이미 있으면 갱신, 없으면 생성)
-    const saved = await prisma.aIInsight.upsert({
-      where: { userId_dateOnly: { userId, dateOnly } },
-      create: {
-        type: "PERSONAL",
-        content,
-        userId,
-        dateOnly,
-        promptTokens: completion.usage?.prompt_tokens ?? null,
-        completionTokens: completion.usage?.completion_tokens ?? null,
-        model: completion.model ?? "gpt-4o-mini",
-      },
-      update: {
-        content,
-        createdAt: new Date(),
-        promptTokens: completion.usage?.prompt_tokens ?? null,
-        completionTokens: completion.usage?.completion_tokens ?? null,
-      },
-    });
+    // 7. 개인 + 팀 병렬 저장
+    await Promise.all(
+      [
+        !personalHit &&
+          prisma.aIInsight.upsert({
+            where: { userId_dateOnly: { userId, dateOnly } },
+            create: { type: "PERSONAL", content: personalContent, userId, dateOnly },
+            update: { content: personalContent, createdAt: new Date() },
+          }),
+        !teamHit &&
+          !teamAlreadyGenerating &&
+          teamLogs.length > 0 &&
+          prisma.aIInsight.upsert({
+            where: { teamId_dateOnly: { teamId, dateOnly } },
+            create: { type: "TEAM", content: teamContent, teamId, dateOnly },
+            update: { content: teamContent, createdAt: new Date() },
+          }),
+      ].filter(Boolean)
+    );
 
-    generatingUsers.delete(userId);
     return NextResponse.json({
-      insight: { content: saved.content },
+      insight: { content: mergeContent(personalContent, teamContent) },
       cached: false,
     });
   } catch (error) {
