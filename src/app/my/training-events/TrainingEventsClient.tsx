@@ -110,7 +110,7 @@ export default function TrainingEventsClient({
                 {upcomingEvents.map((event, index) => (
                   <div key={event.id} ref={index === 0 ? nextEventRef : undefined}>
                     {index === 0 && !event.cancelled && (
-                      <p className="text-xs font-semibold text-team-500 px-1 mb-1.5">
+                      <p className="text-xs font-medium text-team-500 px-1 mb-1.5">
                         📌 다음 운동
                       </p>
                     )}
