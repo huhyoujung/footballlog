@@ -9,6 +9,7 @@ import PWAManager from "@/components/PWAManager";
 import TeamColorProvider from "@/components/TeamColorProvider";
 import { TeamProvider } from "@/contexts/TeamContext";
 import SWRProvider from "@/components/SWRProvider";
+import PostHogProvider from "@/components/PostHogProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -79,15 +80,17 @@ export default async function RootLayout({
       <body
         className="antialiased bg-gray-50 min-h-screen"
       >
-        <SessionProvider>
-          <SWRProvider>
-            <TeamProvider>
-              <TeamColorProvider />
-              <PWAManager />
-              {children}
-            </TeamProvider>
-          </SWRProvider>
-        </SessionProvider>
+        <PostHogProvider>
+          <SessionProvider>
+            <SWRProvider>
+              <TeamProvider>
+                <TeamColorProvider />
+                <PWAManager />
+                {children}
+              </TeamProvider>
+            </SWRProvider>
+          </SessionProvider>
+        </PostHogProvider>
         {/* 모달 전용 루트 - 모든 containing block 밖에 위치 */}
         <div id="modal-root"></div>
         {/* Google AdSense */}
