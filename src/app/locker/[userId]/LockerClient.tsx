@@ -1,9 +1,10 @@
-// 개인 락커 클라이언트 컴포넌트 - 타임라인, 쪽지, 프로필 관리
+// 개인 락커 클라이언트 컴포넌트 - 타임라인, 쪽지, 스탯
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import BackButton from "@/components/BackButton";
 import Toast from "@/components/Toast";
@@ -13,7 +14,6 @@ import { fetcher } from "@/lib/fetcher";
 import useSWR, { useSWRConfig } from "swr";
 import PolaroidCard from "@/components/PolaroidCard";
 import type { TrainingLog, GroupedLogs } from "@/types/training";
-import { usePushSubscription } from "@/lib/usePushSubscription";
 import { withEulReul } from "@/lib/korean";
 import { useTeam } from "@/contexts/TeamContext";
 
@@ -49,17 +49,6 @@ interface User {
   number: number | null;
 }
 
-interface Profile {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-  position: string | null;
-  number: number | null;
-}
-
-type LockerTab = "timeline" | "profile";
-
 // 로컬 날짜 문자열로 변환 (YYYY-MM-DD)
 const getLocalDateString = (date: Date): string => {
   const year = date.getFullYear();
@@ -78,32 +67,14 @@ const STICKY_COLORS = [
 
 import { STAT_TAGS } from "@/lib/stat-tags";
 
-const POSITIONS = [
-  "감독",
-  "GK",
-  "CB",
-  "LB",
-  "RB",
-  "CDM",
-  "CM",
-  "CAM",
-  "LM",
-  "RM",
-  "LW",
-  "RW",
-  "ST",
-  "CF",
-];
-
 export default function LockerClient({ userId }: { userId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, update } = useSession();
+  const { data: session } = useSession();
   const { mutate: globalMutate } = useSWRConfig();
   const { teamData } = useTeam(); // TeamContext 사용
   const { toast, showToast, hideToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<LockerTab>("timeline");
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
@@ -116,20 +87,8 @@ export default function LockerClient({ userId }: { userId: string }) {
   const [nudgedToday, setNudgedToday] = useState<Set<string>>(new Set());
   const [showNudgeConfirm, setShowNudgeConfirm] = useState(false);
   const [noteSentToday, setNoteSentToday] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
-  // Profile editing state
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [name, setName] = useState("");
-  const [position, setPosition] = useState("");
-  const [number, setNumber] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  // Push notification state
-  const { isSupported, isSubscribed, isReady, subscribe, unsubscribe } = usePushSubscription();
-  const [subscribing, setSubscribing] = useState(false);
 
   // URL 쿼리 파라미터로 쪽지 모달 자동 열기
   useEffect(() => {
@@ -190,28 +149,19 @@ export default function LockerClient({ userId }: { userId: string }) {
 
   const recentActivities = activitiesData?.activities || [];
 
-  // POM 투표 수신 데이터 (스탯 차트 확장용) — 프로필 탭일 때만 페치
-  const { data: pomData } = useSWR<{ pomVotes: { tags: string[] }[]; mvpCount: number }>(
-    userId && activeTab === "profile" ? `/api/pom/user/${userId}` : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5분 캐시
-    }
-  );
-
   // Profile data fetching (only for own locker)
   const isMyLocker = session?.user?.id === userId;
 
   // 모든 쪽지 표시 (내 락커 / 남의 락커 모두)
   const notes = allNotes || [];
-  const { data: profileData } = useSWR<Profile>(
-    isMyLocker ? "/api/profile" : null,
+
+  // POM 투표 수신 데이터 (스탯 차트용) — 내 락커룸일 때만 페치
+  const { data: pomData } = useSWR<{ pomVotes: { tags: string[] }[]; mvpCount: number; logCount: number }>(
+    isMyLocker ? `/api/pom/user/${userId}` : null,
     fetcher,
     {
       revalidateOnFocus: false,
-      revalidateIfStale: false,
-      dedupingInterval: 300000,
+      dedupingInterval: 300000, // 5분 캐시
     }
   );
 
@@ -228,138 +178,6 @@ export default function LockerClient({ userId }: { userId: string }) {
     }
   }, [allNotes, session?.user?.id]);
 
-  // Sync profile data with state
-  useEffect(() => {
-    if (profileData && isMyLocker) {
-      setProfile(profileData);
-      setName(profileData.name || "");
-      setPosition(profileData.position || "");
-      setNumber(profileData.number !== null ? String(profileData.number) : "");
-      setImagePreview(profileData.image);
-    }
-  }, [profileData, isMyLocker]);
-
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("이미지는 5MB 이하만 가능합니다");
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      showToast("이미지 파일만 업로드 가능합니다");
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const uploadData = new FormData();
-      uploadData.append("file", file);
-
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: uploadData,
-      });
-
-      if (!uploadRes.ok) {
-        const data = await uploadRes.json();
-        throw new Error(data.error || "이미지 업로드에 실패했습니다");
-      }
-
-      const { url } = await uploadRes.json();
-      setImagePreview(url);
-
-      await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: url }),
-      });
-
-      await update();
-      showToast("프로필 사진이 변경되었습니다");
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "이미지 업로드 실패");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    if (!name.trim()) {
-      showToast("이름을 입력해주세요");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const res = await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          position: position || null,
-          number: number ? parseInt(number) : null,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "저장에 실패했습니다");
-      }
-
-      await update();
-      showToast("저장되었습니다");
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "저장 실패");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePushToggle = async () => {
-    if (subscribing || !isReady) return;
-
-    setSubscribing(true);
-
-    try {
-      if (isSubscribed) {
-        const result = await unsubscribe();
-        if (result) {
-          showToast("알림이 비활성화되었습니다");
-        } else {
-          showToast("알림 해제에 실패했습니다");
-        }
-      } else {
-        const result = await subscribe();
-        if (result.success) {
-          showToast("알림이 활성화되었습니다");
-        } else {
-          const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-          const isPWA = window.matchMedia('(display-mode: standalone)').matches;
-
-          const errorMessages: Record<string, string> = {
-            NOT_SUPPORTED: isIOS && !isPWA
-              ? "iOS에서는 홈 화면에 추가한 후에만 푸시 알림을 사용할 수 있습니다"
-              : "이 브라우저는 푸시 알림을 지원하지 않습니다",
-            PERMISSION_DENIED: "알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요",
-            VAPID_KEY_MISSING: "서버 설정 오류입니다. 관리자에게 문의하세요",
-            SERVER_ERROR: "서버 구독 실패. 잠시 후 다시 시도해주세요",
-            "Service worker timeout": "서비스 워커 준비 시간 초과. 페이지를 새로고침해주세요",
-          };
-          showToast(errorMessages[result.error] || `오류: ${result.error}`);
-        }
-      }
-    } catch (err) {
-      console.error("Push toggle error:", err);
-      showToast("알림 설정에 실패했습니다");
-    } finally {
-      setSubscribing(false);
-    }
-  };
 
   const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) =>
@@ -637,74 +455,74 @@ export default function LockerClient({ userId }: { userId: string }) {
         <BackButton href="/my" />
       </div>
 
-      {/* 설정 버튼 (본인 락커이고 타임라인 탭일 때만) */}
-      {isMyLocker && activeTab === "timeline" && (
-        <button
-          onClick={() => setActiveTab("profile")}
+      {/* 설정 버튼 (본인 락커만) → /my/settings 이동 */}
+      {isMyLocker && (
+        <Link
+          href="/my/settings"
           className="fixed top-4 right-4 z-30 p-2 bg-white/80 rounded-full hover:bg-gray-50 transition-colors"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-        </button>
+        </Link>
       )}
 
       {/* 이름표 */}
-      {activeTab === "timeline" && (
-        <div className="pt-16 pb-2 flex flex-col items-center">
-          {/* 이름표와 버튼 */}
-          {!isMyLocker ? (
-            <div className="flex flex-col items-center">
-              {/* 금속 틀 */}
-              <div
-                className="relative p-2 rounded"
-                style={{
-                  background: "linear-gradient(135deg, #9CA3AF 0%, #6B7280 50%, #9CA3AF 100%)",
-                }}
-              >
-                {/* 이름표 카드 */}
-                <div className="bg-white px-6 py-3">
-                  <div className="flex items-center justify-center gap-2">
-                    {user.number !== null && user.number !== undefined && (
-                      <div className="text-xs text-gray-500 font-medium">
-                        No. {user.number}
-                      </div>
-                    )}
-                    <div className="text-base font-semibold text-gray-900">
-                      {user.name || "선수"}
+      <div className="pt-16 pb-2 flex flex-col items-center">
+        {/* 이름표와 버튼 */}
+        {!isMyLocker ? (
+          <div className="flex flex-col items-center">
+            {/* 금속 틀 */}
+            <div
+              className="relative p-2 rounded"
+              style={{
+                background: "linear-gradient(135deg, #9CA3AF 0%, #6B7280 50%, #9CA3AF 100%)",
+              }}
+            >
+              {/* 이름표 카드 */}
+              <div className="bg-white px-6 py-3">
+                <div className="flex items-center justify-center gap-2">
+                  {user.number !== null && user.number !== undefined && (
+                    <div className="text-xs text-gray-500 font-medium">
+                      No. {user.number}
                     </div>
+                  )}
+                  <div className="text-base font-semibold text-gray-900">
+                    {user.name || "선수"}
                   </div>
                 </div>
               </div>
-
-              {/* 칭찬 쪽지 놓고 오기 / 닦달하기 버튼 */}
-              <div className="flex gap-2.5 mt-4 w-64">
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  disabled={noteSentToday}
-                  className="flex-1 min-w-0 py-2.5 bg-team-50 text-team-600 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                  <span className="truncate">쪽지 놓고 오기</span>
-                </button>
-                <button
-                  onClick={() => setShowNudgeConfirm(true)}
-                  disabled={nudgedToday.has(userId)}
-                  className="flex-1 min-w-0 py-2.5 bg-team-50 text-team-600 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                    <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  <span className="truncate">닦달하기</span>
-                </button>
-              </div>
             </div>
-          ) : (
-            /* 본인 락커 - 이름표만 */
+
+            {/* 칭찬 쪽지 놓고 오기 / 닦달하기 버튼 */}
+            <div className="flex gap-2.5 mt-4 w-64">
+              <button
+                onClick={() => setShowAddModal(true)}
+                disabled={noteSentToday}
+                className="flex-1 min-w-0 py-2.5 bg-team-50 text-team-600 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <span className="truncate">쪽지 놓고 오기</span>
+              </button>
+              <button
+                onClick={() => setShowNudgeConfirm(true)}
+                disabled={nudgedToday.has(userId)}
+                className="flex-1 min-w-0 py-2.5 bg-team-50 text-team-600 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span className="truncate">닦달하기</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* 본인 락커 - 이름표 + 나의 스탯 콜랩스 */
+          <div className="flex flex-col items-center w-full px-4">
             <div
               className="relative p-2 rounded"
               style={{
@@ -724,14 +542,103 @@ export default function LockerClient({ userId }: { userId: string }) {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* MVP 배지 — 버튼과 분리, 이름표 아래 독립 노출 */}
+            {(pomData?.mvpCount ?? 0) > 0 && (
+              <div className="mt-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 text-xs font-semibold rounded-full border border-yellow-200">
+                  🏆 MVP 수상 {pomData!.mvpCount}회
+                </span>
+              </div>
+            )}
+
+            {/* 나의 스탯 콜랩스 섹션 */}
+            <div className="w-full max-w-xs mt-3">
+              {!hasEnoughNotes ? (
+                /* 잠금 상태 — 버튼 비활성 + 진행 프로그레스바 */
+                <div>
+                  <div className="flex items-center justify-between w-full px-4 py-2.5 bg-gray-100 rounded-xl text-sm">
+                    <span className="font-medium text-gray-400">나의 스탯</span>
+                    <span className="text-xs text-gray-400">
+                      {notes.length + (pomData?.pomVotes?.length ?? 0)}/5
+                    </span>
+                  </div>
+                  <div className="mt-1.5 w-full bg-gray-200 rounded-full h-1">
+                    <div
+                      className="bg-team-400 h-1 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(((notes.length + (pomData?.pomVotes?.length ?? 0)) / 5) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 text-center mt-1.5">
+                    쪽지·투표 {Math.max(5 - notes.length - (pomData?.pomVotes?.length ?? 0), 0)}개 더 받으면 열려요
+                  </p>
+                </div>
+              ) : (
+                /* 잠금 해제 상태 */
+                <>
+                  <button
+                    onClick={() => setStatsOpen((v) => !v)}
+                    className="flex items-center justify-between w-full px-4 py-2.5 bg-team-50 rounded-xl text-sm active:scale-[0.98] transition-transform"
+                  >
+                    <span className="font-medium text-team-700">나의 스탯</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-team-500">
+                        {notes.length + (pomData?.pomVotes?.length ?? 0)}개 분석
+                      </span>
+                      <svg
+                        width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        className={`text-team-400 transition-transform duration-200 ${statsOpen ? "rotate-180" : ""}`}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  {statsOpen && (
+                    <div className="mt-2 bg-white rounded-xl p-4 border border-gray-100">
+                      {statEntries.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500 text-sm">
+                          아직 태그가 없습니다
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-xs text-gray-400 text-center">
+                            {(pomData?.logCount ?? 0) > 0 && <>일지 {pomData!.logCount}회 · </>}
+                            쪽지 {notes.length}장
+                            {(pomData?.pomVotes?.length ?? 0) > 0 && (
+                              <> · POM {pomData!.pomVotes.length}회</>
+                            )}{" "}
+                            기반 분석
+                          </p>
+                          <div className="space-y-2">
+                            {statEntries.slice(0, 5).map(([tag, count]) => (
+                              <div key={tag} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-700 w-10 shrink-0">{tag}</span>
+                                <div className="flex-1 bg-gray-100 rounded-full h-2">
+                                  <div
+                                    className="bg-team-400 h-2 rounded-full"
+                                    style={{ width: `${(count / maxStatValue) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-team-600 w-4 text-right shrink-0">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <main className="max-w-2xl mx-auto">
-        {/* 타임라인 탭 */}
-        {(activeTab === "timeline" || !isMyLocker) && (
-          <div className="bg-white min-h-screen">
+        {/* 타임라인 */}
+        <div className="bg-white min-h-screen">
             {/* 폴라로이드 스택 (날짜별) */}
             <div className="flex flex-col items-center gap-12 py-6 px-4">
               {logsLoading && groupedLogs.length === 0 ? (
@@ -775,322 +682,6 @@ export default function LockerClient({ userId }: { userId: string }) {
               )}
             </div>
           </div>
-        )}
-
-        {/* 프로필 탭 */}
-        {activeTab === "profile" && isMyLocker && (
-          <div className="space-y-6 p-4 bg-white min-h-screen">
-            {/* 프로필 사진 */}
-            <div className="bg-white rounded-xl p-6 flex flex-col items-center">
-              <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden">
-                  {imagePreview ? (
-                    <Image
-                      src={imagePreview}
-                      alt="프로필"
-                      width={96}
-                      height={96}
-                      sizes="96px"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
-                      👤
-                    </div>
-                  )}
-                </div>
-                {uploading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="text-team-500 text-sm font-medium"
-              >
-                {uploading ? "업로드 중..." : "사진 변경"}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </div>
-
-            {/* 팀이 생각하는 나의 강점 */}
-            <div className="bg-white rounded-xl p-6">
-              <h3 className="text-base font-semibold text-gray-900 mb-4">
-                팀이 생각하는 나의 강점
-              </h3>
-
-              {!hasEnoughNotes ? (
-                <div className="flex flex-col items-center justify-center py-8 px-4 bg-gradient-to-br from-team-50 to-team-100 rounded-lg">
-                  <div className="text-5xl mb-3">🔒</div>
-                  <p className="text-sm text-center text-gray-600 font-medium mb-1">
-                    아직 스탯을 볼 수 없어요
-                  </p>
-                  <p className="text-xs text-center text-gray-500">
-                    쪽지와 MVP 투표 합산{" "}
-                    <span className="font-semibold text-team-600">
-                      {notes.length + (pomData?.pomVotes?.length ?? 0)}/5
-                    </span>
-                    개 받았어요
-                  </p>
-                  <p className="text-xs text-center text-gray-500 mt-3 leading-relaxed">
-                    팀 운동에 열심히 참여하고<br />쪽지를 더 받아보세요!
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {statEntries.length === 0 ? (
-                    <div className="text-center py-6 text-gray-500 text-sm">
-                      아직 태그가 없습니다
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <p className="text-xs text-gray-500">
-                          쪽지 <span className="font-semibold text-team-600">{notes.length}</span>장
-                          {(pomData?.pomVotes?.length ?? 0) > 0 && (
-                            <> · MVP투표 <span className="font-semibold text-team-600">{pomData!.pomVotes.length}</span>회</>
-                          )}{" "}
-                          분석 결과
-                        </p>
-                        {(pomData?.mvpCount ?? 0) > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-50 text-yellow-700 text-xs font-medium rounded-full border border-yellow-200">
-                            🏆 MVP 수상 {pomData!.mvpCount}회
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 레이더 차트 */}
-                      <div className="flex justify-center py-4">
-                        <svg
-                          viewBox="0 0 400 400"
-                          className="w-full max-w-sm"
-                          style={{ maxHeight: '320px' }}
-                        >
-                          {/* 배경 원들 (가이드 라인) */}
-                          {[0.2, 0.4, 0.6, 0.8, 1.0].map((scale) => (
-                            <circle
-                              key={scale}
-                              cx="200"
-                              cy="200"
-                              r={150 * scale}
-                              fill="none"
-                              stroke="#F3F4F6"
-                              strokeWidth="1"
-                            />
-                          ))}
-
-                          {/* 축 라인 및 라벨 */}
-                          {STAT_TAGS.map((tag, i) => {
-                            const angle = (i * 2 * Math.PI) / STAT_TAGS.length - Math.PI / 2;
-                            const x = 200 + 150 * Math.cos(angle);
-                            const y = 200 + 150 * Math.sin(angle);
-                            const labelX = 200 + 180 * Math.cos(angle);
-                            const labelY = 200 + 180 * Math.sin(angle);
-
-                            return (
-                              <g key={tag}>
-                                {/* 축 라인 */}
-                                <line
-                                  x1="200"
-                                  y1="200"
-                                  x2={x}
-                                  y2={y}
-                                  stroke="#E5E7EB"
-                                  strokeWidth="1"
-                                />
-                                {/* 라벨 */}
-                                <text
-                                  x={labelX}
-                                  y={labelY}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                  className="text-xs font-medium fill-gray-700"
-                                  style={{ fontSize: '12px' }}
-                                >
-                                  {tag}
-                                </text>
-                              </g>
-                            );
-                          })}
-
-                          {/* 데이터 다각형 */}
-                          <polygon
-                            points={STAT_TAGS.map((tag, i) => {
-                              const count = stats[tag] || 0;
-                              const ratio = Math.min(count / maxStatValue, 1);
-                              const angle = (i * 2 * Math.PI) / STAT_TAGS.length - Math.PI / 2;
-                              const x = 200 + 150 * ratio * Math.cos(angle);
-                              const y = 200 + 150 * ratio * Math.sin(angle);
-                              return `${x},${y}`;
-                            }).join(' ')}
-                            className="fill-team-500/20 stroke-team-500"
-                            strokeWidth="2"
-                            strokeLinejoin="round"
-                          />
-
-                          {/* 데이터 포인트 */}
-                          {STAT_TAGS.map((tag, i) => {
-                            const count = stats[tag] || 0;
-                            if (count === 0) return null;
-
-                            const ratio = Math.min(count / maxStatValue, 1);
-                            const angle = (i * 2 * Math.PI) / STAT_TAGS.length - Math.PI / 2;
-                            const x = 200 + 150 * ratio * Math.cos(angle);
-                            const y = 200 + 150 * ratio * Math.sin(angle);
-
-                            return (
-                              <g key={`point-${tag}`}>
-                                <circle
-                                  cx={x}
-                                  cy={y}
-                                  r="4"
-                                  className="fill-team-500"
-                                  stroke="white"
-                                  strokeWidth="2"
-                                />
-                                {/* 카운트 표시 */}
-                                <text
-                                  x={x}
-                                  y={y - 12}
-                                  textAnchor="middle"
-                                  className="text-xs font-semibold fill-team-600"
-                                  style={{ fontSize: '11px' }}
-                                >
-                                  {count}
-                                </text>
-                              </g>
-                            );
-                          })}
-                        </svg>
-                      </div>
-
-                      {/* 범례 */}
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                        {statEntries.map(([tag, count]) => (
-                          <div key={tag} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">{tag}</span>
-                            <span className="font-semibold text-team-600">{count}회</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* 이름 */}
-            <div className="bg-white rounded-xl p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                이름
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="이름을 입력하세요"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* 포지션 */}
-            <div className="bg-white rounded-xl p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                포지션
-              </label>
-              <div className="grid grid-cols-5 gap-2">
-                {POSITIONS.map((pos) => (
-                  <button
-                    key={pos}
-                    type="button"
-                    onClick={() => setPosition(position === pos ? "" : pos)}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                      position === pos
-                        ? "bg-team-500 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {pos}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 등번호 */}
-            <div className="bg-white rounded-xl p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                등번호
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={2}
-                value={number}
-                onChange={(e) => setNumber(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="등번호를 입력하세요 (0~99)"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-team-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* 이메일 (읽기 전용) */}
-            <div className="bg-white rounded-xl p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                이메일
-              </label>
-              <p className="px-4 py-3 bg-gray-50 rounded-lg text-gray-500">
-                {profile?.email}
-              </p>
-            </div>
-
-            {/* 푸시 알림 설정 */}
-            {isSupported && (
-              <div className="bg-white rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    푸시 알림
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handlePushToggle}
-                    disabled={subscribing || !isReady}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${
-                      isSubscribed ? "bg-team-500" : "bg-gray-300"
-                    } disabled:opacity-50`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                        isSubscribed ? "translate-x-5" : ""
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  {isSubscribed
-                    ? "닦달, 댓글, 좋아요 등의 알림을 받고 있습니다"
-                    : "알림을 켜면 중요한 소식을 놓치지 않아요"}
-                </p>
-              </div>
-            )}
-
-            {/* 저장 버튼 */}
-            <button
-              onClick={handleSaveProfile}
-              disabled={saving}
-              className="w-full py-3.5 bg-team-600 text-white rounded-xl font-semibold hover:bg-team-700 transition-colors disabled:opacity-50"
-            >
-              {saving ? "저장 중..." : "저장"}
-            </button>
-          </div>
-        )}
       </main>
 
       {/* 닦달 확인 모달 */}
