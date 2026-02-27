@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import PageHeader from "@/components/PageHeader";
 import DashboardTabs from "./DashboardTabs";
+import AdminChart from "./AdminChart";
 
 // 대시보드 데이터는 1분마다 갱신 (실시간 불필요)
 export const revalidate = 60;
@@ -42,6 +43,9 @@ export default async function SuperAdminPage({ params }: Props) {
     recentLogs,
     inactiveUsers,
     recentFeedbacks,
+    recentSignups,
+    aiAggregate,
+    aiDailyUsage,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
@@ -111,6 +115,30 @@ export default async function SuperAdminPage({ params }: Props) {
         status: true,
       },
     }),
+    prisma.$queryRaw<{ date: string; count: number }[]>`
+      SELECT DATE("createdAt") as date, COUNT(*)::int as count
+      FROM "User"
+      WHERE "createdAt" >= ${sevenDaysAgo}
+      GROUP BY DATE("createdAt")
+    `,
+    // 전체 누적 AI 토큰 집계
+    prisma.aIInsight.aggregate({
+      _sum: { promptTokens: true, completionTokens: true },
+      _count: { id: true },
+      where: { promptTokens: { not: null } },
+    }),
+    // 7일 일별 AI 사용량 집계
+    prisma.$queryRaw<{ date_only: string; calls: number; prompt: number; completion: number }[]>`
+      SELECT "dateOnly" as date_only,
+             COUNT(*)::int as calls,
+             COALESCE(SUM("promptTokens"), 0)::int as prompt,
+             COALESCE(SUM("completionTokens"), 0)::int as completion
+      FROM "AIInsight"
+      WHERE "promptTokens" IS NOT NULL
+        AND "dateOnly" >= ${sevenDaysAgo.toISOString().split("T")[0]}
+      GROUP BY "dateOnly"
+      ORDER BY "dateOnly"
+    `,
   ]);
 
   const dau = dauSessions.length;
@@ -126,11 +154,28 @@ export default async function SuperAdminPage({ params }: Props) {
     if (dateKey in logsByDate) logsByDate[dateKey] = row.count;
   });
 
+  // 날짜별 신규 가입자 집계
+  const signupsByDate: Record<string, number> = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    signupsByDate[d.toISOString().split("T")[0]] = 0;
+  }
+  recentSignups.forEach((row) => {
+    const dateKey = String(row.date);
+    if (dateKey in signupsByDate) signupsByDate[dateKey] = row.count;
+  });
+
+  // 피드백 유형별 집계
+  const feedbackByType: Record<string, number> = {};
+  recentFeedbacks.forEach((f) => {
+    feedbackByType[f.type] = (feedbackByType[f.type] ?? 0) + 1;
+  });
+
   // --- 탭별 콘텐츠 ---
 
   const overview = (
     <>
-      {/* 요약 카드 */}
+      {/* 요약 카드 — 기존 코드 그대로 유지 */}
       <section>
         <h2 className="text-xs font-semibold text-gray-500 uppercase mb-3">현황 요약</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -148,12 +193,33 @@ export default async function SuperAdminPage({ params }: Props) {
           ))}
         </div>
       </section>
-      {/* 최근 7일 훈련 로그 */}
+
+      {/* 신규: 7일 신규 가입자 차트 */}
+      <Section title="최근 7일 신규 가입자">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(signupsByDate).map(([date, count]) => ({
+              label: date.slice(5),
+              value: count,
+            }))}
+            unit="명"
+            color="#10b981"
+          />
+        </div>
+      </Section>
+
+      {/* 기존 훈련 로그 → 테이블 제거, 차트로 교체 */}
       <Section title="최근 7일 훈련 로그">
-        <Table
-          headers={["날짜", "로그 수"]}
-          rows={Object.entries(logsByDate).map(([date, count]) => [date, String(count)])}
-        />
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(logsByDate).map(([date, count]) => ({
+              label: date.slice(5),
+              value: count,
+            }))}
+            unit="개"
+            color="#6366f1"
+          />
+        </div>
       </Section>
     </>
   );
@@ -187,6 +253,17 @@ export default async function SuperAdminPage({ params }: Props) {
 
   const teams = (
     <Section title="팀별 인원 현황">
+      <div className="p-4 border-b border-gray-100">
+        <AdminChart
+          data={teamsWithStats.map((t) => ({
+            label: t.name.length > 6 ? t.name.slice(0, 6) + "…" : t.name,
+            value: t._count.members,
+          }))}
+          unit="명"
+          color="#f59e0b"
+          height={180}
+        />
+      </div>
       <Table
         headers={["팀명", "인원", "최근 훈련"]}
         rows={teamsWithStats.map((t) => [
@@ -199,19 +276,102 @@ export default async function SuperAdminPage({ params }: Props) {
   );
 
   const feedbacks = (
-    <Section title="최근 피드백">
-      <Table
-        headers={["유형", "제목", "내용", "작성자", "날짜", "상태"]}
-        rows={recentFeedbacks.map((f) => [
-          f.type,
-          f.title,
-          f.content.length > 50 ? f.content.slice(0, 50) + "…" : f.content,
-          f.userName ?? f.userEmail ?? "-",
-          formatDate(f.createdAt),
-          f.status,
-        ])}
-      />
-    </Section>
+    <>
+      <Section title="피드백 유형별 분포">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(feedbackByType).map(([type, count]) => ({
+              label: type,
+              value: count,
+            }))}
+            unit="건"
+            color="#ec4899"
+            height={160}
+          />
+        </div>
+      </Section>
+      <Section title="최근 피드백">
+        <Table
+          headers={["유형", "제목", "내용", "작성자", "날짜", "상태"]}
+          rows={recentFeedbacks.map((f) => [
+            f.type,
+            f.title,
+            f.content.length > 50 ? f.content.slice(0, 50) + "…" : f.content,
+            f.userName ?? f.userEmail ?? "-",
+            formatDate(f.createdAt),
+            f.status,
+          ])}
+        />
+      </Section>
+    </>
+  );
+
+  const totalPrompt = aiAggregate._sum.promptTokens ?? 0;
+  const totalCompletion = aiAggregate._sum.completionTokens ?? 0;
+  const totalCalls = aiAggregate._count.id;
+  const totalCost = calcCost(totalPrompt, totalCompletion);
+
+  const aiByDate: Record<string, { calls: number; prompt: number; completion: number }> = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    aiByDate[d.toISOString().split("T")[0]] = { calls: 0, prompt: 0, completion: 0 };
+  }
+  aiDailyUsage.forEach((row) => {
+    if (row.date_only in aiByDate) {
+      aiByDate[row.date_only] = {
+        calls: row.calls,
+        prompt: row.prompt,
+        completion: row.completion,
+      };
+    }
+  });
+
+  const aiUsage = (
+    <>
+      <section>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase mb-3">GPT API 사용량 요약</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "총 호출 수", value: `${totalCalls}회` },
+            { label: "총 입력 토큰", value: totalPrompt.toLocaleString() },
+            { label: "총 출력 토큰", value: totalCompletion.toLocaleString() },
+            { label: "누적 비용", value: `$${totalCost.toFixed(4)}` },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div className="text-2xl font-bold text-gray-900">{value}</div>
+              <div className="text-xs text-gray-500 mt-1">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <Section title="최근 7일 일별 비용">
+        <div className="p-4">
+          <AdminChart
+            data={Object.entries(aiByDate).map(([date, d]) => ({
+              label: date.slice(5),
+              value: parseFloat(calcCost(d.prompt, d.completion).toFixed(5)),
+            }))}
+            unit="$"
+            color="#f97316"
+            valueFormatter={(v) => `$${v.toFixed(5)}`}
+          />
+        </div>
+      </Section>
+
+      <Section title="최근 7일 상세">
+        <Table
+          headers={["날짜", "호출 수", "입력 토큰", "출력 토큰", "비용"]}
+          rows={Object.entries(aiByDate).map(([date, d]) => [
+            date,
+            `${d.calls}회`,
+            d.prompt.toLocaleString(),
+            d.completion.toLocaleString(),
+            `$${calcCost(d.prompt, d.completion).toFixed(5)}`,
+          ])}
+        />
+      </Section>
+    </>
   );
 
   return (
@@ -223,6 +383,7 @@ export default async function SuperAdminPage({ params }: Props) {
           users={users}
           teams={teams}
           feedbacks={feedbacks}
+          aiUsage={aiUsage}
         />
       </div>
     </div>
@@ -281,4 +442,9 @@ function formatDate(date: Date) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+// gpt-4o-mini 기준: 입력 $0.15/1M, 출력 $0.60/1M
+function calcCost(promptTokens: number, completionTokens: number): number {
+  return (promptTokens / 1_000_000) * 0.15 + (completionTokens / 1_000_000) * 0.6;
 }

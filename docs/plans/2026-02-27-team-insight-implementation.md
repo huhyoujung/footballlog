@@ -1,13 +1,31 @@
-// AI 코치 통합 인사이트 생성/조회
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getOpenAI } from "@/lib/openai";
+# 팀 인사이트 통합 구현 플랜
 
-// 동일 유저 동시 생성 방지 (프로세스 단위 잠금, 크로스 인스턴스는 P2002로 처리)
-const generatingUsers = new Set<string>();
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Goal:** `unified` AI 코치 API에 팀 전체 분석 섹션을 추가해 개인 코칭 + 팀 리포트가 하나의 레포트에 출력되도록 한다.
+
+**Architecture:** GPT 2회 병렬 호출(개인/팀 각각), 결과를 하나의 마크다운 문자열로 합산해 기존 `content` 필드에 반환. 팀 인사이트는 `teamId_dateOnly` 기준으로 캐싱해 팀원 전체가 공유한다. 팀 레포트에서는 선수 이름 대신 포지션 기반 익명 ID(FW1, MF2)를 사용한다.
+
+**Tech Stack:** Next.js API Route, Prisma (PostgreSQL), OpenAI gpt-4o-mini
+
+---
+
+## 수정 파일
+
+- **Modify**: `src/app/api/insights/unified/route.ts`
+
+---
+
+## Task 1: 모듈 스코프 상수 + 순수 헬퍼 함수 추가
+
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (파일 상단, POST 함수 외부)
+
+### Step 1: 파일 맨 위(`generatingUsers` Set 바로 아래)에 코드 추가
+
+다음 코드를 `generatingUsers` Set 선언 바로 아래, `export async function POST` 바로 위에 삽입한다:
+
+```typescript
 // 동일 팀 동시 생성 방지 (팀원 여럿이 동시 요청해도 팀 GPT 1번만 호출)
 const generatingTeams = new Set<string>();
 
@@ -24,7 +42,7 @@ function anonymizeTeamLogs(
     keyPoints: string;
     improvement: string;
     trainingDate: Date;
-    user: { name: string | null; position: string | null };
+    user: { name: string; position: string | null };
   }>
 ): string {
   const nameToAnon = new Map<string, string>();
@@ -32,7 +50,7 @@ function anonymizeTeamLogs(
 
   return logs
     .map((log) => {
-      const name = log.user.name ?? `__unnamed_${nameToAnon.size}`;
+      const name = log.user.name;
       if (!nameToAnon.has(name)) {
         const pos = log.user.position?.toUpperCase() || "선수";
         posCounters[pos] = (posCounters[pos] ?? 0) + 1;
@@ -56,14 +74,9 @@ function calcPositionStats(
     stats[pos].sum += log.condition;
     stats[pos].count += 1;
   }
-  return (
-    Object.entries(stats)
-      .map(
-        ([pos, { sum, count }]) =>
-          `- ${pos}: 평균 ${(sum / count).toFixed(1)}/10 (${count}개 일지)`
-      )
-      .join("\n") || "없음"
-  );
+  return Object.entries(stats)
+    .map(([pos, { sum, count }]) => `- ${pos}: 평균 ${(sum / count).toFixed(1)}/10 (${count}개 일지)`)
+    .join("\n") || "없음";
 }
 
 // 칭찬쪽지 태그 빈도 집계 (상위 10개)
@@ -74,30 +87,63 @@ function buildTeamTagFrequency(notes: Array<{ tags: string[] }>): string {
       freq[tag] = (freq[tag] ?? 0) + 1;
     }
   }
-  return (
-    Object.entries(freq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([tag, count]) => `"${tag}": ${count}회`)
-      .join(", ") || "없음"
-  );
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([tag, count]) => `"${tag}": ${count}회`)
+    .join(", ") || "없음";
 }
+```
 
-export async function POST() {
-  let userId: string | undefined;
-  let teamId: string | undefined;
-  try {
-    const session = await getServerSession(authOptions);
+### Step 2: TypeScript 타입 체크
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-    }
-    if (!session.user.teamId) {
-      return NextResponse.json({ error: "팀에 소속되어 있지 않습니다" }, { status: 400 });
-    }
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
 
+에러 없으면 통과.
+
+### Step 3: 커밋
+
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - 헬퍼 함수 추가"
+```
+
+---
+
+## Task 2: 캐시 체크를 4-way 병렬로 교체
+
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (POST 함수 내부 캐시 체크 부분)
+
+현재 캐시 체크는 개인 캐시만 확인하고 순차적으로 처리된다. 이를 개인+팀 캐시를 병렬로 확인하도록 교체한다.
+
+### Step 1: 기존 캐시 체크 코드 교체
+
+**교체 전** (현재 코드 줄 33~77):
+```typescript
+// 1. 일지 존재 여부 확인
+const latestLog = await prisma.trainingLog.findFirst(...);
+if (!latestLog) { return 400; }
+
+// 2. KST dateOnly 계산
+
+// 3. 오늘 인사이트 존재 + 그 이후 새 일지 없으면 캐시 반환
+const existingToday = await prisma.aIInsight.findUnique(...);
+if (existingToday && latestLog.createdAt <= existingToday.createdAt) { ... }
+
+// 4. 새 데이터 없으면 마지막 인사이트 반환
+if (!existingToday) { const latestInsight = ...; if (...) { ... } }
+```
+
+**교체 후**:
+
+`userId = session.user.id;` 이후부터 `// 4. 데이터 수집 (병렬)` 이전까지의 블록 전체를 다음으로 교체한다:
+
+```typescript
     userId = session.user.id;
-    teamId = session.user.teamId;
+    const teamId = session.user.teamId;
 
     if (generatingUsers.has(userId)) {
       return NextResponse.json(
@@ -150,7 +196,33 @@ export async function POST() {
         cached: true,
       });
     }
+```
 
+### Step 2: 타입 체크
+
+```bash
+npx tsc --noEmit 2>&1 | head -20
+```
+
+### Step 3: 커밋
+
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - 4-way 캐시 체크 추가"
+```
+
+---
+
+## Task 3: 데이터 수집에 팀 분석용 7개 쿼리 추가
+
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (Promise.all 블록)
+
+### Step 1: 현재 `Promise.all` 블록 상단에서 `generatingUsers.add(userId)` 이후를 교체
+
+현재 코드 (줄 79~179) 전체를 다음으로 교체한다:
+
+```typescript
     // 데이터 수집 (병렬) — 여기서부터 OpenAI 호출까지 잠금
     const teamAlreadyGenerating = generatingTeams.has(teamId);
     generatingUsers.add(userId);
@@ -159,6 +231,7 @@ export async function POST() {
     }
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
     const [
       userInfo,
       myLogs,
@@ -311,8 +384,35 @@ export async function POST() {
         select: { scoringTeam: true, isOwnGoal: true, minute: true },
       }),
     ]);
+```
 
-    // 팀 분석 시스템 프롬프트
+### Step 2: 타입 체크
+
+```bash
+npx tsc --noEmit 2>&1 | head -30
+```
+
+에러 없으면 통과.
+
+### Step 3: 커밋
+
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - 팀 분석용 7개 쿼리 추가"
+```
+
+---
+
+## Task 4: 팀 시스템 프롬프트 + User Prompt 빌더 추가
+
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (프롬프트 구성 섹션)
+
+### Step 1: 기존 `// 5. 프롬프트 구성` 주석 바로 위에 상수 추가
+
+파일 내 `const systemPrompt = ...` 직전에 아래 상수를 추가한다:
+
+```typescript
     const TEAM_SYSTEM_PROMPT = `당신은 한국 아마추어 축구/풋살 팀의 팀 코치입니다.
 팀 전체 데이터를 분석해 팀의 현재 상태와 다음 훈련 방향을 제시합니다.
 
@@ -321,143 +421,57 @@ export async function POST() {
 - 정량 데이터(컨디션 수치, 출석률, 골 기록, RSVP 분포) + 정성 데이터(일지 키워드, MVP 이유, 칭찬 태그) 모두 활용
 - 보고가 아닌 처방: "~했다" 대신 "~해보자", "~이 필요하다"
 - 지각비 건수, RSVP NO_SHOW 비율 등으로 팀 헌신도(commitment) 언급
-- 특정 포지션의 문제를 언급할 때 다른 포지션이 어떻게 도울 수 있는지 함께 제시해라. 예: 공격이 침체되면 미드필더가 어떤 연결을 만들어야 하는지, 수비가 불안하면 공격수가 어떻게 압박 가담을 해야 하는지
 - 다음 훈련에서 팀 전체가 집중해야 할 과제 1-2개를 구체적으로 제시해라
 
 응답 형식:
 - ## 팀 현황 분석 으로 시작
 - 1000자 내외, 마크다운, 이모지 강조 용도
 - 반말 (팀원에게 직접 말하는 코치 톤)
-- 구조: 이번 주 팀 상태 요약(수치 기반) → 포지션 간 연결/상호보완 관점의 처방 → 다음 훈련 집중 과제
+- 구조: 이번 주 팀 상태 요약(수치 기반) → 주목할 포지션/패턴 → 다음 훈련 집중 과제
 - 한국어로 응답`;
+```
 
-    // 5. 프롬프트 구성
-    const systemPrompt = `당신은 한국 아마추어 축구/풋살 팀의 현장 코치입니다.
-선수 데이터를 바탕으로 "지금 이 선수에게 무엇을 시킬지"를 중심으로 코칭합니다.
+### Step 2: 기존 텍스트 포매팅 코드 이후에 팀 프롬프트 구성 코드 추가
 
-코칭 원칙:
-- 선수를 부를 때 이름 대신 등번호를 사용해라. 예: "30번 선수님은", "30번은". 등번호가 없으면 '너'로 통일해라
-- 보고하지 말고 지시해라: "컨디션이 낮았어" 대신 "이렇게 해봐"
-- 데이터에서 패턴을 찾아 개인화된 처방을 내려라
-- 이론 기반: 주기화(periodization), 자기결정이론(SDT), 성장형 마인드셋 적용
-- 강점은 더 강화하고, 약점은 실행 가능한 작은 과제로 쪼개라
-- 과거 코칭 기록이 있으면 반드시 참조해, 그때와 지금을 비교하고 아직 안 된 과제는 다시 강조해
-- 단기(이번 훈련)와 장기(이번 달) 목표를 동시에 제시해라
-- RSVP 패턴이 있으면 참석 의향 vs 실제 참석을 비교해 헌신도(commitment)를 짚어라
+기존 `const rsvpText = ...` 블록 바로 뒤에 다음을 추가한다:
 
-응답 형식:
-- 마크다운 형식, 이모지를 섹션 레이블이 아닌 강조 용도로 활용
-- 섹션 헤더(##) 없이 코치가 선수에게 직접 말하는 흐르는 텍스트
-- 반말 (친근한 코칭 톤)
-- 1000~1500자 내외
-- 구조: 핵심 발견(데이터 기반, 2-3문장) → 지금 당장 실행 과제(1-2개, 매우 구체적) → 장기 성장 방향
-- 한국어로 응답`;
-
-    const myLogsText = myLogs
-      .map((log, i) => {
-        const date = log.trainingDate.toLocaleDateString("ko-KR");
-        const event = log.trainingEvent?.title || "";
-        return `${i + 1}. [${date}] 컨디션:${log.condition}/10 | 이유:"${log.conditionReason}" | 핵심:"${log.keyPoints}" | 개선:"${log.improvement}"${event ? ` | 훈련:${event}` : ""}`;
-      })
-      .join("\n");
-
-    const teamAvgCondition = teamLogs.length > 0
-      ? (teamLogs.reduce((sum, l) => sum + l.condition, 0) / teamLogs.length).toFixed(1)
-      : "없음";
-
-    const teamKeywords = teamLogs
-      .map((l) => l.keyPoints)
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 300);
-
-    const attendanceRate = totalEventCount > 0
-      ? ((myCheckInCount / totalEventCount) * 100).toFixed(0)
-      : "0";
-
-    const mvpReasonsText = myPomVotes.length > 0
-      ? myPomVotes.map((v) => `- "${v.reason}"`).join("\n")
-      : "없음";
-
-    const notesText = myLockerNotes.length > 0
-      ? myLockerNotes
-          .map((n) => {
-            const from = n.author?.name ?? "팀원";
-            const tags = (n.tags as string[])?.join(", ") || "";
-            return `- ${from}: "${n.content}"${tags ? ` [${tags}]` : ""}`;
-          })
-          .join("\n")
-      : "없음";
-
-    const eventsText = recentEvents
-      .map((e) => {
-        const date = e.date.toLocaleDateString("ko-KR");
-        const weather = e.weather && e.temperature !== null
-          ? `${e.weather} ${e.temperature}°C`
-          : "";
-        return `- [${date}] ${e.title || "훈련"} @ ${e.location} | 참여:${e._count.checkIns}명 | RSVP:${e._count.rsvps}명${weather ? ` | ${weather}` : ""}`;
-      })
-      .join("\n");
-
-    const pastInsightsText = pastInsights.length > 0
-      ? pastInsights
-          .map((ins) => `[${ins.dateOnly}]\n${ins.content}`)
-          .join("\n\n---\n\n")
-      : "없음";
-
-    const rsvpText = rsvpData.length > 0
-      ? rsvpData
-          .map((r) => {
-            const date = r.trainingEvent.date.toLocaleDateString("ko-KR");
-            return `- [${date}]: ${r.status}`;
-          })
-          .join("\n")
-      : "없음";
-
+```typescript
     // 팀 분석 데이터 포매팅
     const positionStatsText = calcPositionStats(teamLogs);
 
     const anonymizedTeamLogsText = anonymizeTeamLogs(teamLogs);
 
-    const teamMvpText =
-      teamMvpVotes.length > 0
-        ? teamMvpVotes
-            .map(
-              (v) =>
-                `- ${v.nominee.position?.toUpperCase() || "선수"}: "${v.reason}"${v.tags.length > 0 ? ` [${v.tags.join(", ")}]` : ""}`
-            )
-            .join("\n")
-        : "없음";
+    const teamMvpText = teamMvpVotes.length > 0
+      ? teamMvpVotes
+          .map((v) => `- ${v.nominee.position?.toUpperCase() || "선수"}: "${v.reason}"${(v.tags as string[]).length > 0 ? ` [${(v.tags as string[]).join(", ")}]` : ""}`)
+          .join("\n")
+      : "없음";
 
-    const matchResultsText =
-      recentMatches.length > 0
-        ? recentMatches
-            .map((m) => {
-              const date = m.date.toLocaleDateString("ko-KR");
-              return `- [${date}] vs ${m.opponentTeamName || "상대팀"}: ${m.teamAScore}-${m.teamBScore}`;
-            })
-            .join("\n")
-        : "없음";
+    const matchResultsText = recentMatches.length > 0
+      ? recentMatches
+          .map((m) => {
+            const date = m.date.toLocaleDateString("ko-KR");
+            return `- [${date}] vs ${m.opponentTeamName || "상대팀"}: ${m.teamAScore}-${m.teamBScore}`;
+          })
+          .join("\n")
+      : "없음";
 
-    const activeLoggerRate =
-      teamMemberCount > 0
-        ? `${activeLoggers.length}/${teamMemberCount}명 (${Math.round((activeLoggers.length / teamMemberCount) * 100)}%)`
-        : "없음";
+    const activeLoggerRate = teamMemberCount > 0
+      ? `${activeLoggers.length}/${teamMemberCount}명 (${Math.round((activeLoggers.length / teamMemberCount) * 100)}%)`
+      : "없음";
 
-    const rsvpDistText =
-      teamRsvpDistribution.length > 0
-        ? teamRsvpDistribution
-            .map((r) => `${r.status}: ${r._count.status}건`)
-            .join(" / ")
-        : "없음";
+    const rsvpDistText = teamRsvpDistribution.length > 0
+      ? teamRsvpDistribution
+          .map((r) => `${r.status}: ${r._count.status}건`)
+          .join(" / ")
+      : "없음";
 
     const teamTagFreqText = buildTeamTagFrequency(teamLockerTags);
 
     const ownGoals = recentGoals.filter((g) => g.isOwnGoal).length;
-    const goalsText =
-      recentGoals.length > 0
-        ? `총 ${recentGoals.length}골 (자책골 ${ownGoals}개)`
-        : "없음";
+    const goalsText = recentGoals.length > 0
+      ? `총 ${recentGoals.length}골 (자책골 ${ownGoals}개)`
+      : "없음";
 
     const teamUserPrompt = `## 팀 기본 현황
 - 팀 인원: ${teamMemberCount}명
@@ -492,49 +506,35 @@ ${eventsText || "없음"}
 위 데이터를 바탕으로, 팀 코치로서 팀원 전체에게 말하듯이 팀 현황 분석 리포트를 작성해줘.
 선수 이름은 절대 언급하지 말고, 포지션 익명 ID(FW1, MF2 등)만 사용해줘.
 다음 훈련에서 팀 전체가 집중해야 할 구체적인 과제를 포함해줘.`;
+```
 
-    const userPrompt = `## 선수 정보
-- 이름: ${userInfo?.name || "선수"}
-- 포지션: ${userInfo?.position || "미정"}
-- 등번호: ${userInfo?.number ?? "미정"}
+### Step 3: 타입 체크
 
-## 내 최근 훈련 일지 (${myLogs.length}개)
-${myLogsText || "없음"}
+```bash
+npx tsc --noEmit 2>&1 | head -30
+```
 
-## 내 통계
-- 출석률: ${attendanceRate}% (${myCheckInCount}/${totalEventCount} 이벤트 체크인)
-- MVP 득표: 총 ${myPomVotes.length}표
+### Step 4: 커밋
 
-## 나의 RSVP 패턴 (최근 ${rsvpData.length}개)
-${rsvpText}
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - 팀 프롬프트 빌더 추가"
+```
 
-## 팀원들이 나를 MVP로 뽑은 이유 (최근 ${myPomVotes.length}개)
-${mvpReasonsText}
+---
 
-## 팀원들의 칭찬 쪽지 (${myLockerNotes.length}개)
-${notesText}
+## Task 5: GPT 2회 병렬 호출 + 저장 + 반환 교체
 
-## 팀 현황
-- 팀 인원: ${teamMemberCount}명
-- 팀 평균 컨디션: ${teamAvgCondition}/10 (최근 30개 일지)
-- 팀 최근 핵심 키워드: ${teamKeywords || "없음"}
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (GPT 호출 ~ 반환 부분)
 
-## 최근 훈련 이벤트
-${eventsText || "없음"}
+### Step 1: 기존 `// 6. OpenAI 호출`부터 `generatingUsers.delete(userId)` 반환까지 전체 교체
 
-## 과거 코칭 기록 (최근 ${pastInsights.length}회)
-${pastInsightsText}
+현재 코드 (줄 299~338) 전체를 다음으로 교체한다:
 
-위 데이터를 바탕으로, 현장 코치로서 이 선수에게 직접 말하듯이 코칭 피드백을 작성해줘.
-단순 현황 보고가 아니라, 선수가 다음 훈련에서 바로 실행할 수 있는 구체적인 과제 중심으로 써줘.
-과거 코칭 기록이 있다면 그때와 지금을 비교해서 성장을 짚어주고, 아직 안 된 과제가 있으면 다시 강조해줘.`;
-
+```typescript
     // 6. GPT 2회 병렬 호출 (캐시 HIT인 경우 해당 호출 스킵)
     const teamFallbackContent = `## 팀 현황 분석\n\n팀 인사이트는 잠시 생성 중이야. 조금 있다가 다시 확인해봐.`;
-
-    let personalUsage: { promptTokens: number | null; completionTokens: number | null; model: string | null } = {
-      promptTokens: null, completionTokens: null, model: null,
-    };
 
     const [personalContent, teamContent] = await Promise.all([
       personalHit
@@ -549,23 +549,14 @@ ${pastInsightsText}
               max_tokens: 1800,
               temperature: 0.7,
             })
-            .then((r) => {
-              personalUsage = {
-                promptTokens: r.usage?.prompt_tokens ?? null,
-                completionTokens: r.usage?.completion_tokens ?? null,
-                model: r.model ?? "gpt-4o-mini",
-              };
-              return r.choices[0]?.message?.content ?? "";
-            }),
+            .then((r) => r.choices[0]?.message?.content ?? ""),
 
       teamHit
         ? Promise.resolve(teamCache!.content)
         : teamAlreadyGenerating
         ? Promise.resolve(teamFallbackContent)
         : teamLogs.length === 0
-        ? Promise.resolve(
-            `## 팀 현황 분석\n\n팀 훈련 일지가 아직 없어. 팀원들이 일지를 작성하면 팀 단위 분석을 시작할 수 있어.`
-          )
+        ? Promise.resolve(`## 팀 현황 분석\n\n팀 훈련 일지가 아직 없어. 팀원들이 일지를 작성하면 팀 단위 분석을 시작할 수 있어.`)
         : getOpenAI()
             .chat.completions.create({
               model: "gpt-4o-mini",
@@ -587,58 +578,78 @@ ${pastInsightsText}
     }
 
     // 7. 개인 + 팀 병렬 저장
-    const saveOps: Promise<unknown>[] = [];
-    if (!personalHit) {
-      saveOps.push(
+    await Promise.all([
+      !personalHit &&
         prisma.aIInsight.upsert({
           where: { userId_dateOnly: { userId, dateOnly } },
-          create: {
-            type: "PERSONAL",
-            content: personalContent,
-            userId,
-            dateOnly,
-            promptTokens: personalUsage.promptTokens,
-            completionTokens: personalUsage.completionTokens,
-            model: personalUsage.model,
-          },
-          update: {
-            content: personalContent,
-            createdAt: new Date(),
-            promptTokens: personalUsage.promptTokens,
-            completionTokens: personalUsage.completionTokens,
-          },
-        })
-      );
-    }
-    if (!teamHit && !teamAlreadyGenerating && teamLogs.length > 0) {
-      saveOps.push(
+          create: { type: "PERSONAL", content: personalContent, userId, dateOnly },
+          update: { content: personalContent, createdAt: new Date() },
+        }),
+      !teamHit &&
+        !teamAlreadyGenerating &&
+        teamLogs.length > 0 &&
         prisma.aIInsight.upsert({
           where: { teamId_dateOnly: { teamId, dateOnly } },
           create: { type: "TEAM", content: teamContent, teamId, dateOnly },
           update: { content: teamContent, createdAt: new Date() },
-        })
-      );
-    }
-    if (saveOps.length > 0) {
-      await Promise.all(saveOps);
-    }
+        }),
+    ].filter(Boolean));
 
     return NextResponse.json({
       insight: { content: mergeContent(personalContent, teamContent) },
       cached: false,
     });
+```
+
+### Step 2: 타입 체크
+
+```bash
+npx tsc --noEmit 2>&1 | head -30
+```
+
+### Step 3: 커밋
+
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - GPT 2회 병렬 호출 및 저장"
+```
+
+---
+
+## Task 6: finally 블록 + P2002 에러 핸들링
+
+**Files:**
+- Modify: `src/app/api/insights/unified/route.ts` (catch/finally 블록)
+
+### Step 1: 현재 catch 블록을 catch + finally로 교체
+
+현재 코드:
+```typescript
+  } catch (error) {
+    if (userId) generatingUsers.delete(userId);
+    console.error("인사이트 생성 실패:", error);
+    return NextResponse.json(
+      { error: "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요." },
+      { status: 500 }
+    );
+  }
+}
+```
+
+교체 후:
+```typescript
   } catch (error) {
     // P2002 — 크로스 인스턴스 경쟁으로 팀 캐시 중복 저장 시도
     // 이미 저장된 캐시를 재조회해서 반환
     const prismaError = error as { code?: string };
-    if (prismaError.code === "P2002" && userId && teamId) {
+    if (prismaError.code === "P2002" && userId && session?.user?.teamId) {
       try {
         const now2 = new Date();
         const kst2 = new Date(now2.getTime() + 9 * 60 * 60 * 1000);
         const dateOnly2 = `${kst2.getUTCFullYear()}-${String(kst2.getUTCMonth() + 1).padStart(2, "0")}-${String(kst2.getUTCDate()).padStart(2, "0")}`;
         const [p, t] = await Promise.all([
           prisma.aIInsight.findUnique({ where: { userId_dateOnly: { userId, dateOnly: dateOnly2 } } }),
-          prisma.aIInsight.findUnique({ where: { teamId_dateOnly: { teamId, dateOnly: dateOnly2 } } }),
+          prisma.aIInsight.findUnique({ where: { teamId_dateOnly: { teamId: session.user.teamId, dateOnly: dateOnly2 } } }),
         ]);
         if (p && t) {
           return NextResponse.json({
@@ -657,6 +668,81 @@ ${pastInsightsText}
     );
   } finally {
     if (userId) generatingUsers.delete(userId);
-    if (teamId) generatingTeams.delete(teamId);
+    if (session?.user?.teamId) generatingTeams.delete(session.user.teamId);
   }
 }
+```
+
+**주의**: `session` 변수가 finally 스코프에서 접근 가능하려면 `let session` 선언을 try 블록 밖으로 올려야 한다. `let userId`처럼 `let session: Awaited<ReturnType<typeof getServerSession>> | null = null;`을 함수 최상단에 선언하고 try 블록에서 `session = await getServerSession(authOptions);`로 할당한다.
+
+팀 ID를 finally에서 안전하게 접근하려면 `let teamId: string | undefined;`도 `userId`와 함께 함수 최상단에 선언한다.
+
+### Step 2: `let userId`, `let teamId`, `let session` 함수 상단 선언 확인
+
+함수 시작 부분을 다음과 같이 수정:
+
+```typescript
+export async function POST() {
+  let userId: string | undefined;
+  let teamId: string | undefined;
+  let session: Awaited<ReturnType<typeof getServerSession>> | null = null;
+  try {
+    session = await getServerSession(authOptions);
+    // ... 나머지
+```
+
+기존 `const teamId = session.user.teamId;` 라인을 `teamId = session.user.teamId;`로 변경 (let → 할당).
+
+### Step 3: 타입 체크
+
+```bash
+npx tsc --noEmit 2>&1 | head -30
+```
+
+### Step 4: 커밋
+
+```bash
+git add src/app/api/insights/unified/route.ts
+git commit -m "feat: AI 코치 팀 인사이트 - finally 블록 및 P2002 에러 핸들링"
+```
+
+---
+
+## Task 7: 로컬 검증
+
+### Step 1: 개발 서버 기동
+
+```bash
+npm run dev
+```
+
+### Step 2: AI 인사이트 캐시 초기화 (오늘 기록 삭제)
+
+로컬 DB에서 오늘 날짜의 AIInsight 레코드를 삭제해서 새로 생성되도록 한다:
+
+```bash
+npx prisma studio
+```
+
+Prisma Studio에서 `AIInsight` 테이블 열고 오늘 날짜(`dateOnly`) 레코드 삭제.
+
+### Step 3: API 직접 호출
+
+브라우저에서 로그인 후 개발자 도구 콘솔에서:
+
+```javascript
+const res = await fetch('/api/insights/unified', { method: 'POST' });
+const data = await res.json();
+console.log(data.insight.content);
+console.log('cached:', data.cached);
+```
+
+### Step 4: 검증 체크리스트
+
+- [ ] `content`에 `## 나의 코칭 피드백` 섹션 존재
+- [ ] `content`에 `## 팀 현황 분석` 섹션 존재
+- [ ] 팀 섹션에 한국 이름(홍길동 등)이 없고 FW1, MF2 같은 익명 ID만 있음
+- [ ] `cached: false` (첫 호출)
+- [ ] 2번째 호출 시 `cached: true`
+- [ ] AI 인사이트 모달 UI에서 두 섹션이 올바르게 렌더링됨 (헤더, 구분선)
+- [ ] TypeScript 빌드 에러 없음: `npm run build` 통과
