@@ -6,6 +6,8 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import BackButton from "@/components/BackButton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
+import { useAnalytics } from "@/lib/useAnalytics";
+import { usePWA } from "@/hooks/usePWA";
 
 const POSITIONS = [
   "감독",
@@ -27,7 +29,9 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams();
   const { update } = useSession();
   const { isSupported, subscribe } = usePushSubscription();
-  const [mode, setMode] = useState<"select" | "find" | "create" | "profile">("select");
+  const { capture } = useAnalytics();
+  const { isInstalled, installApp, deferredPrompt } = usePWA();
+  const [mode, setMode] = useState<"select" | "find" | "create" | "profile" | "install">("select");
 
   // 팀 찾기
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,6 +49,23 @@ export default function OnboardingPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // install 모드 상태
+  const [installStep, setInstallStep] = useState(0); // 0: 앱 설치, 1: 기능 소개
+  const [isIOS, setIsIOS] = useState(false);
+  const [teamNameDisplay, setTeamNameDisplay] = useState("");
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  useEffect(() => {
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+  }, []);
+
+  // 이미 설치된 경우 카드 1 자동 스킵
+  useEffect(() => {
+    if (mode === "install" && isInstalled) {
+      setInstallStep(1);
+    }
+  }, [mode, isInstalled]);
 
   // 온보딩 완료 후 푸시 알림 권한 요청 및 이동
   const completeOnboarding = async () => {
@@ -105,7 +126,10 @@ export default function OnboardingPage() {
         throw new Error(data.error || "팀 생성에 실패했습니다");
       }
 
+      const teamData = await res.json();
+      capture("team_created", { team_name: teamName, team_id: teamData?.id });
       await update();
+      setTeamNameDisplay(teamName);
       setMode("profile");
       setLoading(false);
     } catch (err) {
@@ -133,7 +157,9 @@ export default function OnboardingPage() {
         throw new Error(data.error || "팀 가입에 실패했습니다");
       }
 
+      capture("member_joined", { team_id: selectedTeam?.id, team_name: selectedTeam?.name });
       await update();
+      setTeamNameDisplay(selectedTeam?.name || "");
       setMode("profile");
       setLoading(false);
     } catch (err) {
@@ -162,7 +188,7 @@ export default function OnboardingPage() {
       }
 
       setLoading(false);
-      await completeOnboarding();
+      setMode("install");
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
       setLoading(false);
@@ -436,7 +462,7 @@ export default function OnboardingPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={completeOnboarding}
+                  onClick={() => setMode("install")}
                   disabled={loading}
                   className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
@@ -450,6 +476,172 @@ export default function OnboardingPage() {
                   {loading ? "저장 중..." : "저장하고 시작하기"}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 앱 설치 안내 + 기능 소개 */}
+        {mode === "install" && (
+          <div
+            className="bg-white rounded-2xl shadow-lg p-6 text-center"
+            onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchStart === null) return;
+              const diff = touchStart - e.changedTouches[0].clientX;
+              if (diff > 50 && installStep < 1) setInstallStep(1);
+              if (diff < -50 && installStep > 0) setInstallStep(0);
+              setTouchStart(null);
+            }}
+          >
+            <div className="transition-opacity duration-300 ease-in-out">
+              {/* 카드 1: 앱 설치 안내 */}
+              {installStep === 0 && (
+                <div>
+                  <div className="w-20 h-20 mx-auto mb-6 bg-team-50 rounded-full flex items-center justify-center">
+                    <span className="text-4xl">📱</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">홈 화면에 추가하면</h2>
+                  <p className="text-gray-500 mb-6">팀 소식을 바로 확인할 수 있어요</p>
+
+                  <div className="text-left space-y-3 mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-team-50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-lg">🔔</span>
+                      </div>
+                      <span className="text-sm text-gray-700">경기 일정 알림</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-team-50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-lg">⚡</span>
+                      </div>
+                      <span className="text-sm text-gray-700">팀원 훈련 일지 알림</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-team-50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-lg">🚀</span>
+                      </div>
+                      <span className="text-sm text-gray-700">앱처럼 빠르게 실행</span>
+                    </div>
+                  </div>
+
+                  {deferredPrompt ? (
+                    <>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const accepted = await installApp();
+                            if (accepted) setInstallStep(1);
+                          } catch {
+                            setInstallStep(1);
+                          }
+                        }}
+                        className="w-full py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors mb-3"
+                      >
+                        앱으로 설치하기
+                      </button>
+                      <button
+                        onClick={() => setInstallStep(1)}
+                        className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        나중에 할게요
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-left space-y-3 mb-6 bg-gray-50 rounded-xl p-4">
+                        <p className="text-sm font-semibold text-gray-700 mb-3">설치 방법</p>
+                        {isIOS ? (
+                          <>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                              <span className="text-sm text-gray-600">하단 공유 버튼 ⎋ 을 탭하세요</span>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                              <span className="text-sm text-gray-600">&lsquo;홈 화면에 추가&rsquo;를 선택하세요</span>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                              <span className="text-sm text-gray-600">오른쪽 상단 &lsquo;추가&rsquo;를 탭하세요</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                              <span className="text-sm text-gray-600">Chrome 메뉴 ⋮ 를 탭하세요</span>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                              <span className="text-sm text-gray-600">&lsquo;홈 화면에 추가&rsquo;를 선택하세요</span>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 bg-team-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                              <span className="text-sm text-gray-600">&lsquo;설치&rsquo;를 탭하세요</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setInstallStep(1)}
+                        className="w-full py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors"
+                      >
+                        다음
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 카드 2: 기능 소개 + 완료 */}
+              {installStep === 1 && (
+                <div>
+                  <div className="w-20 h-20 mx-auto mb-6 bg-team-50 rounded-full flex items-center justify-center">
+                    <span className="text-4xl">⚽</span>
+                  </div>
+
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">
+                    {teamNameDisplay ? `${teamNameDisplay} 라커룸에` : "라커룸에"}<br />
+                    오신 걸 환영합니다!
+                  </h2>
+                  <p className="text-gray-500 mb-6">이제 팀원들과 함께 시작해요</p>
+
+                  <div className="text-left space-y-3 mb-8">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📝</span>
+                      <span className="text-sm text-gray-700">훈련 일지를 남기고</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📸</span>
+                      <span className="text-sm text-gray-700">팀원들의 기록을 구경하고</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🏆</span>
+                      <span className="text-sm text-gray-700">MVP 투표에 참여하세요</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={completeOnboarding}
+                    className="w-full py-3 bg-team-500 text-white rounded-xl font-semibold hover:bg-team-600 transition-colors"
+                  >
+                    시작하기 →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 도트 인디케이터 */}
+            <div className="flex justify-center gap-2 mt-6">
+              {[0, 1].map((i) => (
+                <button
+                  key={i}
+                  onClick={() => setInstallStep(i)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    installStep === i ? "bg-team-500" : "bg-gray-300"
+                  }`}
+                />
+              ))}
             </div>
           </div>
         )}
