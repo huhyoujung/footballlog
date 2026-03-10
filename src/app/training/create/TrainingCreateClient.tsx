@@ -9,11 +9,13 @@ import TrainingEventForm, {
   type MemberOption,
   type TrainingEventFormData,
 } from "@/components/training/TrainingEventForm";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function TrainingCreateClient() {
   const router = useRouter();
+  const { capture } = useAnalytics();
 
   // 조끼 당번 추천 + 멤버 목록
   const { data: vestData, isLoading: vestLoading } = useSWR<{
@@ -45,6 +47,13 @@ export default function TrainingCreateClient() {
     }
 
     const event = await res.json();
+    capture("training_created", {
+      event_id: event.id,
+      is_friendly_match: event.isFriendlyMatch ?? false,
+    });
+    if (event.isFriendlyMatch && event.challengeToken) {
+      capture("challenge_sent", { event_id: event.id, challenge_token: event.challengeToken });
+    }
     // 신규 이벤트 생성 후 관련 목록 캐시 무효화
     await Promise.all([
       mutate(`/api/training-events/next`),

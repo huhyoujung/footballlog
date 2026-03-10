@@ -7,7 +7,7 @@ import { usePWA } from "@/hooks/usePWA";
 
 export default function PWAManager() {
   const { data: session } = useSession();
-  const { injectManifest, injectFavicon } = usePWA();
+  const { injectManifest, injectFavicon, injectThemeColor } = usePWA();
   const pathname = usePathname();
   const waitingWorkerRef = useRef<ServiceWorker | null>(null);
   const previousPathRef = useRef<string | null>(null);
@@ -146,6 +146,7 @@ export default function PWAManager() {
       });
 
       injectFavicon(teamLogo);
+      injectThemeColor(themeColor);
     };
 
     setupPWA();

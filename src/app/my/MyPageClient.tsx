@@ -13,6 +13,7 @@ import TeamMemberList from "@/components/TeamMemberList";
 import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import { withEulReul } from "@/lib/korean";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 interface Team {
   id: string;
@@ -37,6 +38,7 @@ interface MyPageClientProps {
 export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
   const { teamData, loading: teamLoading } = useTeam();
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
   const [selectedMember, setSelectedMember] = useState<{
     id: string;
     name: string | null;
@@ -70,7 +72,9 @@ export default function MyPageClient({ userId, isAdmin }: MyPageClientProps) {
       body: JSON.stringify({ recipientId, message }),
     })
       .then(async (res) => {
-        if (!res.ok) {
+        if (res.ok) {
+          capture("nudge_sent", { recipient_id: recipientId });
+        } else {
           // 실패 시 롤백
           setNudgedToday((prev) => {
             const next = new Set(prev);

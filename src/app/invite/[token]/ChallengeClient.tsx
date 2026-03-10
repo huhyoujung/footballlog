@@ -6,6 +6,7 @@ import { MapPin, Calendar, Clock, Shield, Footprints, Share2, Shirt, ChevronDown
 import dynamic from "next/dynamic";
 import MatchRulesBottomSheet from "@/components/training/MatchRulesBottomSheet";
 import type { MatchRulesPayload } from "@/components/training/MatchRulesBottomSheet";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 const ChallengeLiveMode = dynamic(() => import("./ChallengeLiveMode"), { ssr: false });
 
@@ -450,6 +451,7 @@ export default function ChallengeClient({
 }: Props) {
   const router = useRouter();
   const cardRef = useRef<HTMLDivElement>(null);
+  const { capture } = useAnalytics();
   const [submitting, setSubmitting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [error, setError] = useState("");
@@ -626,6 +628,10 @@ export default function ChallengeClient({
       const res = await fetch(`/api/challenge/${token}/accept`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
+        capture("challenge_accepted", {
+          challenge_token: token,
+          host_team_id: event?.team?.id,
+        });
         setAccepted(true);
         setTimeout(() => router.push(`/training/${data.opponentEventId}`), 1500);
       } else {

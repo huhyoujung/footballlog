@@ -1,0 +1,20 @@
+{
+  "title": "락커",
+  "profile": {
+    "title": "프로필",
+    "position": "포지션",
+    "number": "등번호",
+    "attendanceRate": "출석률",
+    "joinedAt": "가입일"
+  },
+  "notes": {
+    "title": "칭찬 쪽지",
+    "empty": "아직 쪽지가 없습니다",
+    "write": "쪽지 남기기",
+    "writePlaceholder": "칭찬 메시지를 작성하세요"
+  },
+  "logs": {
+    "title": "운동 일지",
+    "empty": "아직 운동 일지가 없습니다"
+  }
+}

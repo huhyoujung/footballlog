@@ -16,6 +16,7 @@ import PolaroidCard from "@/components/PolaroidCard";
 import type { TrainingLog, GroupedLogs } from "@/types/training";
 import { withEulReul } from "@/lib/korean";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 interface LockerNote {
   id: string;
@@ -74,6 +75,7 @@ export default function LockerClient({ userId }: { userId: string }) {
   const { mutate: globalMutate } = useSWRConfig();
   const { teamData } = useTeam(); // TeamContext 사용
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
   const [user, setUser] = useState<User | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -205,6 +207,7 @@ export default function LockerClient({ userId }: { userId: string }) {
       });
 
       if (res.ok) {
+        capture("nudge_sent", { recipient_id: userId });
         showToast(`${withEulReul(user.name || "팀원")} 닦달했어요! 🔥`);
         setNudgedToday((prev) => new Set(prev).add(userId));
       } else {
@@ -247,6 +250,11 @@ export default function LockerClient({ userId }: { userId: string }) {
       });
 
       if (res.ok) {
+        capture("locker_note_sent", {
+          recipient_id: userId,
+          has_tags: selectedTags.length > 0,
+          has_activity: !!selectedActivityId,
+        });
         showToast("쪽지를 남겼습니다!");
         setNoteContent("");
         setNoteColor(STICKY_COLORS[0].value);

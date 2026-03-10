@@ -138,6 +138,17 @@ export const usePWA = () => {
     appleIcon.href = logoUrl;
   }, []);
 
+  const injectThemeColor = useCallback((color: string) => {
+    // meta theme-color 태그 업데이트 — PC PWA 타이틀바 색상에 반영됨
+    let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    if (!meta) {
+      meta = document.createElement("meta") as HTMLMetaElement;
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = color;
+  }, []);
+
   function _isInstalled(): boolean {
     // Standalone 모드로 실행 중인지 확인 (iOS Safari, Android Chrome)
     if (window.matchMedia("(display-mode: standalone)").matches) return true;
@@ -195,7 +206,9 @@ export const usePWA = () => {
     isInstalled,
     installApp,
     canInstall,
+    deferredPrompt,
     injectManifest,
     injectFavicon,
+    injectThemeColor,
   };
 };

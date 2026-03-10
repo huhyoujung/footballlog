@@ -1,0 +1,20 @@
+{
+  "title": "Locker",
+  "profile": {
+    "title": "Profile",
+    "position": "Position",
+    "number": "Number",
+    "attendanceRate": "Attendance",
+    "joinedAt": "Joined"
+  },
+  "notes": {
+    "title": "Compliment Notes",
+    "empty": "No notes yet",
+    "write": "Leave a Note",
+    "writePlaceholder": "Write a compliment message"
+  },
+  "logs": {
+    "title": "Training Logs",
+    "empty": "No training logs yet"
+  }
+}

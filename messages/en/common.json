@@ -1,0 +1,48 @@
+{
+  "appName": "Locker Room",
+  "appDescription": "Training log SNS for football teammates",
+  "appTagline": "Our story continues off the field",
+  "nav": {
+    "home": "Locker Room",
+    "write": "Write",
+    "myPage": "My Page"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "retry": "Retry",
+    "loading": "Loading...",
+    "submit": "Submit",
+    "search": "Search"
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "network": "A network error occurred",
+    "notFound": "Page not found"
+  },
+  "time": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{count}d ago",
+    "hoursAgo": "{count}h ago",
+    "minutesAgo": "{count}m ago",
+    "justNow": "Just now"
+  },
+  "footer": {
+    "logout": "Logout",
+    "contact": "Contact",
+    "version": "v{version}"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDescription": "Change the app display language"
+  }
+}

@@ -15,6 +15,7 @@ import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
 import MentionTextarea from "@/components/MentionTextarea";
 import dynamic from "next/dynamic";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 const AIInsightModal = dynamic(() => import("@/components/AIInsightModal"), { ssr: false });
 
@@ -89,6 +90,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
   const [editCommentMentions, setEditCommentMentions] = useState<string[]>([]);
   const [isInsightOpen, setIsInsightOpen] = useState(false);
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
 
   // SWR로 log 데이터 페칭
   const { data: log, isLoading, mutate } = useSWR<TrainingLog>(
@@ -136,6 +138,9 @@ export default function LogDetailClient({ logId }: { logId: string }) {
           },
           false
         );
+        if (data.liked) {
+          capture("log_liked", { log_id: logId, log_owner_id: log.user.id });
+        }
         showToast(data.liked ? "좋아요를 눌렀어요" : "좋아요를 취소했어요");
       } else {
         mutate(); // 롤백
@@ -177,6 +182,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
 
       if (res.ok) {
         const newComment = await res.json();
+        capture("comment_posted", { log_id: logId, log_owner_id: log.user.id });
         mutate({ ...log, comments: [...log.comments, newComment] }, false);
         setComment("");
         setCommentMentions([]);

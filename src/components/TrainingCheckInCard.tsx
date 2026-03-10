@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getTimeUntilEvent } from "@/lib/timeUntil";
 import { useSound } from "@/lib/useSound";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 interface TrainingEvent {
   id: string;
@@ -24,6 +25,7 @@ export default function TrainingCheckInCard({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const { playSound } = useSound();
+  const { capture } = useAnalytics();
 
   const { message } = getTimeUntilEvent(event.date);
 
@@ -49,7 +51,9 @@ export default function TrainingCheckInCard({
     // 백그라운드 API 호출 — 실패해도 페이지 이동은 완료됨
     fetch(`/api/training-events/${event.id}/check-in`, { method: "POST" })
       .then((res) => {
-        if (!res.ok) {
+        if (res.ok) {
+          capture("check_in_done", { event_id: event.id });
+        } else {
           // 드문 실패 케이스 — 체크인 안됨 (SWR 갱신 시 반영됨)
           console.warn("체크인 실패 — 서버에서 거부됨");
         }

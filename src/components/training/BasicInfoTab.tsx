@@ -10,6 +10,7 @@ import type { Session } from "next-auth";
 import PomVoting from "@/components/PomVoting";
 import { useTeam } from "@/contexts/TeamContext";
 import { useToast } from "@/lib/useToast";
+import { useAnalytics } from "@/lib/useAnalytics";
 import Toast from "@/components/Toast";
 import Image from "next/image";
 import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users, Cloud, Sun, Moon, CloudRain, CloudDrizzle, Snowflake, CloudLightning, CloudFog, Wind } from "lucide-react";
@@ -29,6 +30,7 @@ interface Props {
 export default function BasicInfoTab({ event, session, onRefresh }: Props) {
   const { teamData } = useTeam();
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
   const isAdmin = session?.user?.role === "ADMIN";
   const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(event.myRsvp);
   const [reason, setReason] = useState("");
@@ -201,6 +203,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         body: JSON.stringify({ status, reason: reason.trim() || null }),
       });
       if (res.ok) {
+        capture("rsvp_submitted", { event_id: event.id, status });
         const label = status === "ATTEND" ? "참석" : status === "ABSENT" ? "불참" : "늦참";
         showToast(`${label}으로 응답했습니다 ✓`);
         onRefresh();
@@ -225,6 +228,7 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
         method: "POST",
       });
       if (res.ok) {
+        capture("check_in_done", { event_id: event.id });
         onRefresh();
       } else {
         const data = await res.json();

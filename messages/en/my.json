@@ -1,0 +1,18 @@
+{
+  "title": "OURPAGE",
+  "menu": {
+    "teamTraining": "Team Training",
+    "teamTrainingDesc": "Upcoming & past sessions",
+    "myLocker": "My Locker",
+    "myLockerDesc": "Profile · Logs · Settings",
+    "manage": "Manage"
+  },
+  "feedback": {
+    "title": "💌 Send Feedback",
+    "description": "Help us make Locker Room better with your feedback"
+  },
+  "memberSheet": {
+    "viewLocker": "🗃️ View Locker",
+    "leaveNote": "💌 Leave a Compliment Note"
+  }
+}

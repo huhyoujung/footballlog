@@ -1,0 +1,25 @@
+{
+  "title": "Team Management",
+  "dashboard": "Dashboard",
+  "members": {
+    "title": "Members",
+    "invite": "Invite Member",
+    "remove": "Remove Member",
+    "changeRole": "Change Role"
+  },
+  "events": {
+    "title": "Training Events",
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "settings": {
+    "title": "Team Settings",
+    "teamColor": "Team Color",
+    "teamLogo": "Team Logo"
+  },
+  "manualCheckIn": {
+    "title": "Manual Check-in",
+    "description": "Manually manage member attendance"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "팀 관리",
+  "dashboard": "대시보드",
+  "members": {
+    "title": "팀원 관리",
+    "invite": "팀원 초대",
+    "remove": "팀원 제거",
+    "changeRole": "역할 변경"
+  },
+  "events": {
+    "title": "훈련 관리",
+    "create": "훈련 생성",
+    "edit": "훈련 수정",
+    "delete": "훈련 삭제"
+  },
+  "settings": {
+    "title": "팀 설정",
+    "teamColor": "팀 컬러",
+    "teamLogo": "팀 로고"
+  },
+  "manualCheckIn": {
+    "title": "수동 출석 체크",
+    "description": "팀원의 출석을 직접 관리합니다"
+  }
+}

@@ -8,6 +8,7 @@ import { useSWRConfig } from "swr";
 import { getPomVotingStatus, isPomVotingClosed } from "@/lib/pom";
 import { STAT_TAGS } from "@/lib/stat-tags";
 import MvpResultSheet from "./MvpResultSheet";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 interface User {
   id: string;
@@ -46,6 +47,7 @@ interface Props {
 
 export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVotesPerPerson, checkIns, teamName }: Props) {
   const { mutate: globalMutate } = useSWRConfig();
+  const { capture } = useAnalytics();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<PomResult[]>([]);
@@ -167,6 +169,10 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
       });
       if (res.ok) {
         const data = await res.json();
+        capture("pom_voted", {
+          event_id: eventId,
+          vote_count: nominees.length,
+        });
         setMyVotes(data.votes || []);
         setShowVoting(false);
         fetchPomData();

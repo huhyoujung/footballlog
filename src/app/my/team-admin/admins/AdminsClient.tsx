@@ -30,6 +30,10 @@ export default function AdminsClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [roleChangeNotice, setRoleChangeNotice] = useState<{
+    name: string;
+    newRole: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchTeam();
@@ -62,6 +66,7 @@ export default function AdminsClient() {
       });
 
       if (res.ok) {
+        const changedMember = team?.members.find((m) => m.id === userId);
         setTeam((prev) =>
           prev
             ? {
@@ -72,6 +77,10 @@ export default function AdminsClient() {
               }
             : null
         );
+        setRoleChangeNotice({
+          name: changedMember?.name || "해당 팀원",
+          newRole,
+        });
       }
     } catch (error) {
       console.error("역할 변경 실패:", error);
@@ -173,6 +182,25 @@ export default function AdminsClient() {
             )}
           </div>
         </div>
+
+        {roleChangeNotice && (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 relative">
+            <button
+              onClick={() => setRoleChangeNotice(null)}
+              className="absolute top-2 right-2 text-amber-400 hover:text-amber-600 p-1"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+            <p className="text-sm font-semibold text-amber-800 mb-1">
+              {roleChangeNotice.name}님이 {roleChangeNotice.newRole === "ADMIN" ? "운영진으로 지정" : "운영진에서 해제"}되었습니다
+            </p>
+            <p className="text-xs text-amber-600">
+              권한 반영을 위해 {roleChangeNotice.name}님에게 앱 새로고침을 안내해주세요
+            </p>
+          </div>
+        )}
 
         {error && (
           <p className="text-red-500 text-sm text-center mt-4">{error}</p>

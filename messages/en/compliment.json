@@ -1,0 +1,16 @@
+{
+  "title": "Compliments",
+  "pom": {
+    "title": "POM Vote",
+    "description": "Vote for today's MVP",
+    "vote": "Vote",
+    "voted": "Voted",
+    "result": "Results",
+    "winner": "🏆 Today's MVP"
+  },
+  "note": {
+    "title": "Compliment Notes",
+    "send": "Send Note",
+    "sent": "Note sent!"
+  }
+}

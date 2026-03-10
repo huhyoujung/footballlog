@@ -1,0 +1,39 @@
+{
+  "title": "훈련",
+  "checkIn": {
+    "title": "출석 체크",
+    "button": "출석하기",
+    "completed": "출석 완료",
+    "time": "{time} 출석"
+  },
+  "event": {
+    "upcoming": "예정된 훈련",
+    "past": "지난 훈련",
+    "noUpcoming": "예정된 훈련이 없습니다",
+    "rsvpCount": "{count}명 참석",
+    "detail": "훈련 상세"
+  },
+  "rsvp": {
+    "title": "참석 여부",
+    "attend": "참석",
+    "absent": "불참",
+    "late": "늦참",
+    "deadline": "응답 마감: {time}",
+    "change": "변경하기"
+  },
+  "weather": {
+    "temperature": "{temp}°",
+    "airQuality": "미세먼지",
+    "good": "좋음",
+    "moderate": "보통",
+    "unhealthy": "나쁨",
+    "veryUnhealthy": "매우 나쁨"
+  },
+  "quarter": {
+    "q1": "1쿼터",
+    "q2": "2쿼터",
+    "q3": "3쿼터",
+    "q4": "4쿼터",
+    "half": "전반/후반"
+  }
+}

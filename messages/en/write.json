@@ -1,0 +1,25 @@
+{
+  "title": "Write Training Log",
+  "editTitle": "Edit Training Log",
+  "form": {
+    "date": "Training Date",
+    "condition": "Condition",
+    "conditionReason": "Condition Reason",
+    "conditionReasonPlaceholder": "How was your condition today?",
+    "keyPoints": "Key Points",
+    "keyPointsPlaceholder": "What did you do well today?",
+    "improvement": "Improvement",
+    "improvementPlaceholder": "What can you improve next time?",
+    "image": "Photo",
+    "imageDescription": "Attach a training photo (optional)",
+    "submit": "Submit",
+    "submitting": "Saving..."
+  },
+  "condition": {
+    "1": "Very Bad",
+    "2": "Bad",
+    "3": "Average",
+    "4": "Good",
+    "5": "Very Good"
+  }
+}

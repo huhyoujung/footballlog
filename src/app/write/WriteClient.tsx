@@ -12,6 +12,7 @@ import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
 import { getConditionLevel, getConditionColor } from "@/lib/condition";
 import { compressImage } from "@/lib/compressImage";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 // 모달은 Lazy Loading (필요할 때만 로드)
 const ConditionPicker = lazy(() => import("@/components/ConditionPicker"));
@@ -88,6 +89,7 @@ function WritePageContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const isEditMode = !!editId;
+  const { capture } = useAnalytics();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -262,6 +264,14 @@ function WritePageContent() {
           throw new Error(data.error || "작성에 실패했습니다");
         }
 
+        const newLog = await res.json();
+        capture("log_written", {
+          log_id: newLog?.id,
+          log_type: formData.logType,
+          has_photo: !!imageFile,
+          has_event_link: !!formData.trainingEventId,
+          condition: formData.condition,
+        });
         // 첫 일지 작성 후 흔들기 힌트용 플래그
         sessionStorage.setItem("justSubmittedLog", "1");
         // 성공 토스트 표시 후 네비게이션

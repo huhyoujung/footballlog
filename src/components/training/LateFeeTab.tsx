@@ -64,13 +64,19 @@ export default function LateFeeTab({ eventId, eventDate, rsvps, checkIns, lateFe
       amounts[fee.userId] = fee.amount;
     });
 
-    // 지각자 및 미도착자 0원으로 초기화 (기존 값 없으면)
+    // 지각자, 미도착자, RSVP 늦참(정시 도착) 0원으로 초기화 (기존 값 없으면)
     const lateCheckIns = checkIns.filter((c) => c.isLate);
     const noShows = rsvps
       .filter((r) => r.status === "ATTEND" || r.status === "LATE")
       .filter((r) => !checkIns.some((c) => c.userId === r.userId));
+    const rsvpLateOnTime = rsvps
+      .filter((r) => r.status === "LATE")
+      .filter((r) => {
+        const ci = checkIns.find((c) => c.userId === r.userId);
+        return ci && !ci.isLate;
+      });
 
-    [...lateCheckIns, ...noShows].forEach((item) => {
+    [...lateCheckIns, ...noShows, ...rsvpLateOnTime].forEach((item) => {
       const userId = item.userId;
       if (!(userId in amounts)) {
         amounts[userId] = 0;
@@ -344,6 +350,7 @@ export default function LateFeeTab({ eventId, eventDate, rsvps, checkIns, lateFe
               const existingFee = lateFees.find((f) => f.userId === userId);
               const isLate = checkIn?.isLate;
               const isNoShow = !checkIn && rsvp;
+              const isRsvpLateOnTime = rsvp?.status === "LATE" && checkIn && !checkIn.isLate;
 
               // 로컬 상태에서 현재 상태 가져오기 (즉각 반응)
               const currentStatus = existingFee ? (localFeeStatus[existingFee.id] ?? existingFee.status) : null;
@@ -374,9 +381,9 @@ export default function LateFeeTab({ eventId, eventDate, rsvps, checkIns, lateFe
                         {user?.name || "이름 없음"}
                       </span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        isLate ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"
+                        isNoShow ? "bg-red-100 text-red-700" : isRsvpLateOnTime ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"
                       }`}>
-                        {isLate ? "지각" : "미도착"}
+                        {isNoShow ? "미도착" : isRsvpLateOnTime ? "늦참 신고" : "지각"}
                       </span>
                     </div>
                   </div>

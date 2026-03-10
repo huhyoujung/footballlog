@@ -46,13 +46,19 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  themeColor: "#1D4237",
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
+export async function generateViewport(): Promise<Viewport> {
+  // 세션에서 팀 색상을 가져와 theme-color에 반영 (PC PWA 타이틀바)
+  const session = await getServerSession(authOptions);
+  const themeColor = session?.user?.team?.primaryColor || "#1D4237";
+
+  return {
+    themeColor,
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -76,8 +82,8 @@ export default async function RootLayout({
       <body
         className="antialiased bg-gray-50 min-h-screen"
       >
-        <PostHogProvider>
-          <SessionProvider>
+        <SessionProvider>
+          <PostHogProvider>
             <SWRProvider>
               <TeamProvider>
                 <TeamColorProvider />
@@ -85,8 +91,8 @@ export default async function RootLayout({
                 {children}
               </TeamProvider>
             </SWRProvider>
-          </SessionProvider>
-        </PostHogProvider>
+          </PostHogProvider>
+        </SessionProvider>
         {/* 모달 전용 루트 - 모든 containing block 밖에 위치 */}
         <div id="modal-root"></div>
         {/* Google AdSense */}

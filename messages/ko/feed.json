@@ -1,0 +1,29 @@
+{
+  "title": "라커룸",
+  "emptyState": "아직 운동 일지가 없습니다",
+  "writeFirst": "첫 번째 운동 일지를 작성해보세요!",
+  "comments": "댓글",
+  "likes": "좋아요",
+  "commentCount": "{count}개",
+  "likeCount": "{count}개",
+  "nudge": {
+    "title": "{name} 닦달하기",
+    "limitDescription": "한 사람에게 하루에 한 번만 닦달할 수 있어요",
+    "messagePlaceholder": "닦달 메시지를 입력하세요 (선택)",
+    "button": "닦달하기",
+    "completed": "오늘 닦달 완료",
+    "success": "{name}을(를) 닦달했습니다! 👉",
+    "failed": "닦달에 실패했습니다"
+  },
+  "rsvp": {
+    "attend": "정참",
+    "absent": "불참",
+    "late": "늦참",
+    "noResponse": "미응답"
+  },
+  "ticker": {
+    "nudged": "{sender}님이 {recipient}님을 닦달했습니다 👉",
+    "mvp": "🏆 {name} MVP 선정!",
+    "note": "💌 {author}님이 {recipient}님에게 칭찬 쪽지를 남겼습니다"
+  }
+}

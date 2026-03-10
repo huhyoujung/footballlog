@@ -75,6 +75,20 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
     window.scrollTo(0, 0);
   }, [eventId]);
 
+  // 친선경기 IN_PROGRESS 리다이렉트: 렌더 안에서 window.location 직접 호출하면
+  // 히스토리 스택이 replace로 덮어씌워져 뒤로가기가 막히므로 useEffect로 처리
+  useEffect(() => {
+    if (!event) return;
+    if (event.isFriendlyMatch && event.matchStatus === "IN_PROGRESS") {
+      const challengeToken = event.challengeToken ?? event.linkedEvent?.challengeToken ?? null;
+      if (challengeToken) {
+        window.location.replace(`/invite/${challengeToken}`);
+      } else {
+        window.location.replace("/");
+      }
+    }
+  }, [event]);
+
   // loading.tsx와 동일한 스켈레톤 (이중 전환 방지)
   if (isLoading && !event) {
     return (
@@ -139,20 +153,14 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const isAdmin = session?.user?.role === "ADMIN";
   const opponentColor = event.opponentTeam?.primaryColor ?? "#374151";
 
-  // 친선경기 IN_PROGRESS: 도전장 링크로 리다이렉트 (골/카드 등 모든 기록이 호스트 이벤트에 집중)
+  // 친선경기 IN_PROGRESS: useEffect에서 리다이렉트 처리 (위 useEffect 참고)
+  // 렌더 중에는 로딩 UI만 표시
   if (event.isFriendlyMatch && event.matchStatus === "IN_PROGRESS") {
-    const challengeToken = event.challengeToken ?? event.linkedEvent?.challengeToken ?? null;
-    if (challengeToken) {
-      window.location.replace(`/invite/${challengeToken}`);
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <p className="text-gray-400 text-sm">경기 페이지로 이동 중...</p>
-        </div>
-      );
-    }
-    // challengeToken 없는 경우 — 홈으로 리다이렉트
-    window.location.replace("/");
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">경기 페이지로 이동 중...</p>
+      </div>
+    );
   }
 
   const handleShare = async () => {

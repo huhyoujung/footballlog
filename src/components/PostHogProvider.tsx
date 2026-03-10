@@ -3,6 +3,23 @@
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+
+function PostHogIdentifier() {
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    posthog.identify(session.user.id, {
+      team_id: session.user.teamId ?? null,
+      role: session.user.role ?? null,
+      name: session.user.name ?? null,
+    });
+  }, [session?.user?.id, session?.user?.teamId, session?.user?.role]);
+
+  return null;
+}
 
 export default function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -14,5 +31,10 @@ export default function PostHogProvider({ children }: { children: React.ReactNod
     });
   }, []);
 
-  return <PHProvider client={posthog}>{children}</PHProvider>;
+  return (
+    <PHProvider client={posthog}>
+      <PostHogIdentifier />
+      {children}
+    </PHProvider>
+  );
 }

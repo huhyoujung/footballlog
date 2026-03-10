@@ -1,0 +1,25 @@
+{
+  "title": "운동 일지 작성",
+  "editTitle": "운동 일지 수정",
+  "form": {
+    "date": "운동 날짜",
+    "condition": "컨디션",
+    "conditionReason": "컨디션 이유",
+    "conditionReasonPlaceholder": "오늘 컨디션은 어땠나요?",
+    "keyPoints": "잘한 점",
+    "keyPointsPlaceholder": "오늘 잘한 점을 적어보세요",
+    "improvement": "개선할 점",
+    "improvementPlaceholder": "다음에 더 나아질 점을 적어보세요",
+    "image": "사진 첨부",
+    "imageDescription": "운동 사진을 첨부해보세요 (선택)",
+    "submit": "작성 완료",
+    "submitting": "저장 중..."
+  },
+  "condition": {
+    "1": "매우 나쁨",
+    "2": "나쁨",
+    "3": "보통",
+    "4": "좋음",
+    "5": "매우 좋음"
+  }
+}

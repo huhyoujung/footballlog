@@ -1,0 +1,18 @@
+{
+  "title": "OURPAGE",
+  "menu": {
+    "teamTraining": "팀 운동",
+    "teamTrainingDesc": "예정 · 지난 운동 보기",
+    "myLocker": "내 락커",
+    "myLockerDesc": "프로필 · 일지 · 설정",
+    "manage": "관리"
+  },
+  "feedback": {
+    "title": "💌 피드백 보내기",
+    "description": "피드백으로 더 유용하고 즐거운 락커룸을 만들어주세요"
+  },
+  "memberSheet": {
+    "viewLocker": "🗃️ 락커 보기",
+    "leaveNote": "💌 칭찬 쪽지 놓고 오기"
+  }
+}

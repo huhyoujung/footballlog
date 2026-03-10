@@ -1,0 +1,29 @@
+{
+  "title": "Locker Room",
+  "emptyState": "No training logs yet",
+  "writeFirst": "Write your first training log!",
+  "comments": "Comments",
+  "likes": "Likes",
+  "commentCount": "{count}",
+  "likeCount": "{count}",
+  "nudge": {
+    "title": "Nudge {name}",
+    "limitDescription": "You can only nudge someone once a day",
+    "messagePlaceholder": "Enter a nudge message (optional)",
+    "button": "Nudge",
+    "completed": "Already nudged today",
+    "success": "Nudged {name}! 👉",
+    "failed": "Failed to nudge"
+  },
+  "rsvp": {
+    "attend": "Attending",
+    "absent": "Absent",
+    "late": "Late",
+    "noResponse": "No Response"
+  },
+  "ticker": {
+    "nudged": "{sender} nudged {recipient} 👉",
+    "mvp": "🏆 {name} selected as MVP!",
+    "note": "💌 {author} left a compliment note for {recipient}"
+  }
+}

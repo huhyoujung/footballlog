@@ -1,0 +1,16 @@
+{
+  "title": "칭찬",
+  "pom": {
+    "title": "POM 투표",
+    "description": "오늘의 MVP를 투표하세요",
+    "vote": "투표하기",
+    "voted": "투표 완료",
+    "result": "투표 결과",
+    "winner": "🏆 오늘의 MVP"
+  },
+  "note": {
+    "title": "칭찬 쪽지",
+    "send": "쪽지 보내기",
+    "sent": "쪽지를 보냈습니다!"
+  }
+}
