@@ -105,22 +105,15 @@ export default function OpenAppClient({
         </button>
 
         {device !== "pc" && (
-          <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-            <p className="text-sm text-white/80 font-medium mb-2 text-center">
-              앱을 아직 설치하지 않으셨나요?
-            </p>
-            <p className="text-xs text-white/60 text-center">
-              {device === "ios"
-                ? '하단 공유 버튼을 누르고 "홈 화면에 추가"를 선택하세요'
-                : '브라우저 메뉴에서 "홈 화면에 추가"를 선택하세요'}
-            </p>
+          <p className="text-xs text-white/50 text-center mt-5">
+            앱이 없으신가요?{" "}
             <button
               onClick={handleOpenBrowser}
-              className="mt-3 w-full text-xs text-white/70 underline underline-offset-2 text-center"
+              className="text-white/70 underline underline-offset-2"
             >
-              브라우저에서 열기
+              브라우저에서 열고 설치하기
             </button>
-          </div>
+          </p>
         )}
       </div>
 
