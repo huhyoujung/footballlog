@@ -72,8 +72,10 @@ export default function OnboardingPage() {
     // 푸시 알림 권한 요청 (비동기, 실패해도 계속 진행)
     if (isSupported) {
       try {
-        await subscribe();
+        const result = await subscribe();
+        capture("push_permission_responded", { granted: result?.success ?? false });
       } catch (error) {
+        capture("push_permission_responded", { granted: false });
         console.log("Push notification prompt skipped or denied");
       }
     }
@@ -130,6 +132,7 @@ export default function OnboardingPage() {
       capture("team_created", { team_name: teamName, team_id: teamData?.id });
       await update();
       setTeamNameDisplay(teamName);
+      capture("onboarding_step_viewed", { step: "profile" });
       setMode("profile");
       setLoading(false);
     } catch (err) {
@@ -160,6 +163,7 @@ export default function OnboardingPage() {
       capture("member_joined", { team_id: selectedTeam?.id, team_name: selectedTeam?.name });
       await update();
       setTeamNameDisplay(selectedTeam?.name || "");
+      capture("onboarding_step_viewed", { step: "profile" });
       setMode("profile");
       setLoading(false);
     } catch (err) {
@@ -188,6 +192,7 @@ export default function OnboardingPage() {
       }
 
       setLoading(false);
+      capture("onboarding_step_viewed", { step: "install" });
       setMode("install");
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");

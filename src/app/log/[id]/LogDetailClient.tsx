@@ -3,7 +3,7 @@
 import BackButton from "@/components/BackButton";
 import PageHeader from "@/components/PageHeader";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -102,6 +102,13 @@ export default function LogDetailClient({ logId }: { logId: string }) {
       dedupingInterval: 120000, // 2분 캐시 (댓글 등 실시간 변경 가능)
     }
   );
+
+  // 일지 조회 트래킹
+  useEffect(() => {
+    if (log) {
+      capture("log_viewed", { log_id: logId, log_owner_id: log.user.id });
+    }
+  }, [logId, !!log]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const teamMembers = teamData?.members || []; // 중복 API 호출 제거
   const isMyPost = log && session?.user?.id === log.user.id;
@@ -590,7 +597,7 @@ export default function LogDetailClient({ logId }: { logId: string }) {
         ) : (
           <div className="px-4 py-3">
             <button
-              onClick={() => setIsInsightOpen(true)}
+              onClick={() => { capture("ai_insight_opened", { log_id: logId }); setIsInsightOpen(true); }}
               className="w-full bg-gradient-to-r from-team-50 to-team-100 rounded-xl p-3.5 hover:from-team-100 hover:to-team-200 active:scale-[0.98] transition-all touch-manipulation text-left"
             >
               <div className="flex items-center justify-between">

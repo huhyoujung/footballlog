@@ -18,6 +18,7 @@ import { fetcher } from "@/lib/fetcher";
 import useSWR from "swr";
 import type { TrainingEventDetail } from "@/types/training-event";
 import { useToast } from "@/lib/useToast";
+import { useAnalytics } from "@/lib/useAnalytics";
 
 const LateFeeTab = lazy(() => import("@/components/training/LateFeeTab"));
 const SessionTab = lazy(() => import("@/components/training/SessionTab"));
@@ -37,6 +38,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
   const defaultDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [responseDeadlineDate, setResponseDeadlineDate] = useState(defaultDeadline);
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
   const [quarterCount, setQuarterCount] = useState(4);
   const [quarterMinutes, setQuarterMinutes] = useState(20);
   const [quarterBreak, setQuarterBreak] = useState(5);
@@ -70,6 +72,13 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
       dedupingInterval: 10000,
     }
   );
+
+  // 훈련 상세 조회 트래킹
+  useEffect(() => {
+    if (event) {
+      capture("training_viewed", { event_id: eventId });
+    }
+  }, [eventId, !!event]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -188,6 +197,7 @@ export default function TrainingDetailClient({ eventId }: { eventId: string }) {
 
     try {
       await navigator.clipboard.writeText(shareText);
+      capture("share_clicked", { event_id: eventId, content_type: "training" });
       showToast("운동 정보가 복사되었습니다!");
     } catch {
       showToast("복사에 실패했습니다");

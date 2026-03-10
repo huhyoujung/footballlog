@@ -45,6 +45,13 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
 
   useEffect(() => { setMounted(true); }, []);
 
+  // RSVP 섹션 노출 트래킹 (미응답 상태일 때)
+  useEffect(() => {
+    if (!event.myRsvp) {
+      capture("rsvp_viewed", { event_id: event.id });
+    }
+  }, [event.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const getMemberPhone = (userId: string) =>
     teamData?.members.find((m) => m.id === userId)?.phoneNumber ?? null;
 

@@ -462,6 +462,13 @@ export default function ChallengeClient({
   const [showReferee, setShowReferee] = useState(false);
   const [showRulesSheet, setShowRulesSheet] = useState(false);
 
+  // 초대 링크 조회 트래킹
+  useEffect(() => {
+    if (event) {
+      capture("invite_link_viewed", { event_id: event.id, token });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 토큰 없음 / 이벤트 없음
   if (!event) {
     return (

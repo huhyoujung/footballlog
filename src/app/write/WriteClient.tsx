@@ -141,6 +141,13 @@ function WritePageContent() {
   });
 
   // 편집 모드: 기존 데이터 로드
+  // 글쓰기 시작 트래킹
+  useEffect(() => {
+    if (!isEditMode) {
+      capture("log_write_started");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!editId) return;
 
@@ -196,6 +203,7 @@ function WritePageContent() {
       setCompressing(true);
       const compressed = await compressImage(file);
       setImageFile(compressed);
+      capture("photo_added", { original_size: file.size });
       setImagePreview(URL.createObjectURL(compressed));
     } catch {
       showToast("이미지 처리에 실패했습니다");

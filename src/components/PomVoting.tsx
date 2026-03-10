@@ -104,7 +104,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
         // 최초 확인 시에만 자동 오픈 (이미 본 경우 localStorage에 기록)
         const seenKey = `pom-result-seen-${eventId}`;
         if (isClosed && data.results.length > 0 && !localStorage.getItem(seenKey)) {
-          setShowResults(true);
+          { capture("pom_result_viewed", { event_id: eventId }); setShowResults(true); };
         }
       }
     } catch (error) {
@@ -233,7 +233,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
   if (isClosed && !hasVoted && totalVotes > 0) {
     return (
       <>
-        <ClosedResultsInline results={results} onShowDetails={() => setShowResults(true)} />
+        <ClosedResultsInline results={results} onShowDetails={() => { capture("pom_result_viewed", { event_id: eventId }); setShowResults(true); }} />
         {mounted && (
           <MvpResultSheet
             eventId={eventId}
@@ -325,7 +325,7 @@ export default function PomVoting({ eventId, eventDate, pomVotingDeadline, pomVo
               )}
               {isClosed && totalVotes > 0 && (
                 <button
-                  onClick={() => setShowResults(true)}
+                  onClick={() => { capture("pom_result_viewed", { event_id: eventId }); setShowResults(true); }}
                   className="flex-1 py-2 bg-team-500 text-white rounded-lg text-sm font-medium transition-colors touch-manipulation active:scale-[0.97]"
                 >
                   결과 보기 ({totalVotes}표)

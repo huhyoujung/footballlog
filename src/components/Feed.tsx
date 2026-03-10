@@ -16,6 +16,7 @@ import FeedSkeleton from "./FeedSkeleton";
 import { usePushSubscription } from "@/lib/usePushSubscription";
 import { useToast } from "@/lib/useToast";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAnalytics } from "@/lib/useAnalytics";
 import { timeAgo } from "@/lib/timeAgo";
 import { isCheckInPeriod } from "@/lib/timeUntil";
 import { fetcher } from "@/lib/fetcher";
@@ -102,6 +103,31 @@ export default function Feed() {
 
   const { isSupported, isSubscribed, subscribe } = usePushSubscription();
   const { toast, showToast, hideToast } = useToast();
+  const { capture } = useAnalytics();
+
+  // 피드 조회 트래킹
+  useEffect(() => {
+    capture("feed_viewed");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 피드 스크롤 깊이 트래킹 (25/50/75/100% 구간별 1회)
+  useEffect(() => {
+    const fired = new Set<number>();
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight <= 0) return;
+      const pct = Math.round((scrollTop / docHeight) * 100);
+      for (const threshold of [25, 50, 75, 100]) {
+        if (pct >= threshold && !fired.has(threshold)) {
+          fired.add(threshold);
+          capture("feed_scroll_depth", { depth: threshold });
+        }
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isAdmin = session?.user?.role === "ADMIN";
   const teamMembers: TeamMember[] = teamData?.members || [];

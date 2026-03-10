@@ -123,7 +123,8 @@ self.addEventListener('notificationclick', (event) => {
 
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  const rawUrl = event.notification.data?.url || '/';
+  const url = rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'from=notification';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

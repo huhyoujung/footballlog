@@ -5,6 +5,18 @@ import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 
+function NotificationClickTracker() {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("from") === "notification") {
+      posthog.capture("notification_clicked", { landing_url: url.pathname });
+      url.searchParams.delete("from");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+  return null;
+}
+
 function PostHogIdentifier() {
   const { data: session } = useSession();
 
@@ -34,6 +46,7 @@ export default function PostHogProvider({ children }: { children: React.ReactNod
   return (
     <PHProvider client={posthog}>
       <PostHogIdentifier />
+      <NotificationClickTracker />
       {children}
     </PHProvider>
   );

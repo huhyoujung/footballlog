@@ -92,6 +92,11 @@ export default function LockerClient({ userId }: { userId: string }) {
   const [statsOpen, setStatsOpen] = useState(false);
 
 
+  // 락커 조회 트래킹
+  useEffect(() => {
+    capture("locker_viewed", { profile_user_id: userId });
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // URL 쿼리 파라미터로 쪽지 모달 자동 열기
   useEffect(() => {
     const openNote = searchParams.get("openNote");
