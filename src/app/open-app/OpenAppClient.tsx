@@ -111,8 +111,8 @@ export default function OpenAppClient({
             </p>
             <p className="text-xs text-white/60 text-center">
               {device === "ios"
-                ? 'Safari 하단 공유 버튼(□↑)을 누르고 "홈 화면에 추가"를 선택하세요'
-                : 'Chrome 메뉴(⋮)를 누르고 "홈 화면에 추가"를 선택하세요'}
+                ? '하단 공유 버튼을 누르고 "홈 화면에 추가"를 선택하세요'
+                : '브라우저 메뉴에서 "홈 화면에 추가"를 선택하세요'}
             </p>
             <button
               onClick={handleOpenBrowser}
