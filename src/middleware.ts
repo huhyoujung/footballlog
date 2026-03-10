@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // 소셜 미디어 크롤러 User-Agent (OG 미리보기 생성용)
-const CRAWLER_UA_REGEX = /facebookexternalhit|Twitterbot|KakaoTalk|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot|bingbot|Googlebot|YandexBot|Applebot/i;
+// 주의: KakaoTalk 크롤러(kakaotalk-scrap)는 facebookexternalhit로 이미 매칭됨
+// KakaoTalk을 여기에 넣으면 인앱 브라우저까지 크롤러로 인식되므로 제외
+const CRAWLER_UA_REGEX = /facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot|bingbot|Googlebot|YandexBot|Applebot|kakaotalk-scrap/i;
 
 // 카카오톡/인스타/페이스북 등 인앱 브라우저 감지
 const IN_APP_BROWSER_REGEX = /KAKAOTALK|Instagram|FBAN|FBAV|NAVER|Line\//i;
