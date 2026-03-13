@@ -227,10 +227,10 @@ export async function POST() {
           _count: { select: { checkIns: true, rsvps: true } },
         },
       }),
-      // 내 체크인 수
-      prisma.checkIn.count({ where: { userId } }),
-      // 전체 이벤트 수
-      prisma.trainingEvent.count({ where: { teamId } }),
+      // 내 체크인 수 (과거 정기운동만)
+      prisma.checkIn.count({ where: { userId, trainingEvent: { isRegular: true, date: { lt: new Date() } } } }),
+      // 과거 정기운동 수
+      prisma.trainingEvent.count({ where: { teamId, isRegular: true, date: { lt: new Date() } } }),
       // 내가 받은 MVP 투표
       prisma.pomVote.findMany({
         where: { nomineeId: userId },
@@ -502,7 +502,7 @@ ${eventsText || "없음"}
 ${myLogsText || "없음"}
 
 ## 내 통계
-- 출석률: ${attendanceRate}% (${myCheckInCount}/${totalEventCount} 이벤트 체크인)
+- 출석률: ${attendanceRate}% (${myCheckInCount}/${totalEventCount} 정기운동 체크인)
 - MVP 득표: 총 ${myPomVotes.length}표
 
 ## 나의 RSVP 패턴 (최근 ${rsvpData.length}개)

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// 팀 출석률 조회 — 정참·늦참은 참여, 불참·노쇼는 미참여로 계산
+// 팀 출석률 조회 — 정기운동 대상, 실제 체크인 기록 기준
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,16 +12,30 @@ export async function GET() {
       return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
     }
 
-    // 팀의 정기운동 이벤트만 — 정참·늦참 RSVP만 포함
-    const events = await prisma.trainingEvent.findMany({
-      where: { teamId: session.user.teamId, isRegular: true },
-      include: {
-        rsvps: {
-          where: { status: { in: ["ATTEND", "LATE"] } },
-          select: { userId: true },
+    const now = new Date();
+
+    // 과거 정기운동 총 개수
+    const totalEvents = await prisma.trainingEvent.count({
+      where: { teamId: session.user.teamId, isRegular: true, date: { lt: now } },
+    });
+
+    // 과거 정기운동 체크인 데이터 한 번에 조회
+    const checkIns = await prisma.checkIn.findMany({
+      where: {
+        trainingEvent: {
+          teamId: session.user.teamId,
+          isRegular: true,
+          date: { lt: now },
         },
       },
+      select: { userId: true },
     });
+
+    // userId별 체크인 횟수 집계
+    const checkInsByUser = checkIns.reduce((acc, ci) => {
+      acc[ci.userId] = (acc[ci.userId] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     // 팀원 목록 조회
     const members = await prisma.user.findMany({
@@ -35,14 +49,9 @@ export async function GET() {
       },
     });
 
-    const totalEvents = events.length;
-
-    // 각 멤버별 출석률 계산 (정참+늦참 기준)
+    // 각 멤버별 출석률 계산 (체크인 기준)
     const attendanceRates = members.map((member) => {
-      const attendedCount = events.filter((event) =>
-        event.rsvps.some((r) => r.userId === member.id)
-      ).length;
-
+      const attendedCount = checkInsByUser[member.id] || 0;
       const rate = totalEvents > 0 ? Math.round((attendedCount / totalEvents) * 100) : 0;
 
       return {
