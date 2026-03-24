@@ -178,13 +178,19 @@ export async function GET() {
       return acc;
     }, {} as Record<string, number>);
 
-    // 각 멤버별 출석률 계산
-    const membersWithAttendance = user.team.members.map((member) => ({
-      ...member,
-      attendanceRate: totalEvents > 0
-        ? Math.round(((checkInsByUser[member.id] || 0) / totalEvents) * 100)
-        : 0,
-    }));
+    // 현재 유저의 역할 확인
+    const isAdmin = session.user.role === "ADMIN";
+
+    // 각 멤버별 출석률 계산 + 비운영진에게는 phoneNumber 제거
+    const membersWithAttendance = user.team.members.map((member) => {
+      const { phoneNumber, ...rest } = member;
+      return {
+        ...(isAdmin ? member : rest),
+        attendanceRate: totalEvents > 0
+          ? Math.round(((checkInsByUser[member.id] || 0) / totalEvents) * 100)
+          : 0,
+      };
+    });
 
     // 출석률 순으로 정렬 (높은 순)
     membersWithAttendance.sort((a, b) => b.attendanceRate - a.attendanceRate);
