@@ -58,7 +58,7 @@ export default function SWRProvider({
         errorRetryInterval: 1000,
         shouldRetryOnError: true,
         keepPreviousData: true,
-        fetcher: (url: string) => fetch(url).then((res) => res.json()),
+        fetcher: (url: string) => fetch(url, { cache: "no-store" }).then((res) => res.json()),
       }}
     >
       {children}

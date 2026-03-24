@@ -43,8 +43,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     {
       revalidateOnFocus: false, // 포커스 시 재검증 비활성화 (성능 개선)
       revalidateOnReconnect: true, // 네트워크 재연결 시 자동 갱신
-      dedupingInterval: 300000, // 5분 캐시
-      revalidateIfStale: false, // stale 데이터도 재검증 안 함 (필요시 수동 refetch)
+      dedupingInterval: 60000, // 1분 캐시 (localStorage 영속 캐시 고려하여 단축)
+      // revalidateIfStale: true (기본값) — localStorage 캐시 우선 표시 후 백그라운드 갱신
     }
   );
 
