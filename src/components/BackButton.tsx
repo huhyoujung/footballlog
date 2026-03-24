@@ -9,20 +9,7 @@ interface BackButtonProps {
 }
 
 export default function BackButton({ href, onClick }: BackButtonProps) {
-  const { back, push } = useViewTransitionRouter();
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (onClick) {
-      e.preventDefault();
-      onClick();
-    } else if (!href) {
-      e.preventDefault();
-      back();
-    } else {
-      e.preventDefault();
-      push(href);
-    }
-  };
+  const { back } = useViewTransitionRouter();
 
   // 더 큰 터치 영역 제공 (모바일 최적화 - 최소 48x48px)
   const className = "text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200 active:scale-95 min-w-[44px] h-10 inline-flex items-center justify-center touch-manipulation rounded-lg transition-[background-color,color,transform]";
@@ -33,16 +20,17 @@ export default function BackButton({ href, onClick }: BackButtonProps) {
     </svg>
   );
 
-  if (href) {
+  // href가 있으면 Link의 네이티브 네비게이션 사용 (prefetch + 즉각 반응)
+  if (href && !onClick) {
     return (
-      <Link href={href} className={className} onClick={handleClick}>
+      <Link href={href} className={className}>
         {content}
       </Link>
     );
   }
 
   return (
-    <button onClick={handleClick} className={className}>
+    <button onClick={onClick ?? back} className={className}>
       {content}
     </button>
   );

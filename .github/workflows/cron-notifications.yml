@@ -1,0 +1,22 @@
+name: Cron Notifications
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: MVP 알림
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/mvp-notification"
+
+      - name: 장비함 체크 알림
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/equipment-check-notification"

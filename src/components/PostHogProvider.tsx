@@ -2,7 +2,7 @@
 
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 
 function NotificationClickTracker() {
@@ -34,14 +34,22 @@ function PostHogIdentifier() {
 }
 
 export default function PostHogProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+  const initialized = useRef(false);
+
+  if (!initialized.current && typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
       person_profiles: "identified_only",
       capture_pageview: true,
       capture_pageleave: true,
+      loaded: (ph) => {
+        if (process.env.NODE_ENV === "development") {
+          console.log("[PostHog] Initialized successfully", ph.get_distinct_id());
+        }
+      },
     });
-  }, []);
+    initialized.current = true;
+  }
 
   return (
     <PHProvider client={posthog}>

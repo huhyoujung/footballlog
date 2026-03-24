@@ -16,8 +16,13 @@ export function useViewTransitionRouter() {
   );
 
   const back = useCallback(() => {
-    window.history.back();
-  }, []);
+    // 앱 내 히스토리가 없으면 홈으로 이동
+    if (window.history.length <= 1) {
+      router.push("/");
+    } else {
+      router.back();
+    }
+  }, [router]);
 
   return { push, back };
 }

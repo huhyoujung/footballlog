@@ -135,6 +135,84 @@
 - **구현 파일**: `src/app/api/training-events/[id]/rsvp/route.ts`
 - **특징**: 운영진이 실시간으로 참석 현황을 파악할 수 있음
 
+### 12. 🏆 MVP 선발 알림 (Cron)
+
+- **발송자**: 시스템 (GitHub Actions Cron, 10분 간격)
+- **수신자**:
+  - A) MVP 당선자 (득표 1위, 동률 시 공동 MVP)
+  - B) MVP에게 투표한 팀원 (적중 알림, MVP 본인 제외)
+- **조건**: MVP 투표 마감 시각(`pomVotingDeadline`) 경과 후
+- **내용**:
+  - MVP 당선: "🏆 오늘의 MVP는 당신!" / 공동: "🏆 공동 MVP!"
+  - 적중자: "👀 보는 눈이 있으시네요! {MVP이름}님이 오늘 MVP가 됐어요"
+- **이동**: `/training/{eventId}`
+- **API**: `GET /api/cron/mvp-notification` (CRON_SECRET 인증)
+- **구현 파일**: `src/app/api/cron/mvp-notification/route.ts`
+- **특징**: `pomPushSentAt` 필드로 중복 발송 방지 (원자적 check-and-set)
+
+### 13. 🏆 MVP 선발 알림 (Lazy Trigger)
+
+- **발송자**: 시스템 (투표 결과 조회 시 자동)
+- **수신자**: #12와 동일 (MVP 당선자 + 적중자)
+- **조건**: 투표 마감 후 누군가 결과 페이지를 처음 조회할 때
+- **내용**: #12와 동일
+- **이동**: `/training/{eventId}`
+- **API**: `GET /api/training-events/{id}/pom`
+- **구현 파일**: `src/app/api/training-events/[id]/pom/route.ts`
+- **특징**:
+  - Cron과 같은 `pomPushSentAt` 필드를 사용해 중복 발송 방지
+  - Cron보다 먼저 트리거될 수 있음 (팀원이 결과를 보러 들어온 경우)
+
+### 14. 📦 장비함 체크 알림
+
+- **발송자**: 시스템 (GitHub Actions Cron, 10분 간격)
+- **수신자**: 팀 장비 담당자 (`isEquipmentManager: true`)
+- **조건**: 운동 종료 시점 (MVP 투표 마감 or 운동 시작 +2시간)
+- **내용**: "📦 장비함 체크해주세요 - {운동명} 운동이 끝났어요!"
+- **이동**: `/training/{eventId}`
+- **API**: `GET /api/cron/equipment-check-notification` (CRON_SECRET 인증)
+- **구현 파일**: `src/app/api/cron/equipment-check-notification/route.ts`
+- **특징**:
+  - `equipmentCheckPushSentAt` 필드로 중복 발송 방지
+  - 배포 기준일(2026-02-23) 이전 이벤트는 무시 (알림 폭탄 방지)
+
+### 15. 🌤️ 날씨 알림
+
+- **발송자**: 시스템 (Vercel Cron, 매일 20시)
+- **수신자**: 내일 운동이 있는 팀 전체
+- **조건**: 내일 예정된 운동이 있고 날씨 데이터가 있을 때
+- **내용**: "내일 운동 날씨 - {운동명} · {날짜} · {날씨} · {기온} · {풍속} · {미세먼지}"
+- **이동**: `/training/{eventId}`
+- **API**: `GET /api/scheduled/weather-reminder` (CRON_SECRET 인증)
+- **구현 파일**: `src/app/api/scheduled/weather-reminder/route.ts`
+
+### 16. 💬 운동 댓글
+
+- **발송자**: 팀원
+- **수신자**: RSVP 불참자 제외한 팀원 전체 (댓글 작성자 본인 제외)
+- **조건**: 운동 상세 페이지에서 댓글 작성 시
+- **내용**: "💬 {운동명} 댓글 - {작성자}: {댓글 앞 50자}..."
+- **이동**: `/training/{eventId}`
+- **API**: `POST /api/training-events/{id}/comments`
+- **구현 파일**: `src/app/api/training-events/[id]/comments/route.ts`
+
+### 17. 📢 RSVP 독촉 (수동)
+
+- **발송자**: 운영진 (ADMIN)
+- **수신자**: RSVP 미응답 팀원
+- **조건**: 운영진이 수동으로 알림 버튼 클릭 시
+- **내용**:
+  - notify-rsvp: "📢 참석 여부 응답 요청 - {운동명} 참석 여부를 알려주세요"
+  - remind-rsvp: "⚽️ 참석 여부 응답 필요 - {운동명} (마감: {마감시간})"
+- **이동**: `/training/{eventId}`
+- **API**:
+  - `POST /api/training-events/{id}/notify-rsvp`
+  - `POST /api/training-events/{id}/remind-rsvp`
+- **구현 파일**:
+  - `src/app/api/training-events/[id]/notify-rsvp/route.ts`
+  - `src/app/api/training-events/[id]/remind-rsvp/route.ts`
+- **특징**: remind-rsvp는 마감 전에만 발송 가능
+
 ---
 
 ## 🎯 알림 우선순위
@@ -142,8 +220,8 @@
 | 우선순위 | 알림 종류 | 중요도 | 특징 |
 |---------|---------|-------|------|
 | 🔴 긴급 | RSVP 리마인더, 지각비 | 시간 제약 | 즉시 확인 필요 |
-| 🟡 중간 | 닦달, 팀 배정, 새 운동, 조끼 담당 | 참여 독려 | 당일 확인 권장 |
-| 🟢 일반 | 좋아요, 댓글, 일지 | 소셜 활동 | 시간 여유 |
+| 🟡 중간 | 닦달, 팀 배정, 새 운동, 조끼 담당, 장비함 체크, 날씨, RSVP 독촉 | 참여 독려 | 당일 확인 권장 |
+| 🟢 일반 | 좋아요, 댓글, 일지, 운동 댓글, MVP 선발 | 소셜 활동 | 시간 여유 |
 
 ---
 
@@ -176,6 +254,38 @@ await unsubscribe()
 - Hook: `src/lib/usePushSubscription.ts`
 - API: `src/app/api/push/subscribe/route.ts`
 - UI: `src/app/my/settings/page.tsx`
+
+---
+
+## ⏰ Cron Job 인프라
+
+### 발송 방식별 분류
+
+| 방식 | 알림 | 인프라 | 주기 |
+|------|------|--------|------|
+| **실시간 (API 호출 시)** | 닦달, 좋아요, 댓글, 일지, 태그/멘션, 팀 배정, 지각비, 새 운동, 조끼 담당, RSVP 응답, 운동 댓글, RSVP 독촉, MVP(lazy) | Vercel Serverless | 즉시 |
+| **Cron (GitHub Actions)** | MVP 선발, 장비함 체크 | GitHub Actions | 10분 간격 |
+| **Cron (Vercel)** | RSVP 리마인더, 날씨 알림 | Vercel Cron | 30분 / 1일 |
+
+### GitHub Actions Cron 설정
+
+- **워크플로우 파일**: `.github/workflows/cron-notifications.yml`
+- **스케줄**: `*/10 * * * *` (10분 간격)
+- **인증**: `Authorization: Bearer ${CRON_SECRET}` 헤더
+- **필요한 GitHub Secrets**:
+  - `CRON_SECRET`: API 엔드포인트 인증 토큰 (Vercel 환경변수와 동일 값)
+  - `APP_URL`: 프로덕션 URL (예: `https://yourdomain.com`)
+- **이관 사유**: Vercel Hobby 플랜은 일 1회 초과 크론 미지원 → 10분 간격 크론을 GitHub Actions로 이관
+
+### Vercel Cron 설정 (`vercel.json`)
+
+```json
+{
+  "crons": [
+    { "path": "/api/scheduled/weather-reminder", "schedule": "0 20 * * *" }
+  ]
+}
+```
 
 ---
 
@@ -433,7 +543,7 @@ console.error('[NUDGE] Push notification failed:', error);
 - [x] Service Worker 등록
 - [x] VAPID 키 생성 및 설정
 - [x] 푸시 구독/해제 API
-- [x] 10가지 알림 시나리오 구현
+- [x] 17가지 알림 시나리오 구현
 - [x] 만료 구독 자동 삭제
 - [x] 에러 핸들링 및 로깅
 
@@ -463,6 +573,6 @@ console.error('[NUDGE] Push notification failed:', error);
 
 ---
 
-**최종 수정일**: 2026-02-13
+**최종 수정일**: 2026-03-14
 **작성자**: Claude Sonnet 4.5
-**버전**: 1.1.0
+**버전**: 1.2.0

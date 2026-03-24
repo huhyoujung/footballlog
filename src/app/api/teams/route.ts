@@ -192,6 +192,8 @@ export async function GET() {
     return NextResponse.json({
       ...user.team,
       members: membersWithAttendance,
+    }, {
+      headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
     console.error("팀 조회 오류:", error);

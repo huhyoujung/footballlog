@@ -13,7 +13,7 @@ import { useToast } from "@/lib/useToast";
 import { useAnalytics } from "@/lib/useAnalytics";
 import Toast from "@/components/Toast";
 import Image from "next/image";
-import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users, Cloud, Sun, Moon, CloudRain, CloudDrizzle, Snowflake, CloudLightning, CloudFog, Wind } from "lucide-react";
+import { Clock, MapPin, Footprints, Shirt, MessageSquare, Package, Bell, Check, ChevronDown, Users, Cloud, Sun, Moon, CloudRain, CloudDrizzle, Snowflake, CloudLightning, CloudFog, Wind, Share2 } from "lucide-react";
 import useSWR from "swr";
 import { getAirQualityGrade, getWeatherRecommendations, getWeatherInKorean, getWeatherCardStyle, getWeatherIcon, getTimeOfDay, getUvGrade, getWindGrade } from "@/lib/weather";
 
@@ -289,6 +289,74 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
     }
   }, [event.id, onRefresh, showToast]);
 
+  const handleShareRsvp = useCallback(async () => {
+    const d = new Date(event.date);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+    const weekday = weekdays[d.getDay()];
+    const hour = d.getHours();
+    const minute = d.getMinutes();
+    const timeStr = minute > 0 ? `${hour}시 ${String(minute).padStart(2, "0")}분` : `${hour}시`;
+
+    // 조끼 세탁 순서 (vestOrder 기반으로 bringer부터 몇 명)
+    const vestOrderIds = teamData?.vestOrder || [];
+    const membersList = teamData?.members || [];
+    const getName = (id: string) => membersList.find((m) => m.id === id)?.name || "미정";
+    let vestLine = "";
+    if (event.vestBringer && vestOrderIds.length > 0) {
+      const bringerIdx = vestOrderIds.indexOf(event.vestBringer.id);
+      if (bringerIdx !== -1) {
+        const rotationNames: string[] = [];
+        const count = Math.min(4, vestOrderIds.length);
+        for (let i = 0; i < count; i++) {
+          const idx = (bringerIdx + i) % vestOrderIds.length;
+          const name = getName(vestOrderIds[idx]);
+          rotationNames.push(i === 0 ? `${name}(이번주)` : name);
+        }
+        vestLine = rotationNames.join(" → ");
+      } else {
+        vestLine = `${event.vestBringer.name || "미정"}(이번주)`;
+        if (event.vestReceiver) vestLine += ` → ${event.vestReceiver.name || "미정"}`;
+      }
+    } else if (event.vestBringer) {
+      vestLine = `${event.vestBringer.name || "미정"}(이번주)`;
+      if (event.vestReceiver) vestLine += ` → ${event.vestReceiver.name || "미정"}`;
+    }
+
+    const attendNames = attendees.map((r) => r.user.name || "?").join(", ");
+    const lateNames = lateComers.map((r) => r.user.name || "?").join(", ");
+
+    const lines: (string | null)[] = [
+      `[${event.title || "팀 운동"}]`,
+      "",
+      `🗓일시 : ${month}/${day}(${weekday}) ${timeStr} 집결`,
+      event.uniform ? `🥜유니폼 : ${event.uniform}` : null,
+      event.shoes.length > 0 ? `👟구장상태 : ${event.shoes.join(", ")}` : null,
+      `📍장소 : ${event.location}`,
+      "",
+      `👉정참(${attendees.length}명)`,
+      attendNames,
+    ];
+
+    if (lateComers.length > 0) {
+      lines.push("", `👉늦참(${lateComers.length}명)`, lateNames);
+    }
+
+    if (vestLine) {
+      lines.push("", `🦺조끼 세탁 순서`, vestLine);
+    }
+
+    const text = lines.filter((l) => l !== null).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+      capture("share_rsvp_result", { event_id: event.id });
+      showToast("참석 현황이 복사되었습니다!");
+    } catch {
+      showToast("복사에 실패했습니다");
+    }
+  }, [event, attendees, lateComers, teamData, showToast, capture]);
 
   return (
     <div className="space-y-3">
@@ -641,6 +709,15 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 </p>
               )}
             </div>
+            {isDeadlinePassed && attendees.length > 0 && (
+              <button
+                onClick={handleShareRsvp}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:text-team-600 hover:bg-team-50 rounded-lg transition-colors active:scale-95 touch-manipulation"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>공유</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1336,16 +1413,16 @@ export default function BasicInfoTab({ event, session, onRefresh }: Props) {
                 {selectedMember.phoneNumber ? (
                   <a
                     href={`tel:${selectedMember.phoneNumber}`}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 text-team-500"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-11 h-11 -ml-1.5 text-team-500"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.54 5.54l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
                   </a>
                 ) : (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 text-gray-300">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-11 h-11 -ml-1.5 text-gray-300">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 5.54 5.54l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
                   </div>
